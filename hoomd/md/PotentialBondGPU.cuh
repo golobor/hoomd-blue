@@ -180,13 +180,7 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
         dx.z = pos.z - neigh_pos.z;
 
         // apply periodic boundary conditions (FLOPS: 12)
-        {
-        Scalar3 dx_scalar = make_scalar3(Scalar(dx.x), Scalar(dx.y), Scalar(dx.z));
-        dx_scalar = box.minImage(dx_scalar);
-        dx.x = ForceReal(dx_scalar.x);
-        dx.y = ForceReal(dx_scalar.y);
-        dx.z = ForceReal(dx_scalar.z);
-        }
+        dx = box.minImageForceReal(dx);
 
         // get the bond parameters (MEM TRANSFER: 8 bytes)
         const typename evaluator::param_type* param;

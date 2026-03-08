@@ -195,10 +195,10 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
         }
 
     // initialize the force to 0
-    Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
-    Scalar virial[6];
+    ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
+    ForceReal virial[6];
     for (unsigned int i = 0; i < 6; i++)
-        virial[i] = Scalar(0.0);
+        virial[i] = ForceReal(0.0);
 
     if (active)
         {
@@ -208,12 +208,12 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
         // read in the position of our particle.
         // (MEM TRANSFER: 16 bytes)
         Scalar4 postypei = __ldg(d_pos + idx);
-        Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
+        ForceReal3 posi = make_forcereal3(ForceReal(postypei.x), ForceReal(postypei.y), ForceReal(postypei.z));
 
         // read in the velocity of our particle.
         // (MEM TRANSFER: 16 bytes)
         Scalar4 velmassi = __ldg(d_vel + idx);
-        Scalar3 veli = make_scalar3(velmassi.x, velmassi.y, velmassi.z);
+        ForceReal3 veli = make_forcereal3(ForceReal(velmassi.x), ForceReal(velmassi.y), ForceReal(velmassi.z));
 
         // prefetch neighbor index
         const size_t head_idx = d_head_list[idx];
@@ -238,30 +238,30 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
 
                 // get the neighbor's position (MEM TRANSFER: 16 bytes)
                 Scalar4 postypej = __ldg(d_pos + cur_j);
-                Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
+                ForceReal3 posj = make_forcereal3(ForceReal(postypej.x), ForceReal(postypej.y), ForceReal(postypej.z));
 
                 // get the neighbor's position (MEM TRANSFER: 16 bytes)
                 Scalar4 velmassj = __ldg(d_vel + cur_j);
-                Scalar3 velj = make_scalar3(velmassj.x, velmassj.y, velmassj.z);
+                ForceReal3 velj = make_forcereal3(ForceReal(velmassj.x), ForceReal(velmassj.y), ForceReal(velmassj.z));
 
                 // calculate dr (with periodic boundary conditions) (FLOPS: 3)
-                Scalar3 dx = posi - posj;
+                ForceReal3 dx = posi - posj;
 
                 // apply periodic boundary conditions: (FLOPS 12)
-                dx = box.minImage(dx);
+                dx = box.minImageForceReal(dx);
 
                 // calculate r squared (FLOPS: 5)
-                Scalar rsq = dot(dx, dx);
+                ForceReal rsq = dot(dx, dx);
 
                 // calculate dv (FLOPS: 3)
-                Scalar3 dv = veli - velj;
+                ForceReal3 dv = veli - velj;
 
-                Scalar rdotv = dot(dx, dv);
+                ForceReal rdotv = dot(dx, dv);
 
                 // access the per type pair parameters
                 unsigned int typpair
                     = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
-                Scalar rcutsq = s_rcutsq[typpair];
+                ForceReal rcutsq = ForceReal(s_rcutsq[typpair]);
                 typename evaluator::param_type& param = s_params[typpair];
 
                 // design specifies that energies are shifted if
@@ -271,8 +271,8 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
                 if (shift_mode == 1)
                     energy_shift = true;
 
-                evaluator eval(static_cast<ForceReal>(rsq),
-                               static_cast<ForceReal>(rcutsq),
+                evaluator eval(rsq,
+                               rcutsq,
                                param);
 
                 // evaluate the potential
@@ -285,7 +285,7 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
                 unsigned int tagj = __ldg(d_tag + cur_j);
                 eval.set_seed_ij_timestep(d_seed, tagi, tagj, d_timestep);
                 eval.setDeltaT(static_cast<ForceReal>(d_deltaT));
-                eval.setRDotV(static_cast<ForceReal>(rdotv));
+                eval.setRDotV(rdotv);
                 eval.setT(static_cast<ForceReal>(d_T));
 
                 eval.evalForceEnergyThermo(fr_force_divr,
@@ -293,14 +293,14 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
                                            fr_pair_eng,
                                            energy_shift);
 
-                Scalar force_divr = static_cast<Scalar>(fr_force_divr);
-                Scalar force_divr_cons = static_cast<Scalar>(fr_force_divr_cons);
-                Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
+                ForceReal force_divr = fr_force_divr;
+                ForceReal force_divr_cons = fr_force_divr_cons;
+                ForceReal pair_eng = fr_pair_eng;
 
                 // calculate the virial (FLOPS: 3)
                 if (compute_virial)
                     {
-                    Scalar force_div2r_cons = Scalar(0.5) * force_divr_cons;
+                    ForceReal force_div2r_cons = ForceReal(0.5) * force_divr_cons;
                     virial[0] += dx.x * dx.x * force_div2r_cons;
                     virial[1] += dx.x * dx.y * force_div2r_cons;
                     virial[2] += dx.x * dx.z * force_div2r_cons;
@@ -319,11 +319,11 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
             }
 
         // potential energy per particle must be halved
-        force.w *= Scalar(0.5);
+        force.w *= ForceReal(0.5);
         }
 
     // reduce force over threads in cta
-    hoomd::detail::WarpReduce<Scalar, tpp> reducer;
+    hoomd::detail::WarpReduce<ForceReal, tpp> reducer;
     force.x = reducer.Sum(force.x);
     force.y = reducer.Sum(force.y);
     force.z = reducer.Sum(force.z);
@@ -331,7 +331,7 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
 
     // now that the force calculation is complete, write out the result (MEM TRANSFER: 20 bytes)
     if (active && threadIdx.x % tpp == 0)
-        d_force[idx] = force;
+        d_force[idx] = make_scalar4(Scalar(force.x), Scalar(force.y), Scalar(force.z), Scalar(force.w));
 
     if (compute_virial)
         {
@@ -341,7 +341,7 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
         // if we are the first thread in the cta, write out virial to global mem
         if (active && threadIdx.x % tpp == 0)
             for (unsigned int i = 0; i < 6; i++)
-                d_virial[i * virial_pitch + idx] = virial[i];
+                d_virial[i * virial_pitch + idx] = Scalar(virial[i]);
         }
     }
 

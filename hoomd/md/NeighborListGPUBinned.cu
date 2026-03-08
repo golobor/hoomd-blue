@@ -84,8 +84,10 @@ __global__ void gpu_compute_nlist_binned_kernel(unsigned int* d_nlist,
     // shared data for per type pair parameters
     HIP_DYNAMIC_SHARED(unsigned char, s_data)
 
-    // pointer for the r_listsq data
-    Scalar* s_r_list = (Scalar*)(&s_data[0]);
+    // pointer for the r_listsq data (ForceReal for mixed-precision)
+    ForceReal* s_r_list = (ForceReal*)(&s_data[0]);
+
+    ForceReal r_buff_f = static_cast<ForceReal>(r_buff);
 
     if (enable_shared_cache)
         {
@@ -94,10 +96,10 @@ __global__ void gpu_compute_nlist_binned_kernel(unsigned int* d_nlist,
             {
             if (cur_offset + threadIdx.x < num_typ_parameters)
                 {
-                Scalar r_cut = d_r_cut[cur_offset + threadIdx.x];
+                ForceReal r_cut_f = static_cast<ForceReal>(d_r_cut[cur_offset + threadIdx.x]);
                 // force the r_list(i,j) to a skippable value if r_cut(i,j) is skippable
                 s_r_list[cur_offset + threadIdx.x]
-                    = (r_cut > Scalar(0.0)) ? r_cut + r_buff : Scalar(-1.0);
+                    = (r_cut_f > ForceReal(0.0)) ? r_cut_f + r_buff_f : ForceReal(-1.0);
                 }
             }
         __syncthreads();
@@ -113,13 +115,18 @@ __global__ void gpu_compute_nlist_binned_kernel(unsigned int* d_nlist,
         return;
 
     Scalar4 my_postype = d_pos[my_pidx];
-    Scalar3 my_pos = make_scalar3(my_postype.x, my_postype.y, my_postype.z);
+    // ForceReal3 position for distance computation (narrowed for speed)
+    ForceReal3 my_pos = make_forcereal3(ForceReal(my_postype.x),
+                                         ForceReal(my_postype.y),
+                                         ForceReal(my_postype.z));
 
     unsigned int my_type = __scalar_as_int(my_postype.w);
     unsigned int my_body = d_body[my_pidx];
     size_t my_head = d_head_list[my_pidx];
 
-    Scalar3 f = box.makeFraction(my_pos, ghost_width);
+    // Binning uses original Scalar precision (only executed once per particle)
+    Scalar3 f = box.makeFraction(make_scalar3(my_postype.x, my_postype.y, my_postype.z),
+                                 ghost_width);
 
     // find the bin each particle belongs in
     int ib = (int)(f.x * ci.getW());
@@ -207,7 +214,7 @@ __global__ void gpu_compute_nlist_binned_kernel(unsigned int* d_nlist,
             unsigned int neigh_type = cur_type_body.x;
 
             // Only do the hard work if the particle should be included by r_cut(i,j)
-            Scalar r_list;
+            ForceReal r_list;
 
             if (enable_shared_cache)
                 {
@@ -215,26 +222,28 @@ __global__ void gpu_compute_nlist_binned_kernel(unsigned int* d_nlist,
                 }
             else
                 {
-                Scalar r_cut = d_r_cut[typpair_idx(my_type, neigh_type)];
+                ForceReal r_cut_f = static_cast<ForceReal>(d_r_cut[typpair_idx(my_type, neigh_type)]);
                 // force the r_list(i,j) to a skippable value if r_cut(i,j) is skippable
-                r_list = (r_cut > Scalar(0.0)) ? r_cut + r_buff : Scalar(-1.0);
+                r_list = (r_cut_f > ForceReal(0.0)) ? r_cut_f + r_buff_f : ForceReal(-1.0);
                 }
 
-            if (r_list > Scalar(0.0))
+            if (r_list > ForceReal(0.0))
                 {
                 unsigned int neigh_body = cur_type_body.y;
 
-                Scalar3 neigh_pos = make_scalar3(cur_xyzf.x, cur_xyzf.y, cur_xyzf.z);
+                ForceReal3 neigh_pos = make_forcereal3(ForceReal(cur_xyzf.x),
+                                                        ForceReal(cur_xyzf.y),
+                                                        ForceReal(cur_xyzf.z));
                 int cur_neigh = __scalar_as_int(cur_xyzf.w);
 
                 // compute the distance between the two particles
-                Scalar3 dx = my_pos - neigh_pos;
+                ForceReal3 dx = my_pos - neigh_pos;
 
                 // wrap the periodic boundary conditions
-                dx = box.minImage(dx);
+                dx = box.minImageForceReal(dx);
 
                 // compute dr squared
-                Scalar drsq = dot(dx, dx);
+                ForceReal drsq = dot(dx, dx);
 
                 bool excluded = (my_pidx == cur_neigh);
 
@@ -326,7 +335,7 @@ inline void launcher(unsigned int* d_nlist,
     {
     // shared memory = r_listsq + Nmax + stuff needed for neighborlist (computed below)
     Index2D typpair_idx(ntypes);
-    unsigned int shared_size = (unsigned int)(sizeof(Scalar) * typpair_idx.getNumElements());
+    unsigned int shared_size = (unsigned int)(sizeof(ForceReal) * typpair_idx.getNumElements());
 
     bool enable_shared = true;
 
