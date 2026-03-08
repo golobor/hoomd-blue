@@ -595,6 +595,14 @@ class PYBIND11_EXPORT ParticleData
         return m_pos;
         }
 
+#ifdef HOOMD_MIXED_PRECISION
+    //! Return position corrections for mixed precision
+    const GPUArray<Scalar4>& getPositionCorrections() const
+        {
+        return m_pos_correction;
+        }
+#endif
+
     //! Return velocities and masses
     const GPUArray<Scalar4>& getVelocities() const
         {
@@ -1273,6 +1281,10 @@ class PYBIND11_EXPORT ParticleData
 
     // per-particle data
     GPUArray<Scalar4> m_pos;        //!< particle positions and types
+#ifdef HOOMD_MIXED_PRECISION
+    GPUArray<Scalar4> m_pos_correction; //!< position correction for mixed precision
+    GPUArray<Scalar4> m_pos_correction_alt; //!< position correction (swap-in)
+#endif
     GPUArray<Scalar4> m_vel;        //!< particle velocities and masses
     GPUArray<Scalar3> m_accel;      //!< particle accelerations
     GPUArray<Scalar> m_charge;      //!< particle charges

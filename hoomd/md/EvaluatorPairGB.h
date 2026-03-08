@@ -136,12 +136,13 @@ class EvaluatorPairGB
         \param _q_j Quaternion of j^th particle
         \param _params Per type pair parameters of this potential
     */
-    HOSTDEVICE EvaluatorPairGB(const Scalar3& _dr,
+    HOSTDEVICE EvaluatorPairGB(const ForceReal3& _dr,
                                const Scalar4& _qi,
                                const Scalar4& _qj,
-                               const Scalar _rcutsq,
+                               const ForceReal _rcutsq,
                                const param_type& _params)
-        : dr(_dr), rcutsq(_rcutsq), qi(_qi), qj(_qj), epsilon(_params.epsilon),
+        : dr(Scalar(_dr.x), Scalar(_dr.y), Scalar(_dr.z)),
+          rcutsq(Scalar(_rcutsq)), qi(_qi), qj(_qj), epsilon(_params.epsilon),
           lperp(_params.lperp), lpar(_params.lpar)
         {
         }
@@ -196,7 +197,23 @@ class EvaluatorPairGB
        exerted on the j^th particle. \return True if they are evaluated or false if they are not
        because we are beyond the cutoff.
     */
-    HOSTDEVICE bool evaluate(Scalar3& force,
+    HOSTDEVICE bool evaluate(ForceReal3& force,
+                             ForceReal& pair_eng,
+                             bool energy_shift,
+                             ForceReal3& torque_i,
+                             ForceReal3& torque_j)
+        {
+        Scalar3 force_s, torque_i_s, torque_j_s;
+        Scalar pair_eng_s;
+        bool ret = evaluate_scalar(force_s, pair_eng_s, energy_shift, torque_i_s, torque_j_s);
+        force = make_forcereal3(ForceReal(force_s.x), ForceReal(force_s.y), ForceReal(force_s.z));
+        pair_eng = ForceReal(pair_eng_s);
+        torque_i = make_forcereal3(ForceReal(torque_i_s.x), ForceReal(torque_i_s.y), ForceReal(torque_i_s.z));
+        torque_j = make_forcereal3(ForceReal(torque_j_s.x), ForceReal(torque_j_s.y), ForceReal(torque_j_s.z));
+        return ret;
+        }
+
+    HOSTDEVICE bool evaluate_scalar(Scalar3& force,
                              Scalar& pair_eng,
                              bool energy_shift,
                              Scalar3& torque_i,

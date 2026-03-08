@@ -68,7 +68,7 @@ class EvaluatorPairForceShiftedLJ
         \param _rcutsq Squared distance at which the potential and the force go to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairForceShiftedLJ(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairForceShiftedLJ(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), lj1(_params.epsilon_x_4 * _params.sigma_6 * _params.sigma_6),
           lj2(_params.epsilon_x_4 * _params.sigma_6)
         {
@@ -83,7 +83,7 @@ class EvaluatorPairForceShiftedLJ
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -94,29 +94,29 @@ class EvaluatorPairForceShiftedLJ
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r6inv = r2inv * r2inv * r2inv;
-            force_divr = r2inv * r6inv * (Scalar(12.0) * lj1 * r6inv - Scalar(6.0) * lj2);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r6inv = r2inv * r2inv * r2inv;
+            force_divr = r2inv * r6inv * (ForceReal(12.0) * lj1 * r6inv - ForceReal(6.0) * lj2);
 
             pair_eng = r6inv * (lj1 * r6inv - lj2);
 
-            Scalar rcut2inv = Scalar(1.0) / rcutsq;
-            Scalar rcut6inv = rcut2inv * rcut2inv * rcut2inv;
+            ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+            ForceReal rcut6inv = rcut2inv * rcut2inv * rcut2inv;
 
             if (energy_shift)
                 pair_eng -= rcut6inv * (lj1 * rcut6inv - lj2);
 
             // shift force and add linear term to potential
-            Scalar rcut_r_inv = fast::rsqrt(rsq * rcutsq);
-            Scalar force_rcut_at_rcut
-                = rcut6inv * (Scalar(12.0) * lj1 * rcut6inv - Scalar(6.0) * lj2);
+            ForceReal rcut_r_inv = fast::rsqrt(rsq * rcutsq);
+            ForceReal force_rcut_at_rcut
+                = rcut6inv * (ForceReal(12.0) * lj1 * rcut6inv - ForceReal(6.0) * lj2);
             force_divr -= rcut_r_inv * force_rcut_at_rcut;
-            pair_eng += (rsq * rcut_r_inv - Scalar(1.0)) * force_rcut_at_rcut;
+            pair_eng += (rsq * rcut_r_inv - ForceReal(1.0)) * force_rcut_at_rcut;
 
             return true;
             }
@@ -124,12 +124,12 @@ class EvaluatorPairForceShiftedLJ
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -150,10 +150,10 @@ class EvaluatorPairForceShiftedLJ
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar lj1;    //!< lj1 parameter extracted from the params passed to the constructor
-    Scalar lj2;    //!< lj2 parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal lj1;    //!< lj1 parameter extracted from the params passed to the constructor
+    ForceReal lj2;    //!< lj2 parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

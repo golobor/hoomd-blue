@@ -288,8 +288,8 @@ template<class evaluator> class PotentialPair : public ForceCompute
                     {
                     // rho is the number density
                     Scalar rho_j = m_num_particles_by_type[type_j] / volume;
-                    evaluator eval(Scalar(0.0),
-                                   h_rcutsq.data[m_typpair_idx(type_i, type_j)],
+                    evaluator eval(ForceReal(0.0),
+                                   static_cast<ForceReal>(h_rcutsq.data[m_typpair_idx(type_i, type_j)]),
                                    m_params[m_typpair_idx(type_i, type_j)]);
                     m_external_energy += Scalar(2.0) * m_num_particles_by_type[type_i] * M_PI
                                          * rho_j * eval.evalEnergyLRCIntegral();
@@ -315,8 +315,8 @@ template<class evaluator> class PotentialPair : public ForceCompute
                     for (unsigned int type_j = 0; type_j < m_pdata->getNTypes(); type_j++)
                         {
                         Scalar rho_j = m_num_particles_by_type[type_j] / volume;
-                        evaluator eval(Scalar(0.0),
-                                       h_rcutsq.data[m_typpair_idx(type_i, type_j)],
+                        evaluator eval(ForceReal(0.0),
+                                       static_cast<ForceReal>(h_rcutsq.data[m_typpair_idx(type_i, type_j)]),
                                        m_params[m_typpair_idx(type_i, type_j)]);
                         // The pressure LRC, where
                         // P = \frac{2 \cdot K_{trans} + W}{D \cdot  V}
@@ -673,13 +673,19 @@ template<class evaluator> void PotentialPair<evaluator>::computeForces(uint64_t 
                     }
 
                 // compute the force and potential energy
-                Scalar force_divr = Scalar(0.0);
-                Scalar pair_eng = Scalar(0.0);
-                evaluator eval(rsq, rcutsq, param);
+                ForceReal fr_force_divr = ForceReal(0.0);
+                ForceReal fr_pair_eng = ForceReal(0.0);
+                evaluator eval(static_cast<ForceReal>(rsq),
+                               static_cast<ForceReal>(rcutsq),
+                               param);
                 if (evaluator::needsCharge())
-                    eval.setCharge(qi, qj);
+                    eval.setCharge(static_cast<ForceReal>(qi),
+                                   static_cast<ForceReal>(qj));
 
-                bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, energy_shift);
+                bool evaluated
+                    = eval.evalForceAndEnergy(fr_force_divr, fr_pair_eng, energy_shift);
+                Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+                Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
 
                 if (evaluated)
                     {
@@ -919,13 +925,19 @@ inline void PotentialPair<evaluator>::computeEnergyBetweenSets(InputIterator fir
                 }
 
             // compute the force and potential energy
-            Scalar force_divr = Scalar(0.0);
-            Scalar pair_eng = Scalar(0.0);
-            evaluator eval(rsq, rcutsq, param);
+            ForceReal fr_force_divr = ForceReal(0.0);
+            ForceReal fr_pair_eng = ForceReal(0.0);
+            evaluator eval(static_cast<ForceReal>(rsq),
+                           static_cast<ForceReal>(rcutsq),
+                           param);
             if (evaluator::needsCharge())
-                eval.setCharge(qi, qj);
+                eval.setCharge(static_cast<ForceReal>(qi),
+                               static_cast<ForceReal>(qj));
 
-            bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, energy_shift);
+            bool evaluated
+                = eval.evalForceAndEnergy(fr_force_divr, fr_pair_eng, energy_shift);
+            Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+            Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
 
             if (evaluated)
                 {

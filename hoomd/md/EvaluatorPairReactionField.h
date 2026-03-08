@@ -49,7 +49,7 @@ class EvaluatorPairReactionField
     struct param_type
         {
         // potential parameters
-        Scalar eps, eps_rf;
+        ForceReal eps, eps_rf;
         bool use_charge;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
@@ -66,8 +66,8 @@ class EvaluatorPairReactionField
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            eps = v["epsilon"].cast<Scalar>();
-            eps_rf = v["eps_rf"].cast<Scalar>();
+            eps = v["epsilon"].cast<ForceReal>();
+            eps_rf = v["eps_rf"].cast<ForceReal>();
             use_charge = v["use_charge"].cast<bool>();
             }
 
@@ -88,7 +88,7 @@ class EvaluatorPairReactionField
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairReactionField(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairReactionField(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), epsilon(_params.eps), epsrf(_params.eps_rf),
           use_charge(_params.use_charge), qiqj(1.0)
         {
@@ -104,7 +104,7 @@ class EvaluatorPairReactionField
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj)
+    DEVICE void setCharge(ForceReal qi, ForceReal qj)
         {
         if (use_charge)
             qiqj = qi * qj;
@@ -119,29 +119,29 @@ class EvaluatorPairReactionField
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && epsilon != 0 && qiqj != 0)
             {
-            Scalar rcut3inv = fast::rsqrt(rcutsq) / rcutsq;
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r = Scalar(1.0) / rinv;
-            Scalar r2inv = Scalar(1.0) / rsq;
+            ForceReal rcut3inv = fast::rsqrt(rcutsq) / rcutsq;
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r = ForceReal(1.0) / rinv;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
 
-            Scalar eps_fac = (epsrf - Scalar(1.0)) / (Scalar(2.0) * epsrf + Scalar(1.0)) * rcut3inv;
-            if (epsrf == Scalar(0.0))
+            ForceReal eps_fac = (epsrf - ForceReal(1.0)) / (ForceReal(2.0) * epsrf + ForceReal(1.0)) * rcut3inv;
+            if (epsrf == ForceReal(0.0))
                 {
-                eps_fac = Scalar(1.0 / 2.0) * rcut3inv;
+                eps_fac = ForceReal(1.0 / 2.0) * rcut3inv;
                 }
 
-            force_divr = qiqj * epsilon * (r2inv * rinv - Scalar(2.0) * eps_fac);
+            force_divr = qiqj * epsilon * (r2inv * rinv - ForceReal(2.0) * eps_fac);
             pair_eng = qiqj * epsilon * (rinv + eps_fac * r * r);
 
             if (energy_shift)
                 {
-                Scalar rcutinv = fast::rsqrt(rcutsq);
-                Scalar rcut = Scalar(1.0) / rcutinv;
+                ForceReal rcutinv = fast::rsqrt(rcutsq);
+                ForceReal rcut = ForceReal(1.0) / rcutinv;
                 pair_eng -= qiqj * epsilon * (rcutinv + eps_fac * rcut * rcut);
                 }
             return true;
@@ -150,12 +150,12 @@ class EvaluatorPairReactionField
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -176,12 +176,12 @@ class EvaluatorPairReactionField
 #endif
 
     protected:
-    Scalar rsq;      //!< Stored rsq from the constructor
-    Scalar rcutsq;   //!< Stored rcutsq from the constructor
-    Scalar epsilon;  //!< epsilon parameter extracted from the params passed to the constructor
-    Scalar epsrf;    //!< epsilon_rf parameter extracted from the params passed to the constructor
+    ForceReal rsq;      //!< Stored rsq from the constructor
+    ForceReal rcutsq;   //!< Stored rcutsq from the constructor
+    ForceReal epsilon;  //!< epsilon parameter extracted from the params passed to the constructor
+    ForceReal epsrf;    //!< epsilon_rf parameter extracted from the params passed to the constructor
     bool use_charge; //!< True if we are using the particle charges
-    Scalar qiqj;     //!< Product of charges
+    ForceReal qiqj;     //!< Product of charges
     };
 
     } // end namespace md

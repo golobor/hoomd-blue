@@ -46,9 +46,9 @@ class EvaluatorPairWangFrenkel
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar prefactor;
-        Scalar sigma_pow_2m;
-        Scalar R_pow_2m;
+        ForceReal prefactor;
+        ForceReal sigma_pow_2m;
+        ForceReal R_pow_2m;
         int mu;
         int nu;
 
@@ -73,13 +73,13 @@ class EvaluatorPairWangFrenkel
             if (nu == 0 || mu == 0)
                 throw std::invalid_argument("Cannot set exponents nu or mu to zero");
 
-            Scalar epsilon = v["epsilon"].cast<Scalar>();
-            Scalar sigma = v["sigma"].cast<Scalar>();
-            Scalar sigma_sq = sigma * sigma;
-            Scalar rcut = v["R"].cast<Scalar>();
-            Scalar rcutsq = rcut * rcut;
-            Scalar left = (1 + 2 * nu) / (2 * nu * (fast::pow(rcutsq / sigma_sq, mu) - 1));
-            Scalar alpha = 2 * nu * fast::pow(rcutsq / sigma_sq, mu) * fast::pow(left, 2 * nu + 1);
+            ForceReal epsilon = v["epsilon"].cast<ForceReal>();
+            ForceReal sigma = v["sigma"].cast<ForceReal>();
+            ForceReal sigma_sq = sigma * sigma;
+            ForceReal rcut = v["R"].cast<ForceReal>();
+            ForceReal rcutsq = rcut * rcut;
+            ForceReal left = (1 + 2 * nu) / (2 * nu * (fast::pow(rcutsq / sigma_sq, mu) - 1));
+            ForceReal alpha = 2 * nu * fast::pow(rcutsq / sigma_sq, mu) * fast::pow(left, 2 * nu + 1);
 
             prefactor = epsilon * alpha;
             R_pow_2m = fast::pow(rcutsq, mu);
@@ -91,13 +91,13 @@ class EvaluatorPairWangFrenkel
             pybind11::dict v;
             v["mu"] = mu;
             v["nu"] = nu;
-            Scalar sigma = fast::pow(sigma_pow_2m, 1.0 / (2.0 * Scalar(mu)));
+            ForceReal sigma = fast::pow(sigma_pow_2m, 1.0 / (2.0 * ForceReal(mu)));
             v["sigma"] = sigma;
-            Scalar sigma_sq = sigma * sigma;
-            v["R"] = fast::pow(R_pow_2m, 1 / Scalar(2 * mu));
-            Scalar rcutsq = fast::pow(R_pow_2m, 1 / Scalar(mu));
-            Scalar left = (1 + 2 * nu) / (2 * nu * (fast::pow(rcutsq / sigma_sq, mu) - 1));
-            Scalar alpha = 2 * nu * fast::pow(rcutsq / sigma_sq, mu) * fast::pow(left, 2 * nu + 1);
+            ForceReal sigma_sq = sigma * sigma;
+            v["R"] = fast::pow(R_pow_2m, 1 / ForceReal(2 * mu));
+            ForceReal rcutsq = fast::pow(R_pow_2m, 1 / ForceReal(mu));
+            ForceReal left = (1 + 2 * nu) / (2 * nu * (fast::pow(rcutsq / sigma_sq, mu) - 1));
+            ForceReal alpha = 2 * nu * fast::pow(rcutsq / sigma_sq, mu) * fast::pow(left, 2 * nu + 1);
 
             v["epsilon"] = prefactor / alpha;
 
@@ -111,7 +111,7 @@ class EvaluatorPairWangFrenkel
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairWangFrenkel(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairWangFrenkel(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), prefactor(_params.prefactor),
           sigma_pow_2m(_params.sigma_pow_2m), R_pow_2m(_params.R_pow_2m), mu(_params.mu),
           nu(_params.nu)
@@ -127,7 +127,7 @@ class EvaluatorPairWangFrenkel
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -138,21 +138,21 @@ class EvaluatorPairWangFrenkel
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && prefactor != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar rinv_pow_2m = fast::pow(r2inv, mu);
-            Scalar sigma_over_r_pow_2m = sigma_pow_2m * rinv_pow_2m;
-            Scalar R_over_r_pow_2m = R_pow_2m * rinv_pow_2m;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal rinv_pow_2m = fast::pow(r2inv, mu);
+            ForceReal sigma_over_r_pow_2m = sigma_pow_2m * rinv_pow_2m;
+            ForceReal R_over_r_pow_2m = R_pow_2m * rinv_pow_2m;
 
-            Scalar sigma_term = sigma_over_r_pow_2m - 1;
-            Scalar R_term = R_over_r_pow_2m - 1;
+            ForceReal sigma_term = sigma_over_r_pow_2m - 1;
+            ForceReal R_term = R_over_r_pow_2m - 1;
 
-            Scalar R_term_2num1 = fast::pow(R_term, 2 * nu - 1);
-            Scalar R_term_2nu = R_term_2num1 * R_term;
+            ForceReal R_term_2num1 = fast::pow(R_term, 2 * nu - 1);
+            ForceReal R_term_2nu = R_term_2num1 * R_term;
 
             pair_eng = prefactor * sigma_term * R_term_2nu;
             force_divr = 2 * prefactor * mu * R_term_2num1
@@ -161,10 +161,10 @@ class EvaluatorPairWangFrenkel
 
             if (energy_shift)
                 {
-                Scalar rcinv_pow_2m = fast::pow(Scalar(1.0) / rcutsq, mu);
-                Scalar sigma_over_rc_pow_2m = sigma_pow_2m * rcinv_pow_2m;
-                Scalar R_over_rc_pow_2m = R_pow_2m * rcinv_pow_2m;
-                Scalar rc_R_term_2nu = fast::pow(R_over_rc_pow_2m - 1, 2 * nu);
+                ForceReal rcinv_pow_2m = fast::pow(ForceReal(1.0) / rcutsq, mu);
+                ForceReal sigma_over_rc_pow_2m = sigma_pow_2m * rcinv_pow_2m;
+                ForceReal R_over_rc_pow_2m = R_pow_2m * rcinv_pow_2m;
+                ForceReal rc_R_term_2nu = fast::pow(R_over_rc_pow_2m - 1, 2 * nu);
                 pair_eng -= prefactor * (sigma_over_rc_pow_2m - 1) * rc_R_term_2nu;
                 }
             return true;
@@ -173,12 +173,12 @@ class EvaluatorPairWangFrenkel
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -199,12 +199,12 @@ class EvaluatorPairWangFrenkel
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
 
-    Scalar prefactor;    //!< Prefactor (epsilon * alpha)
-    Scalar sigma_pow_2m; //!< sigma^(2m) stored
-    Scalar R_pow_2m;     //!< R^(2m) stored
+    ForceReal prefactor;    //!< Prefactor (epsilon * alpha)
+    ForceReal sigma_pow_2m; //!< sigma^(2m) stored
+    ForceReal R_pow_2m;     //!< R^(2m) stored
     unsigned int mu;     //!< mu exponent
     unsigned int nu;     //!< nu exponent
     };

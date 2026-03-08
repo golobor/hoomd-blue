@@ -45,8 +45,8 @@ class EvaluatorPairYukawa
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar epsilon;
-        Scalar kappa;
+        ForceReal epsilon;
+        ForceReal kappa;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -69,12 +69,12 @@ class EvaluatorPairYukawa
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            epsilon = v["epsilon"].cast<Scalar>();
-            kappa = v["kappa"].cast<Scalar>();
+            epsilon = v["epsilon"].cast<ForceReal>();
+            kappa = v["kappa"].cast<ForceReal>();
             }
 
         // this constructor facilitates unit testing
-        param_type(Scalar eps, Scalar kap, bool managed = false)
+        param_type(ForceReal eps, ForceReal kap, bool managed = false)
             {
             epsilon = eps;
             kappa = kap;
@@ -100,7 +100,7 @@ class EvaluatorPairYukawa
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairYukawa(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairYukawa(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), epsilon(_params.epsilon), kappa(_params.kappa)
         {
         }
@@ -114,7 +114,7 @@ class EvaluatorPairYukawa
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -125,24 +125,24 @@ class EvaluatorPairYukawa
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && epsilon != 0)
             {
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r = Scalar(1.0) / rinv;
-            Scalar r2inv = Scalar(1.0) / rsq;
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r = ForceReal(1.0) / rinv;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
 
-            Scalar exp_val = fast::exp(-kappa * r);
+            ForceReal exp_val = fast::exp(-kappa * r);
 
             force_divr = epsilon * exp_val * r2inv * (rinv + kappa);
             pair_eng = epsilon * exp_val * rinv;
 
             if (energy_shift)
                 {
-                Scalar rcutinv = fast::rsqrt(rcutsq);
-                Scalar rcut = Scalar(1.0) / rcutinv;
+                ForceReal rcutinv = fast::rsqrt(rcutsq);
+                ForceReal rcut = ForceReal(1.0) / rcutinv;
                 pair_eng -= epsilon * fast::exp(-kappa * rcut) * rcutinv;
                 }
             return true;
@@ -151,12 +151,12 @@ class EvaluatorPairYukawa
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -177,10 +177,10 @@ class EvaluatorPairYukawa
 #endif
 
     protected:
-    Scalar rsq;     //!< Stored rsq from the constructor
-    Scalar rcutsq;  //!< Stored rcutsq from the constructor
-    Scalar epsilon; //!< epsilon parameter extracted from the params passed to the constructor
-    Scalar kappa;   //!< kappa parameter extracted from the params passed to the constructor
+    ForceReal rsq;     //!< Stored rsq from the constructor
+    ForceReal rcutsq;  //!< Stored rcutsq from the constructor
+    ForceReal epsilon; //!< epsilon parameter extracted from the params passed to the constructor
+    ForceReal kappa;   //!< kappa parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

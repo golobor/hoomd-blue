@@ -107,19 +107,20 @@ class PatchEnvelope
          \param shape_i The patch location on the i^{th} particle
          \param shape_j The patch location on the j^{th} particle
     */
-    DEVICE PatchEnvelope(const Scalar3& _dr,
+    DEVICE PatchEnvelope(const ForceReal3& _dr,
                          const Scalar4& _q_i,
                          const Scalar4& _q_j,
-                         const Scalar _rcutsq,
+                         const ForceReal _rcutsq,
                          const param_type& _params,
                          const shape_type& shape_i,
                          const shape_type& shape_j)
-        : dr(_dr), params(_params), p_i(shape_i.m_norm_patch_local_dir),
+        : dr(_dr.x, _dr.y, _dr.z), params(_params),
+          p_i(shape_i.m_norm_patch_local_dir),
           p_j(shape_j.m_norm_patch_local_dir)
         {
         // compute current particle direction vectors
 
-        // rotate from particle to world frame
+        // rotate from particle to world frame — use LongReal for rotation accuracy
         vec3<LongReal> ex(1, 0, 0);
         vec3<LongReal> ey(0, 1, 0);
         vec3<LongReal> ez(0, 0, 1);
@@ -134,24 +135,33 @@ class PatchEnvelope
 #ifndef __HIPCC__
         auto R_i = rotmat3<LongReal>(q_i);
         auto R_j = rotmat3<LongReal>(q_j);
-        a1 = R_i * ex;
-        a2 = R_i * ey;
-        a3 = R_i * ez;
-        ni_world = R_i * (vec3<LongReal>)p_i;
-        b1 = R_j * ex;
-        b2 = R_j * ey;
-        b3 = R_j * ez;
-        nj_world = R_j * (vec3<LongReal>)p_j;
+        auto a1_lr = R_i * ex;
+        auto a2_lr = R_i * ey;
+        auto a3_lr = R_i * ez;
+        auto ni_world_lr = R_i * (vec3<LongReal>)p_i;
+        auto b1_lr = R_j * ex;
+        auto b2_lr = R_j * ey;
+        auto b3_lr = R_j * ez;
+        auto nj_world_lr = R_j * (vec3<LongReal>)p_j;
 #else
-        a1 = rotate(q_i, ex);
-        a2 = rotate(q_i, ey);
-        a3 = rotate(q_i, ez);
-        ni_world = rotate(q_i, p_i);
-        b1 = rotate(q_j, ex);
-        b2 = rotate(q_j, ey);
-        b3 = rotate(q_j, ez);
-        nj_world = rotate(q_j, p_j);
+        auto a1_lr = rotate(q_i, ex);
+        auto a2_lr = rotate(q_i, ey);
+        auto a3_lr = rotate(q_i, ez);
+        auto ni_world_lr = rotate(q_i, vec3<LongReal>(p_i.x, p_i.y, p_i.z));
+        auto b1_lr = rotate(q_j, ex);
+        auto b2_lr = rotate(q_j, ey);
+        auto b3_lr = rotate(q_j, ez);
+        auto nj_world_lr = rotate(q_j, vec3<LongReal>(p_j.x, p_j.y, p_j.z));
 #endif
+        // narrow rotation results to ForceReal for force computation
+        a1 = vec3<ForceReal>(ForceReal(a1_lr.x), ForceReal(a1_lr.y), ForceReal(a1_lr.z));
+        a2 = vec3<ForceReal>(ForceReal(a2_lr.x), ForceReal(a2_lr.y), ForceReal(a2_lr.z));
+        a3 = vec3<ForceReal>(ForceReal(a3_lr.x), ForceReal(a3_lr.y), ForceReal(a3_lr.z));
+        ni_world = vec3<ForceReal>(ForceReal(ni_world_lr.x), ForceReal(ni_world_lr.y), ForceReal(ni_world_lr.z));
+        b1 = vec3<ForceReal>(ForceReal(b1_lr.x), ForceReal(b1_lr.y), ForceReal(b1_lr.z));
+        b2 = vec3<ForceReal>(ForceReal(b2_lr.x), ForceReal(b2_lr.y), ForceReal(b2_lr.z));
+        b3 = vec3<ForceReal>(ForceReal(b3_lr.x), ForceReal(b3_lr.y), ForceReal(b3_lr.z));
+        nj_world = vec3<ForceReal>(ForceReal(nj_world_lr.x), ForceReal(nj_world_lr.y), ForceReal(nj_world_lr.z));
 
         // compute distance
         drsq = dot(dr, dr);
@@ -159,14 +169,17 @@ class PatchEnvelope
 
         rhat = dr / magdr;
 
-        // cos(angle between dr and pointing vector)
-        Scalar costhetai = -dot(vec3<Scalar>(rhat), ni_world); // negative because dr = dx = pi - pj
-        Scalar costhetaj = dot(vec3<Scalar>(rhat), nj_world);
+        // cos(angle between dr and pointing vector) — use ForceReal
+        ForceReal costhetai = -dot(rhat, ni_world); // negative because dr = dx = pi - pj
+        ForceReal costhetaj = dot(rhat, nj_world);
+
+        ForceReal omega_fr = ForceReal(params.omega);
+        ForceReal cosalpha_fr = ForceReal(params.cosalpha);
 
         exp_neg_omega_times_cos_theta_i_minus_cos_alpha
-            = fast::exp(-params.omega * (costhetai - params.cosalpha));
+            = fast::exp(-omega_fr * (costhetai - cosalpha_fr));
         exp_neg_omega_times_cos_theta_j_minus_cos_alpha
-            = fast::exp(-params.omega * (costhetaj - params.cosalpha));
+            = fast::exp(-omega_fr * (costhetaj - cosalpha_fr));
         }
 
     DEVICE static bool needsCharge()
@@ -174,7 +187,7 @@ class PatchEnvelope
         return false;
         }
 
-    DEVICE void setCharge(Scalar qi, Scalar qj)
+    DEVICE void setCharge(ForceReal qi, ForceReal qj)
         {
         m_charge_i = qi;
         m_charge_j = qj;
@@ -189,69 +202,75 @@ class PatchEnvelope
       energy of interaction. \note There is no need to check if rsq < rcutsq in this method. Cutoff
       tests are performed in PotentialPair from the PairModulator. \return Always true
     */
-    DEVICE bool evaluate(Scalar3& force,
-                         Scalar& envelope,
-                         Scalar3& torque_div_energy_i,
-                         Scalar3& torque_div_energy_j)
+    DEVICE bool evaluate(ForceReal3& force,
+                         ForceReal& envelope,
+                         ForceReal3& torque_div_energy_i,
+                         ForceReal3& torque_div_energy_j)
         {
-        // common calculations
+        // common calculations — all in ForceReal
+        ForceReal omega_fr = ForceReal(params.omega);
+        ForceReal cosalpha_fr = ForceReal(params.cosalpha);
 
-        Scalar f_min, f_max, f_max_min_inv;
+        ForceReal f_min, f_max, f_max_min_inv;
 
-        f_min = Scalar(1.0) / (Scalar(1.0 + fast::exp(-params.omega * (-1 - params.cosalpha))));
-        f_max = Scalar(1.0) / (Scalar(1.0 + fast::exp(-params.omega * (1 - params.cosalpha))));
+        f_min = ForceReal(1.0) / (ForceReal(1.0) + fast::exp(-omega_fr * (ForceReal(-1) - cosalpha_fr)));
+        f_max = ForceReal(1.0) / (ForceReal(1.0) + fast::exp(-omega_fr * (ForceReal(1) - cosalpha_fr)));
 
-        f_max_min_inv = 1 / (f_max - f_min);
+        f_max_min_inv = ForceReal(1) / (f_max - f_min);
 
-        Scalar fi = Scalar(1.0) / (Scalar(1.0) + exp_neg_omega_times_cos_theta_i_minus_cos_alpha);
-        Scalar dfi_du = params.omega * exp_neg_omega_times_cos_theta_i_minus_cos_alpha
+        ForceReal fi = ForceReal(1.0) / (ForceReal(1.0) + exp_neg_omega_times_cos_theta_i_minus_cos_alpha);
+        ForceReal dfi_du = omega_fr * exp_neg_omega_times_cos_theta_i_minus_cos_alpha
                         * f_max_min_inv * fi * fi;
         // normalize the modulator function
         fi = (fi - f_min) * f_max_min_inv;
 
-        Scalar fj = Scalar(1.0) / (Scalar(1.0) + exp_neg_omega_times_cos_theta_j_minus_cos_alpha);
-        Scalar dfj_du = params.omega * exp_neg_omega_times_cos_theta_j_minus_cos_alpha
+        ForceReal fj = ForceReal(1.0) / (ForceReal(1.0) + exp_neg_omega_times_cos_theta_j_minus_cos_alpha);
+        ForceReal dfj_du = omega_fr * exp_neg_omega_times_cos_theta_j_minus_cos_alpha
                         * f_max_min_inv * fj * fj;
         fj = (fj - f_min) * f_max_min_inv;
 
         // the overall modulation
         envelope = fi * fj;
 
-        vec3<Scalar> dfi_dni = dfi_du * -rhat;
+        vec3<ForceReal> dfi_dni = dfi_du * -rhat;
 
-        torque_div_energy_i = vec_to_scalar3(p_i.x * cross(a1, dfi_dni))
-                              + vec_to_scalar3(p_i.y * cross(a2, dfi_dni))
-                              + vec_to_scalar3(p_i.z * cross(a3, dfi_dni));
+        // narrowing p_i components to ForceReal for torque calculation
+        ForceReal p_ix = ForceReal(p_i.x), p_iy = ForceReal(p_i.y), p_iz = ForceReal(p_i.z);
+        ForceReal p_jx = ForceReal(p_j.x), p_jy = ForceReal(p_j.y), p_jz = ForceReal(p_j.z);
 
-        torque_div_energy_i *= Scalar(-1) * fj;
+        torque_div_energy_i = vec_to_forcereal3(p_ix * cross(a1, dfi_dni))
+                              + vec_to_forcereal3(p_iy * cross(a2, dfi_dni))
+                              + vec_to_forcereal3(p_iz * cross(a3, dfi_dni));
 
-        vec3<Scalar> dfj_dnj = dfj_du * rhat; // still positive
+        torque_div_energy_i *= ForceReal(-1) * fj;
 
-        torque_div_energy_j = vec_to_scalar3(p_j.x * cross(b1, dfj_dnj))
-                              + vec_to_scalar3(p_j.y * cross(b2, dfj_dnj))
-                              + vec_to_scalar3(p_j.z * cross(b3, dfj_dnj));
+        vec3<ForceReal> dfj_dnj = dfj_du * rhat; // still positive
 
-        torque_div_energy_j *= Scalar(-1) * fi;
+        torque_div_energy_j = vec_to_forcereal3(p_jx * cross(b1, dfj_dnj))
+                              + vec_to_forcereal3(p_jy * cross(b2, dfj_dnj))
+                              + vec_to_forcereal3(p_jz * cross(b3, dfj_dnj));
+
+        torque_div_energy_j *= ForceReal(-1) * fi;
 
         // find df/dr = df/du * du/dr (using chain rule)
         // find du/dr using quotient rule, where u = "hi" / "lo" = dot(dr,n) / magdr
-        Scalar lo = magdr;
-        vec3<Scalar> dlo = rhat;
+        ForceReal lo = magdr;
+        vec3<ForceReal> dlo = rhat;
 
-        Scalar dfi_dui = dfi_du;
+        ForceReal dfi_dui = dfi_du;
 
-        Scalar hi = -dot(dr, vec3<Scalar>(ni_world));
-        vec3<Scalar> dhi = -ni_world;
+        ForceReal hi = -dot(dr, ni_world);
+        vec3<ForceReal> dhi = -ni_world;
         /// quotient rule
-        vec3<Scalar> dui_dr = (lo * dhi - hi * dlo) / (lo * lo);
+        vec3<ForceReal> dui_dr = (lo * dhi - hi * dlo) / (lo * lo);
 
-        Scalar dfj_duj = dfj_du;
-        hi = dot(vec3<Scalar>(dr), vec3<Scalar>(nj_world));
+        ForceReal dfj_duj = dfj_du;
+        hi = dot(dr, nj_world);
         dhi = nj_world;
         // lo and dlo are the same as above
-        vec3<Scalar> duj_dr = (lo * dhi - hi * dlo) / (lo * lo);
+        vec3<ForceReal> duj_dr = (lo * dhi - hi * dlo) / (lo * lo);
 
-        force = -vec_to_scalar3(dfj_duj * duj_dr * fi + dfi_dui * dui_dr * fj);
+        force = -vec_to_forcereal3(dfj_duj * duj_dr * fi + dfi_dui * dui_dr * fj);
 
         return true;
         }
@@ -264,22 +283,22 @@ class PatchEnvelope
 #endif
 
     private:
-    vec3<Scalar> dr;
+    vec3<ForceReal> dr;
 
     const param_type& params;
-    vec3<Scalar> ni_world, nj_world;
-    vec3<Scalar> p_i, p_j;
-    vec3<Scalar> a1, a2, a3;
-    vec3<Scalar> b1, b2, b3;
+    vec3<ForceReal> ni_world, nj_world;
+    vec3<Scalar> p_i, p_j;  // patch directions in body frame — keep Scalar for rotation input
+    vec3<ForceReal> a1, a2, a3;
+    vec3<ForceReal> b1, b2, b3;
 
-    Scalar m_charge_i, m_charge_j;
+    ForceReal m_charge_i, m_charge_j;
 
-    Scalar drsq;
-    Scalar magdr;
-    vec3<Scalar> rhat;
+    ForceReal drsq;
+    ForceReal magdr;
+    vec3<ForceReal> rhat;
 
-    Scalar exp_neg_omega_times_cos_theta_i_minus_cos_alpha;
-    Scalar exp_neg_omega_times_cos_theta_j_minus_cos_alpha;
+    ForceReal exp_neg_omega_times_cos_theta_i_minus_cos_alpha;
+    ForceReal exp_neg_omega_times_cos_theta_j_minus_cos_alpha;
     };
 
     } // end namespace md

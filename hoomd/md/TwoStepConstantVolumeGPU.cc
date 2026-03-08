@@ -68,6 +68,13 @@ void TwoStepConstantVolumeGPU::integrateStepOne(uint64_t timestep)
         ArrayHandle<int3> d_image(m_pdata->getImages(),
                                   access_location::device,
                                   access_mode::readwrite);
+#ifdef HOOMD_MIXED_PRECISION
+        ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
+                                              access_location::device,
+                                              access_mode::readwrite);
+#else
+        struct { Scalar4* data = nullptr; } d_pos_correction;
+#endif
 
         BoxDim box = m_pdata->getBox();
         ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),
@@ -81,6 +88,7 @@ void TwoStepConstantVolumeGPU::integrateStepOne(uint64_t timestep)
         // perform the update on the GPU
         m_tuner_one->begin();
         kernel::gpu_nvt_rescale_step_one(d_pos.data,
+                                         d_pos_correction.data,
                                          d_vel.data,
                                          d_accel.data,
                                          d_image.data,

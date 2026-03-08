@@ -19,6 +19,7 @@ namespace kernel
     {
 //! Kernel driver for the first part of the NVE update called by TwoStepNVEGPU
 hipError_t gpu_nve_step_one(Scalar4* d_pos,
+                            Scalar4* d_pos_correction,
                             Scalar4* d_vel,
                             const Scalar3* d_accel,
                             int3* d_image,

@@ -170,11 +170,13 @@ template<class evaluator> class EvaluatorWalls
         Scalar rsq = dot(drv, drv);
 
         // compute the force and potential energy
-        Scalar force_divr = Scalar(0.0);
-        Scalar pair_eng = Scalar(0.0);
-        evaluator eval(rsq, m_params.rcutsq, m_params.params);
+        ForceReal force_divr = ForceReal(0.0);
+        ForceReal pair_eng = ForceReal(0.0);
+        evaluator eval(static_cast<ForceReal>(rsq),
+                       static_cast<ForceReal>(m_params.rcutsq),
+                       m_params.params);
         if (evaluator::needsCharge())
-            eval.setCharge(qi, Scalar(0.0));
+            eval.setCharge(static_cast<ForceReal>(qi), ForceReal(0.0));
 
         bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, true);
 
@@ -187,12 +189,12 @@ template<class evaluator> class EvaluatorWalls
             if (!std::isfinite(force_divr))
 #endif
                 {
-                force_divr = Scalar(0.0);
-                pair_eng = Scalar(0.0);
+                force_divr = ForceReal(0.0);
+                pair_eng = ForceReal(0.0);
                 }
             // add the force and potential energy to the particle i
-            F += drv * force_divr;
-            energy += pair_eng; // removing half since the other "particle" won't be represented *
+            F += drv * static_cast<Scalar>(force_divr);
+            energy += static_cast<Scalar>(pair_eng); // removing half since the other "particle" won't be represented *
                                 // Scalar(0.5);
             }
         }
@@ -204,19 +206,21 @@ template<class evaluator> class EvaluatorWalls
                                        const Scalar r)
         {
         // compute the force and potential energy
-        Scalar force_divr = Scalar(0.0);
-        Scalar pair_eng = Scalar(0.0);
+        ForceReal force_divr = ForceReal(0.0);
+        ForceReal pair_eng = ForceReal(0.0);
 
-        evaluator eval(rextrapsq, m_params.rcutsq, m_params.params);
+        evaluator eval(static_cast<ForceReal>(rextrapsq),
+                       static_cast<ForceReal>(m_params.rcutsq),
+                       m_params.params);
         if (evaluator::needsCharge())
-            eval.setCharge(qi, Scalar(0.0));
+            eval.setCharge(static_cast<ForceReal>(qi), ForceReal(0.0));
 
         bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, true);
 
         if (evaluated)
             {
-            pair_eng = pair_eng + force_divr * m_params.rextrap * r;
-            force_divr *= m_params.rextrap / r;
+            pair_eng = pair_eng + force_divr * static_cast<ForceReal>(m_params.rextrap * r);
+            force_divr *= static_cast<ForceReal>(m_params.rextrap / r);
 // correctly result in a 0 force in this case
 #ifdef __HIPCC__
             if (!isfinite(force_divr))
@@ -224,11 +228,11 @@ template<class evaluator> class EvaluatorWalls
             if (!std::isfinite(force_divr))
 #endif
                 {
-                force_divr = Scalar(0.0);
-                pair_eng = Scalar(0.0);
+                force_divr = ForceReal(0.0);
+                pair_eng = ForceReal(0.0);
                 }
-            F += drv * force_divr;
-            energy += pair_eng;
+            F += drv * static_cast<Scalar>(force_divr);
+            energy += static_cast<Scalar>(pair_eng);
             }
         }
 

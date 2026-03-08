@@ -7,6 +7,7 @@
 
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/Index1D.h"
+#include "hoomd/MixedPrecisionPos.h"
 #include "hoomd/ParticleData.cuh"
 #include "hoomd/TextureTools.h"
 
@@ -164,17 +165,19 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
     // shared arrays for per type pair parameters
     HIP_DYNAMIC_SHARED(char, s_data)
     typename evaluator::param_type* s_params = (typename evaluator::param_type*)(&s_data[0]);
-    Scalar* s_rcutsq
-        = (Scalar*)(&s_data[num_typ_parameters * sizeof(typename evaluator::param_type)]);
+    // Use ForceReal for cutoff in shared memory (mixed-precision force evaluation)
+    ForceReal* s_rcutsq
+        = (ForceReal*)(&s_data[num_typ_parameters * sizeof(typename evaluator::param_type)]);
     typename evaluator::shape_type* s_shape_params
         = (typename evaluator::shape_type*)(&s_rcutsq[num_typ_parameters]);
 
-    // load in the per type pair parameters
+    // load in the per type pair parameters (narrowing rcutsq to ForceReal)
     for (unsigned int cur_offset = 0; cur_offset < num_typ_parameters; cur_offset += blockDim.x)
         {
         if (cur_offset + threadIdx.x < num_typ_parameters)
             {
-            s_rcutsq[cur_offset + threadIdx.x] = d_rcutsq[cur_offset + threadIdx.x];
+            s_rcutsq[cur_offset + threadIdx.x]
+                = static_cast<ForceReal>(d_rcutsq[cur_offset + threadIdx.x]);
             }
         }
 
@@ -222,29 +225,32 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
         active = false;
         }
 
-    // initialize the force to 0
-    Scalar4 force = make_scalar4(Scalar(0), Scalar(0), Scalar(0), Scalar(0));
-    Scalar4 torque = make_scalar4(Scalar(0), Scalar(0), Scalar(0), Scalar(0));
-    Scalar virialxx = Scalar(0);
-    Scalar virialxy = Scalar(0);
-    Scalar virialxz = Scalar(0);
-    Scalar virialyy = Scalar(0);
-    Scalar virialyz = Scalar(0);
-    Scalar virialzz = Scalar(0);
+    // initialize the force to 0 — accumulate in ForceReal for speed
+    ForceReal4 force
+        = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
+    ForceReal4 torque
+        = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
+    ForceReal virialxx = ForceReal(0);
+    ForceReal virialxy = ForceReal(0);
+    ForceReal virialxz = ForceReal(0);
+    ForceReal virialyy = ForceReal(0);
+    ForceReal virialyz = ForceReal(0);
+    ForceReal virialzz = ForceReal(0);
 
     if (active)
         {
         // load in the length of the neighbor list
         unsigned int n_neigh = d_n_neigh[idx];
 
-        // read in the position of our particle
-        Scalar4 postypei = __ldg(d_pos + idx);
-        Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
+        // read in the position of our particle — narrow to ForceReal for force evaluation
+        ForceReal4 postypei = hoomd::loadPosForceReal(d_pos, idx);
+        ForceReal3 posi = make_forcereal3(postypei.x, postypei.y, postypei.z);
+        // keep quaternion in full Scalar precision
         Scalar4 quati = __ldg(d_orientation + idx);
 
-        Scalar qi = Scalar(0);
+        ForceReal qi = ForceReal(0);
         if (evaluator::needsCharge())
-            qi = __ldg(d_charge + idx);
+            qi = static_cast<ForceReal>(__ldg(d_charge + idx));
 
         size_t my_head = d_head_list[idx];
         unsigned int cur_j = 0;
@@ -264,28 +270,33 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
                     next_j = __ldg(d_nlist + my_head + neigh_idx + tpp);
                     }
 
-                // get the neighbor's position
-                Scalar4 postypej = __ldg(d_pos + cur_j);
-                Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
+                // get the neighbor's position — narrow to ForceReal
+                ForceReal4 postypej = hoomd::loadPosForceReal(d_pos, cur_j);
+                ForceReal3 posj = make_forcereal3(postypej.x, postypej.y, postypej.z);
+                // keep quaternion in full Scalar precision
                 Scalar4 quatj = __ldg(d_orientation + cur_j);
 
-                Scalar qj = Scalar(0);
+                ForceReal qj = ForceReal(0);
                 if (evaluator::needsCharge())
-                    qj = __ldg(d_charge + cur_j);
+                    qj = static_cast<ForceReal>(__ldg(d_charge + cur_j));
 
-                // calculate dr (with periodic boundary conditions)
-                Scalar3 dx = posi - posj;
+                // calculate dr (with periodic boundary conditions) in ForceReal
+                ForceReal3 dx = posi - posj;
 
-                // apply periodic boundary conditions
+                // apply periodic boundary conditions in ForceReal precision
+#ifdef HOOMD_MIXED_PRECISION
+                dx = box.minImageForceReal(dx);
+#else
                 dx = box.minImage(dx);
+#endif
 
                 // calculate r squared
-                Scalar rsq = dot(dx, dx);
+                ForceReal rsq = dot(dx, dx);
 
                 // access the per type pair parameters
                 unsigned int typpair
-                    = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
-                Scalar rcutsq = s_rcutsq[typpair];
+                    = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
+                ForceReal rcutsq = s_rcutsq[typpair];
                 const typename evaluator::param_type& param = s_params[typpair];
 
                 // design specifies that energies are shifted if
@@ -294,19 +305,19 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
                 if (shift_mode == 1)
                     energy_shift = true;
 
-                // evaluate the potential
-                Scalar3 jforce = {Scalar(0), Scalar(0), Scalar(0)};
-                Scalar3 torquei = {Scalar(0), Scalar(0), Scalar(0)};
-                Scalar3 torquej = {Scalar(0), Scalar(0), Scalar(0)};
-                Scalar pair_eng = Scalar(0);
+                // evaluate the potential — all in ForceReal
+                ForceReal3 jforce = {ForceReal(0), ForceReal(0), ForceReal(0)};
+                ForceReal3 torquei = {ForceReal(0), ForceReal(0), ForceReal(0)};
+                ForceReal3 torquej = {ForceReal(0), ForceReal(0), ForceReal(0)};
+                ForceReal pair_eng = ForceReal(0);
 
-                // constructor call
+                // constructor call — dx and rcutsq are ForceReal, quaternions are Scalar
                 evaluator eval(dx, quati, quatj, rcutsq, param);
                 if (evaluator::needsCharge())
                     eval.setCharge(qi, qj);
                 if (evaluator::needsShape())
-                    eval.setShape(&(s_shape_params[__scalar_as_int(postypei.w)]),
-                                  &(s_shape_params[__scalar_as_int(postypej.w)]));
+                    eval.setShape(&(s_shape_params[__forcereal_as_int(postypei.w)]),
+                                  &(s_shape_params[__forcereal_as_int(postypej.w)]));
                 if (evaluator::needsTags())
                     eval.setTags(__ldg(d_tag + idx), __ldg(d_tag + cur_j));
 
@@ -316,7 +327,7 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
                 // calculate the virial
                 if (compute_virial)
                     {
-                    Scalar3 jforce2 = Scalar(0.5) * jforce;
+                    ForceReal3 jforce2 = ForceReal(0.5) * jforce;
                     virialxx += dx.x * jforce2.x;
                     virialxy += dx.y * jforce2.x;
                     virialxz += dx.z * jforce2.x;
@@ -338,11 +349,11 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
             }
 
         // potential energy per particle must be halved
-        force.w *= Scalar(0.5);
+        force.w *= ForceReal(0.5);
         }
 
-    // reduce force over threads in cta
-    hoomd::detail::WarpReduce<Scalar, tpp> reducer;
+    // reduce force over threads in cta — using ForceReal for warp reduction
+    hoomd::detail::WarpReduce<ForceReal, tpp> reducer;
     force.x = reducer.Sum(force.x);
     force.y = reducer.Sum(force.y);
     force.z = reducer.Sum(force.z);
@@ -353,10 +364,17 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
     torque.z = reducer.Sum(torque.z);
 
     // now that the force calculation is complete, write out the result
+    // promote ForceReal -> Scalar for output storage
     if (active && threadIdx.x % tpp == 0)
         {
-        d_force[idx] = force;
-        d_torque[idx] = torque;
+        d_force[idx] = make_scalar4(static_cast<Scalar>(force.x),
+                                    static_cast<Scalar>(force.y),
+                                    static_cast<Scalar>(force.z),
+                                    static_cast<Scalar>(force.w));
+        d_torque[idx] = make_scalar4(static_cast<Scalar>(torque.x),
+                                     static_cast<Scalar>(torque.y),
+                                     static_cast<Scalar>(torque.z),
+                                     Scalar(0));
         }
 
     if (compute_virial)
@@ -369,14 +387,15 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
         virialzz = reducer.Sum(virialzz);
 
         // if we are the first thread in the cta, write out virial to global mem
+        // promote ForceReal -> Scalar for output storage
         if (active && threadIdx.x % tpp == 0)
             {
-            d_virial[0 * virial_pitch + idx] = virialxx;
-            d_virial[1 * virial_pitch + idx] = virialxy;
-            d_virial[2 * virial_pitch + idx] = virialxz;
-            d_virial[3 * virial_pitch + idx] = virialyy;
-            d_virial[4 * virial_pitch + idx] = virialyz;
-            d_virial[5 * virial_pitch + idx] = virialzz;
+            d_virial[0 * virial_pitch + idx] = static_cast<Scalar>(virialxx);
+            d_virial[1 * virial_pitch + idx] = static_cast<Scalar>(virialxy);
+            d_virial[2 * virial_pitch + idx] = static_cast<Scalar>(virialxz);
+            d_virial[3 * virial_pitch + idx] = static_cast<Scalar>(virialyy);
+            d_virial[4 * virial_pitch + idx] = static_cast<Scalar>(virialyz);
+            d_virial[5 * virial_pitch + idx] = static_cast<Scalar>(virialzz);
             }
         }
     }
@@ -413,7 +432,7 @@ struct AnisoPairForceComputeKernel
             unsigned int block_size = pair_args.block_size;
 
             Index2D typpair_idx(pair_args.ntypes);
-            size_t shared_bytes = (2 * sizeof(Scalar) + sizeof(typename evaluator::param_type))
+            size_t shared_bytes = (sizeof(ForceReal) + sizeof(typename evaluator::param_type))
                                       * typpair_idx.getNumElements()
                                   + sizeof(typename evaluator::shape_type) * pair_args.ntypes;
 

@@ -114,8 +114,8 @@ template<class aniso_evaluator> class AnisoPotentialPair : public ForceCompute
         {
         std::vector<std::string> type_shape_mapping(m_pdata->getNTypes());
         Scalar4 q = make_scalar4(1, 0, 0, 0);
-        Scalar3 dr = make_scalar3(0, 0, 0);
-        Scalar rcut = Scalar(0.0);
+        ForceReal3 dr = make_forcereal3(0, 0, 0);
+        ForceReal rcut = ForceReal(0.0);
         for (unsigned int i = 0; i < type_shape_mapping.size(); i++)
             {
             aniso_evaluator evaluator(dr, q, q, rcut, m_params[m_typpair_idx(i, i)]);
@@ -530,26 +530,36 @@ void AnisoPotentialPair<aniso_evaluator>::computeForces(uint64_t timestep)
                 if (m_shift_mode == shift)
                     energy_shift = true;
 
-                // compute the force and potential energy
-                Scalar3 force = make_scalar3(0.0, 0.0, 0.0);
-                Scalar3 torque_i = make_scalar3(0.0, 0.0, 0.0);
-                Scalar3 torque_j = make_scalar3(0.0, 0.0, 0.0);
+                // compute the force and potential energy — use ForceReal for evaluator interface
+                ForceReal3 force_fr = make_forcereal3(0.0, 0.0, 0.0);
+                ForceReal3 torque_i_fr = make_forcereal3(0.0, 0.0, 0.0);
+                ForceReal3 torque_j_fr = make_forcereal3(0.0, 0.0, 0.0);
 
-                Scalar pair_eng = Scalar(0.0);
+                ForceReal pair_eng_fr = ForceReal(0.0);
 
-                aniso_evaluator eval(dx, quat_i, quat_j, rcutsq, param);
+                // narrow dx and rcutsq to ForceReal for evaluator
+                ForceReal3 dx_fr = make_forcereal3(ForceReal(dx.x), ForceReal(dx.y), ForceReal(dx.z));
+                ForceReal rcutsq_fr = ForceReal(rcutsq);
+
+                aniso_evaluator eval(dx_fr, quat_i, quat_j, rcutsq_fr, param);
 
                 if (aniso_evaluator::needsCharge())
-                    eval.setCharge(qi, qj);
+                    eval.setCharge(ForceReal(qi), ForceReal(qj));
                 if (aniso_evaluator::needsShape())
                     eval.setShape(&m_shape_params[typei], &m_shape_params[typej]);
                 if (aniso_evaluator::needsTags())
                     eval.setTags(h_tag.data[i], h_tag.data[j]);
 
-                bool evaluated = eval.evaluate(force, pair_eng, energy_shift, torque_i, torque_j);
+                bool evaluated = eval.evaluate(force_fr, pair_eng_fr, energy_shift, torque_i_fr, torque_j_fr);
 
                 if (evaluated)
                     {
+                    // widen back to Scalar for accumulation
+                    Scalar3 force = make_scalar3(Scalar(force_fr.x), Scalar(force_fr.y), Scalar(force_fr.z));
+                    Scalar pair_eng = Scalar(pair_eng_fr);
+                    Scalar3 torque_i = make_scalar3(Scalar(torque_i_fr.x), Scalar(torque_i_fr.y), Scalar(torque_i_fr.z));
+                    Scalar3 torque_j = make_scalar3(Scalar(torque_j_fr.x), Scalar(torque_j_fr.y), Scalar(torque_j_fr.z));
+
                     Scalar3 force2 = Scalar(0.5) * force;
 
                     // add the force, potential energy and virial to the particle i

@@ -97,6 +97,19 @@ typedef double4 ShortReal4;
 #error HOOMD_SHORTREAL_SIZE must be 32 or 64.
 #endif
 
+// Mixed precision is active when ShortReal != LongReal
+#if (HOOMD_SHORTREAL_SIZE != HOOMD_LONGREAL_SIZE)
+#define HOOMD_MIXED_PRECISION
+#endif
+
+// ForceReal: the precision used for force evaluation kernels.
+// In mixed precision mode, forces are evaluated in ShortReal (float) for speed,
+// while integration (position/velocity accumulation) stays in Scalar (double).
+typedef ShortReal ForceReal;
+typedef ShortReal2 ForceReal2;
+typedef ShortReal3 ForceReal3;
+typedef ShortReal4 ForceReal4;
+
 //! make a scalar2 value
 HOSTDEVICE inline Scalar2 make_scalar2(Scalar x, Scalar y)
     {
@@ -125,6 +138,54 @@ HOSTDEVICE inline Scalar4 make_scalar4(Scalar x, Scalar y, Scalar z, Scalar w)
     retval.z = z;
     retval.w = w;
     return retval;
+    }
+
+//! make a forcereal3 value
+HOSTDEVICE inline ForceReal3 make_forcereal3(ForceReal x, ForceReal y, ForceReal z)
+    {
+    ForceReal3 retval;
+    retval.x = x;
+    retval.y = y;
+    retval.z = z;
+    return retval;
+    }
+
+//! make a forcereal4 value
+HOSTDEVICE inline ForceReal4 make_forcereal4(ForceReal x, ForceReal y, ForceReal z, ForceReal w)
+    {
+    ForceReal4 retval;
+    retval.x = x;
+    retval.y = y;
+    retval.z = z;
+    retval.w = w;
+    return retval;
+    }
+
+//! Stuff an integer inside a ForceReal
+HOSTDEVICE inline ForceReal __int_as_forcereal(int a)
+    {
+        union {
+        int a;
+        ForceReal b;
+        } u;
+
+    u.b = ForceReal(0.0);
+    u.a = a;
+
+    return u.b;
+    }
+
+//! Extract an integer from a ForceReal
+HOSTDEVICE inline int __forcereal_as_int(ForceReal b)
+    {
+        union {
+        int a;
+        ForceReal b;
+        } u;
+
+    u.b = b;
+
+    return u.a;
     }
 
 #ifndef __HIPCC__
@@ -813,6 +874,67 @@ HOSTDEVICE inline hoomd::Scalar dot(const hoomd::Scalar3& a, const hoomd::Scalar
     {
     return a.x * b.x + a.y * b.y + a.z * b.z;
     }
+
+#ifdef HOOMD_MIXED_PRECISION
+// ----------- ForceReal3 vector math functions for mixed precision ----------------------
+//! ForceReal3 vector addition
+HOSTDEVICE inline hoomd::ForceReal3 operator+(const hoomd::ForceReal3& a,
+                                              const hoomd::ForceReal3& b)
+    {
+    return hoomd::make_forcereal3(a.x + b.x, a.y + b.y, a.z + b.z);
+    }
+//! ForceReal3 vector addition in place
+HOSTDEVICE inline hoomd::ForceReal3& operator+=(hoomd::ForceReal3& a, const hoomd::ForceReal3& b)
+    {
+    a.x += b.x;
+    a.y += b.y;
+    a.z += b.z;
+    return a;
+    }
+//! ForceReal3 vector subtraction
+HOSTDEVICE inline hoomd::ForceReal3 operator-(const hoomd::ForceReal3& a,
+                                              const hoomd::ForceReal3& b)
+    {
+    return hoomd::make_forcereal3(a.x - b.x, a.y - b.y, a.z - b.z);
+    }
+//! ForceReal3 scalar multiplication
+HOSTDEVICE inline hoomd::ForceReal3 operator*(const hoomd::ForceReal& a,
+                                              const hoomd::ForceReal3& b)
+    {
+    return hoomd::make_forcereal3(a * b.x, a * b.y, a * b.z);
+    }
+//! ForceReal3 scalar multiplication
+HOSTDEVICE inline hoomd::ForceReal3 operator*(const hoomd::ForceReal3& a,
+                                              const hoomd::ForceReal& b)
+    {
+    return hoomd::make_forcereal3(a.x * b, a.y * b, a.z * b);
+    }
+//! ForceReal3 unary negation
+HOSTDEVICE inline hoomd::ForceReal3 operator-(const hoomd::ForceReal3& a)
+    {
+    return hoomd::make_forcereal3(-a.x, -a.y, -a.z);
+    }
+//! ForceReal3 dot product
+HOSTDEVICE inline hoomd::ForceReal dot(const hoomd::ForceReal3& a, const hoomd::ForceReal3& b)
+    {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+//! ForceReal3 scalar multiply-assign
+HOSTDEVICE inline hoomd::ForceReal3& operator*=(hoomd::ForceReal3& a, const hoomd::ForceReal& b)
+    {
+    a.x *= b;
+    a.y *= b;
+    a.z *= b;
+    return a;
+    }
+//! ForceReal3 scalar division
+HOSTDEVICE inline hoomd::ForceReal3 operator/(const hoomd::ForceReal3& a,
+                                              const hoomd::ForceReal& b)
+    {
+    hoomd::ForceReal inv = hoomd::ForceReal(1.0) / b;
+    return hoomd::make_forcereal3(a.x * inv, a.y * inv, a.z * inv);
+    }
+#endif // HOOMD_MIXED_PRECISION
 
 // ----------- Integer vector math functions ----------------------
 //! Integer vector addition

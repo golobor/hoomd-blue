@@ -29,8 +29,8 @@ namespace md
     {
 struct harmonic_params
     {
-    Scalar k;
-    Scalar r_0;
+    ForceReal k;
+    ForceReal r_0;
 
 #ifndef __HIPCC__
     harmonic_params()
@@ -39,12 +39,12 @@ struct harmonic_params
         r_0 = 0;
         }
 
-    harmonic_params(Scalar k, Scalar r_0) : k(k), r_0(r_0) { }
+    harmonic_params(ForceReal k, ForceReal r_0) : k(k), r_0(r_0) { }
 
     harmonic_params(pybind11::dict v)
         {
-        k = v["k"].cast<Scalar>();
-        r_0 = v["r0"].cast<Scalar>();
+        k = v["k"].cast<ForceReal>();
+        r_0 = v["r0"].cast<ForceReal>();
         }
 
     pybind11::dict asDict()
@@ -78,7 +78,7 @@ class EvaluatorBondHarmonic
     /*! \param _rsq Squared distance between the particles
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorBondHarmonic(Scalar _rsq, const param_type& _params)
+    DEVICE EvaluatorBondHarmonic(ForceReal _rsq, const param_type& _params)
         : rsq(_rsq), K(_params.k), r_0(_params.r_0)
         {
         }
@@ -93,7 +93,7 @@ class EvaluatorBondHarmonic
     /*! \param qa Charge of particle a
         \param qb Charge of particle b
     */
-    DEVICE void setCharge(Scalar qa, Scalar qb) { }
+    DEVICE void setCharge(ForceReal qa, ForceReal qb) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -102,10 +102,10 @@ class EvaluatorBondHarmonic
         \return True if they are evaluated or false if the bond
                 energy is not defined
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& bond_eng)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& bond_eng)
         {
-        Scalar r = sqrt(rsq);
-        force_divr = K * (r_0 / r - Scalar(1.0));
+        ForceReal r = sqrt(rsq);
+        force_divr = K * (r_0 / r - ForceReal(1.0));
 
 // if the result is not finite, it is likely because of a division by 0, setting force_divr to 0
 // will correctly result in a 0 force in this case
@@ -115,9 +115,9 @@ class EvaluatorBondHarmonic
         if (!std::isfinite(force_divr))
 #endif
             {
-            force_divr = Scalar(0);
+            force_divr = ForceReal(0);
             }
-        bond_eng = Scalar(0.5) * K * (r_0 - r) * (r_0 - r);
+        bond_eng = ForceReal(0.5) * K * (r_0 - r) * (r_0 - r);
 
         return true;
         }
@@ -133,9 +133,9 @@ class EvaluatorBondHarmonic
 #endif
 
     protected:
-    Scalar rsq; //!< Stored rsq from the constructor
-    Scalar K;   //!< K parameter
-    Scalar r_0; //!< r_0 parameter
+    ForceReal rsq; //!< Stored rsq from the constructor
+    ForceReal K;   //!< K parameter
+    ForceReal r_0; //!< r_0 parameter
     };
 
     } // end namespace md

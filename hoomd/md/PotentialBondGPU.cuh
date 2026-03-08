@@ -139,20 +139,20 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
 
     // read in the position of our particle. (MEM TRANSFER: 16 bytes)
     Scalar4 postype = __ldg(d_pos + idx);
-    Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
+    ForceReal3 pos = make_forcereal3(ForceReal(postype.x), ForceReal(postype.y), ForceReal(postype.z));
 
-    Scalar q(0);
+    ForceReal q(0);
     if (evaluator::needsCharge())
         {
-        q = __ldg(d_charge + idx);
+        q = ForceReal(__ldg(d_charge + idx));
         }
     else
         q += 0; // Silence compiler warning.
 
     // initialize the force to 0
-    Scalar4 force = make_scalar4(0, 0, 0, 0);
+    ForceReal4 force = make_forcereal4(0, 0, 0, 0);
     // initialize the virial tensor to 0
-    Scalar virial[6];
+    ForceReal virial[6];
     for (unsigned int i = 0; i < 6; i++)
         virial[i] = 0;
 
@@ -171,13 +171,22 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
 
         // get the bonded particle's position (MEM_TRANSFER: 16 bytes)
         Scalar4 neigh_postypej = __ldg(d_pos + cur_bond_idx);
-        Scalar3 neigh_pos = make_scalar3(neigh_postypej.x, neigh_postypej.y, neigh_postypej.z);
+        ForceReal3 neigh_pos = make_forcereal3(ForceReal(neigh_postypej.x), ForceReal(neigh_postypej.y), ForceReal(neigh_postypej.z));
 
         // calculate dr (FLOPS: 3)
-        Scalar3 dx = pos - neigh_pos;
+        ForceReal3 dx;
+        dx.x = pos.x - neigh_pos.x;
+        dx.y = pos.y - neigh_pos.y;
+        dx.z = pos.z - neigh_pos.z;
 
         // apply periodic boundary conditions (FLOPS: 12)
-        dx = box.minImage(dx);
+        {
+        Scalar3 dx_scalar = make_scalar3(Scalar(dx.x), Scalar(dx.y), Scalar(dx.z));
+        dx_scalar = box.minImage(dx_scalar);
+        dx.x = ForceReal(dx_scalar.x);
+        dx.y = ForceReal(dx_scalar.y);
+        dx.z = ForceReal(dx_scalar.z);
+        }
 
         // get the bond parameters (MEM TRANSFER: 8 bytes)
         const typename evaluator::param_type* param;
@@ -190,17 +199,17 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
             param = d_params + cur_bond_type;
             }
 
-        Scalar rsq = dot(dx, dx);
+        ForceReal rsq = dx.x * dx.x + dx.y * dx.y + dx.z * dx.z;
 
         // evaluate the potential
-        Scalar force_divr = Scalar(0.0);
-        Scalar bond_eng = Scalar(0.0);
+        ForceReal force_divr = ForceReal(0.0);
+        ForceReal bond_eng = ForceReal(0.0);
 
         evaluator eval(rsq, *param);
 
         if (evaluator::needsCharge())
             {
-            Scalar neigh_q = __ldg(d_charge + cur_bond_idx);
+            ForceReal neigh_q = ForceReal(__ldg(d_charge + cur_bond_idx));
             eval.setCharge(q, neigh_q);
             }
 
@@ -209,7 +218,7 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
         if (evaluated)
             {
             // add up the virial (double counting, multiply by 0.5)
-            Scalar force_div2r = force_divr / Scalar(2.0);
+            ForceReal force_div2r = force_divr / ForceReal(2.0);
             virial[0] += dx.x * dx.x * force_div2r; // xx
             virial[1] += dx.x * dx.y * force_div2r; // xy
             virial[2] += dx.x * dx.z * force_div2r; // xz
@@ -222,7 +231,7 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
             force.y += dx.y * force_divr;
             force.z += dx.z * force_divr;
             // energy is double counted: multiply by 0.5
-            force.w += bond_eng * Scalar(0.5);
+            force.w += bond_eng * ForceReal(0.5);
             }
         else
             {
@@ -232,10 +241,10 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
         }
 
     // now that the force calculation is complete, write out the result (MEM TRANSFER: 20 bytes);
-    d_force[idx] = force;
+    d_force[idx] = make_scalar4(Scalar(force.x), Scalar(force.y), Scalar(force.z), Scalar(force.w));
 
     for (unsigned int i = 0; i < 6; i++)
-        d_virial[i * virial_pitch + idx] = virial[i];
+        d_virial[i * virial_pitch + idx] = Scalar(virial[i]);
     }
 
 //! Kernel driver that computes lj forces on the GPU for LJForceComputeGPU

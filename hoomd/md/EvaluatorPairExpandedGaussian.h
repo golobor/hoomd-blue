@@ -42,9 +42,9 @@ class EvaluatorPairExpandedGaussian
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar epsilon;
-        Scalar sigma;
-        Scalar delta;
+        ForceReal epsilon;
+        ForceReal sigma;
+        ForceReal delta;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -63,9 +63,9 @@ class EvaluatorPairExpandedGaussian
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            sigma = v["sigma"].cast<Scalar>();
-            epsilon = v["epsilon"].cast<Scalar>();
-            delta = v["delta"].cast<Scalar>();
+            sigma = v["sigma"].cast<ForceReal>();
+            epsilon = v["epsilon"].cast<ForceReal>();
+            delta = v["delta"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -86,7 +86,7 @@ class EvaluatorPairExpandedGaussian
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairExpandedGaussian(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairExpandedGaussian(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), epsilon(_params.epsilon), sigma(_params.sigma),
           delta(_params.delta)
         {
@@ -101,7 +101,7 @@ class EvaluatorPairExpandedGaussian
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -112,31 +112,31 @@ class EvaluatorPairExpandedGaussian
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // precompute some quantities
-        Scalar r = fast::sqrt(rsq);
-        Scalar rcut = fast::sqrt(rcutsq);
-        Scalar rinv = Scalar(1.0) / r;
+        ForceReal r = fast::sqrt(rsq);
+        ForceReal rcut = fast::sqrt(rcutsq);
+        ForceReal rinv = ForceReal(1.0) / r;
 
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar rmd = r - delta;
-            Scalar rmd_sq = (r - delta) * (r - delta);
-            Scalar sigma_sq = sigma * sigma;
-            Scalar rmd_over_sigma_sq = rmd_sq / sigma_sq;
-            Scalar exp_val = fast::exp(-Scalar(1.0) / Scalar(2.0) * rmd_over_sigma_sq);
+            ForceReal rmd = r - delta;
+            ForceReal rmd_sq = (r - delta) * (r - delta);
+            ForceReal sigma_sq = sigma * sigma;
+            ForceReal rmd_over_sigma_sq = rmd_sq / sigma_sq;
+            ForceReal exp_val = fast::exp(-ForceReal(1.0) / ForceReal(2.0) * rmd_over_sigma_sq);
 
             force_divr = epsilon / sigma_sq * exp_val * rmd * rinv;
             pair_eng = epsilon * exp_val;
 
-            Scalar rcutmd_sq = (rcut - delta) * (rcut - delta);
-            Scalar rcutmd_over_sigma_sq = rcutmd_sq / sigma_sq;
+            ForceReal rcutmd_sq = (rcut - delta) * (rcut - delta);
+            ForceReal rcutmd_over_sigma_sq = rcutmd_sq / sigma_sq;
 
             if (energy_shift)
                 {
-                pair_eng -= epsilon * fast::exp(-Scalar(1.0) / Scalar(2.0) * rcutmd_over_sigma_sq);
+                pair_eng -= epsilon * fast::exp(-ForceReal(1.0) / ForceReal(2.0) * rcutmd_over_sigma_sq);
                 }
             return true;
             }
@@ -146,12 +146,12 @@ class EvaluatorPairExpandedGaussian
             }
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -172,11 +172,11 @@ class EvaluatorPairExpandedGaussian
 #endif
 
     protected:
-    Scalar rsq;     //!< Stored rsq from the constructor
-    Scalar rcutsq;  //!< Stored rcutsq from the constructor
-    Scalar epsilon; //!< epsilon parameter extracted from the params passed to the constructor
-    Scalar sigma;   //!< sigma parameter extracted from the params passed to the constructor
-    Scalar delta;   //!< delta parameter extracted from the params passed to the constructor
+    ForceReal rsq;     //!< Stored rsq from the constructor
+    ForceReal rcutsq;  //!< Stored rcutsq from the constructor
+    ForceReal epsilon; //!< epsilon parameter extracted from the params passed to the constructor
+    ForceReal sigma;   //!< sigma parameter extracted from the params passed to the constructor
+    ForceReal delta;   //!< delta parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

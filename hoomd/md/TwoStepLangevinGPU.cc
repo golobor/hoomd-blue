@@ -78,11 +78,20 @@ void TwoStepLangevinGPU::integrateStepOne(uint64_t timestep)
     ArrayHandle<int3> d_image(m_pdata->getImages(),
                               access_location::device,
                               access_mode::readwrite);
+#ifdef HOOMD_MIXED_PRECISION
+    ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
+                                          access_location::device,
+                                          access_mode::readwrite);
+#else
+    // Provide a null pointer when mixed precision is disabled
+    struct { Scalar4* data = nullptr; } d_pos_correction;
+#endif
 
     m_exec_conf->setDevice();
     m_tuner_one->begin();
     // perform the update on the GPU
     kernel::gpu_nve_step_one(d_pos.data,
+                             d_pos_correction.data,
                              d_vel.data,
                              d_accel.data,
                              d_image.data,

@@ -81,8 +81,8 @@ class EvaluatorSpecialPairCoulomb
     /*! \param _rsq Squared distance between the particles
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorSpecialPairCoulomb(Scalar _rsq, const param_type& _params)
-        : rsq(_rsq), scale(_params.alpha), rcutsq(_params.r_cutsq)
+    DEVICE EvaluatorSpecialPairCoulomb(ForceReal _rsq, const param_type& _params)
+        : rsq(_rsq), scale(ForceReal(_params.alpha)), rcutsq(ForceReal(_params.r_cutsq))
         {
         }
 
@@ -96,7 +96,7 @@ class EvaluatorSpecialPairCoulomb
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj)
+    DEVICE void setCharge(ForceReal qi, ForceReal qj)
         {
         qiqj = qi * qj;
         }
@@ -109,16 +109,16 @@ class EvaluatorSpecialPairCoulomb
                 energy is not defined. Based on EvaluatorSpecialPairLJ which
                 returns true regardless whether it is evaluated or not.
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& bond_eng)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& bond_eng)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && qiqj != 0)
             {
-            Scalar r1inv = Scalar(1.0) / fast::sqrt(rsq);
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r3inv = r2inv * r1inv;
+            ForceReal r1inv = ForceReal(1.0) / fast::sqrt(ForceReal(rsq));
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r3inv = r2inv * r1inv;
 
-            Scalar scaledQ = qiqj * scale;
+            ForceReal scaledQ = qiqj * scale;
 
             force_divr = scaledQ * r3inv;
             bond_eng = scaledQ * r1inv;
@@ -137,10 +137,10 @@ class EvaluatorSpecialPairCoulomb
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar qiqj;   //!< product of charges from setCharge(qa, qb)
-    Scalar scale;  //!< scaling factor to apply to Coulomb interaction
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal qiqj;   //!< product of charges from setCharge(qa, qb)
+    ForceReal scale;  //!< scaling factor to apply to Coulomb interaction
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
     };
 
     } // end namespace md

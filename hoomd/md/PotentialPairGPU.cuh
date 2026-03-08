@@ -7,6 +7,7 @@
 
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/Index1D.h"
+#include "hoomd/MixedPrecisionPos.h"
 #include "hoomd/ParticleData.cuh"
 #include "hoomd/TextureTools.h"
 
@@ -159,23 +160,26 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
     // shared arrays for per type pair parameters
     HIP_DYNAMIC_SHARED(char, s_data)
     typename evaluator::param_type* s_params = (typename evaluator::param_type*)(&s_data[0]);
-    Scalar* s_rcutsq
-        = (Scalar*)(&s_data[num_typ_parameters * sizeof(typename evaluator::param_type)]);
-    Scalar* s_ronsq
-        = (Scalar*)(&s_data[num_typ_parameters
-                            * (sizeof(typename evaluator::param_type) + sizeof(Scalar))]);
+    // Shared memory cutoff arrays use ForceReal for mixed-precision force evaluation
+    ForceReal* s_rcutsq
+        = (ForceReal*)(&s_data[num_typ_parameters * sizeof(typename evaluator::param_type)]);
+    ForceReal* s_ronsq
+        = (ForceReal*)(&s_data[num_typ_parameters
+                            * (sizeof(typename evaluator::param_type) + sizeof(ForceReal))]);
     auto s_extra = reinterpret_cast<char*>(s_ronsq + num_typ_parameters);
 
     if (enable_shared_cache)
         {
-        // load in the per type pair parameters
+        // load in the per type pair parameters (narrowing to ForceReal for force evaluation)
         for (unsigned int cur_offset = 0; cur_offset < num_typ_parameters; cur_offset += blockDim.x)
             {
             if (cur_offset + threadIdx.x < num_typ_parameters)
                 {
-                s_rcutsq[cur_offset + threadIdx.x] = d_rcutsq[cur_offset + threadIdx.x];
+                s_rcutsq[cur_offset + threadIdx.x]
+                    = static_cast<ForceReal>(d_rcutsq[cur_offset + threadIdx.x]);
                 if (shift_mode == 2)
-                    s_ronsq[cur_offset + threadIdx.x] = d_ronsq[cur_offset + threadIdx.x];
+                    s_ronsq[cur_offset + threadIdx.x]
+                        = static_cast<ForceReal>(d_ronsq[cur_offset + threadIdx.x]);
                 }
             }
 
@@ -209,27 +213,28 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
         active = false;
         }
 
-    // initialize the force to 0
-    Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
-    Scalar virialxx = Scalar(0.0);
-    Scalar virialxy = Scalar(0.0);
-    Scalar virialxz = Scalar(0.0);
-    Scalar virialyy = Scalar(0.0);
-    Scalar virialyz = Scalar(0.0);
-    Scalar virialzz = Scalar(0.0);
+    // initialize the force to 0 — accumulate in ForceReal for speed
+    ForceReal4 force
+        = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
+    ForceReal virialxx = ForceReal(0.0);
+    ForceReal virialxy = ForceReal(0.0);
+    ForceReal virialxz = ForceReal(0.0);
+    ForceReal virialyy = ForceReal(0.0);
+    ForceReal virialyz = ForceReal(0.0);
+    ForceReal virialzz = ForceReal(0.0);
 
     if (active)
         {
         // load in the length of the neighbor list
         unsigned int n_neigh = d_n_neigh[idx];
 
-        // read in the position of our particle.
-        Scalar4 postypei = __ldg(d_pos + idx);
-        Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
+        // read in the position of our particle — narrow to ForceReal for force evaluation
+        ForceReal4 postypei = hoomd::loadPosForceReal(d_pos, idx);
+        ForceReal3 posi = make_forcereal3(postypei.x, postypei.y, postypei.z);
 
-        Scalar qi = Scalar(0);
+        ForceReal qi = ForceReal(0);
         if (evaluator::needsCharge())
-            qi = __ldg(d_charge + idx);
+            qi = static_cast<ForceReal>(__ldg(d_charge + idx));
 
         size_t my_head = d_head_list[idx];
         unsigned int cur_j = 0;
@@ -247,29 +252,33 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
                     {
                     next_j = __ldg(d_nlist + my_head + neigh_idx + tpp);
                     }
-                // get the neighbor's position
-                Scalar4 postypej = __ldg(d_pos + cur_j);
-                Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
+                // get the neighbor's position — narrow to ForceReal
+                ForceReal4 postypej = hoomd::loadPosForceReal(d_pos, cur_j);
+                ForceReal3 posj = make_forcereal3(postypej.x, postypej.y, postypej.z);
 
-                Scalar qj = Scalar(0.0);
+                ForceReal qj = ForceReal(0.0);
                 if (evaluator::needsCharge())
-                    qj = __ldg(d_charge + cur_j);
+                    qj = static_cast<ForceReal>(__ldg(d_charge + cur_j));
 
-                // calculate dr (with periodic boundary conditions)
-                Scalar3 dx = posi - posj;
+                // calculate dr (with periodic boundary conditions) in ForceReal
+                ForceReal3 dx = posi - posj;
 
-                // apply periodic boundary conditions
+                // apply periodic boundary conditions in ForceReal precision
+#ifdef HOOMD_MIXED_PRECISION
+                dx = box.minImageForceReal(dx);
+#else
                 dx = box.minImage(dx);
+#endif
 
                 // calculate r squared
-                Scalar rsq = dot(dx, dx);
+                ForceReal rsq = dot(dx, dx);
 
                 // access the per type pair parameters
                 unsigned int typpair
-                    = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
-                Scalar rcutsq;
+                    = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
+                ForceReal rcutsq;
                 const typename evaluator::param_type* param = nullptr;
-                Scalar ronsq = Scalar(0.0);
+                ForceReal ronsq = ForceReal(0.0);
 
                 if (enable_shared_cache)
                     {
@@ -281,11 +290,11 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
                     }
                 else
                     {
-                    rcutsq = d_rcutsq[typpair];
+                    rcutsq = static_cast<ForceReal>(d_rcutsq[typpair]);
                     param = d_params + typpair;
 
                     if (shift_mode == 2)
-                        ronsq = d_ronsq[typpair];
+                        ronsq = static_cast<ForceReal>(d_ronsq[typpair]);
                     }
 
                 // design specifies that energies are shifted if
@@ -301,8 +310,8 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
                     }
 
                 // evaluate the potential
-                Scalar force_divr = Scalar(0.0);
-                Scalar pair_eng = Scalar(0.0);
+                ForceReal force_divr = ForceReal(0.0);
+                ForceReal pair_eng = ForceReal(0.0);
 
                 evaluator eval(rsq, rcutsq, *param);
                 if (evaluator::needsCharge())
@@ -315,20 +324,21 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
                     if (rsq >= ronsq && rsq < rcutsq)
                         {
                         // Implement XPLOR smoothing
-                        Scalar old_pair_eng = pair_eng;
-                        Scalar old_force_divr = force_divr;
+                        ForceReal old_pair_eng = pair_eng;
+                        ForceReal old_force_divr = force_divr;
 
                         // calculate 1.0 / (xplor denominator)
-                        Scalar xplor_denom_inv
-                            = Scalar(1.0)
+                        ForceReal xplor_denom_inv
+                            = ForceReal(1.0)
                               / ((rcutsq - ronsq) * (rcutsq - ronsq) * (rcutsq - ronsq));
 
-                        Scalar rsq_minus_r_cut_sq = rsq - rcutsq;
-                        Scalar s = rsq_minus_r_cut_sq * rsq_minus_r_cut_sq
-                                   * (rcutsq + Scalar(2.0) * rsq - Scalar(3.0) * ronsq)
+                        ForceReal rsq_minus_r_cut_sq = rsq - rcutsq;
+                        ForceReal s = rsq_minus_r_cut_sq * rsq_minus_r_cut_sq
+                                   * (rcutsq + ForceReal(2.0) * rsq - ForceReal(3.0) * ronsq)
                                    * xplor_denom_inv;
-                        Scalar ds_dr_divr
-                            = Scalar(12.0) * (rsq - ronsq) * rsq_minus_r_cut_sq * xplor_denom_inv;
+                        ForceReal ds_dr_divr
+                            = ForceReal(12.0) * (rsq - ronsq) * rsq_minus_r_cut_sq
+                              * xplor_denom_inv;
 
                         // make modifications to the old pair energy and force
                         pair_eng = old_pair_eng * s;
@@ -338,7 +348,7 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
                 // calculate the virial
                 if (compute_virial)
                     {
-                    Scalar force_div2r = Scalar(0.5) * force_divr;
+                    ForceReal force_div2r = ForceReal(0.5) * force_divr;
                     virialxx += dx.x * dx.x * force_div2r;
                     virialxy += dx.x * dx.y * force_div2r;
                     virialxz += dx.x * dx.z * force_div2r;
@@ -357,19 +367,23 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
             }
 
         // potential energy per particle must be halved
-        force.w *= Scalar(0.5);
+        force.w *= ForceReal(0.5);
         }
 
-    // reduce force over threads in cta
-    hoomd::detail::WarpReduce<Scalar, tpp> reducer;
+    // reduce force over threads in cta — using ForceReal for warp reduction
+    hoomd::detail::WarpReduce<ForceReal, tpp> reducer;
     force.x = reducer.Sum(force.x);
     force.y = reducer.Sum(force.y);
     force.z = reducer.Sum(force.z);
     force.w = reducer.Sum(force.w);
 
     // now that the force calculation is complete, write out the result
+    // promote ForceReal -> Scalar for output storage
     if (active && threadIdx.x % tpp == 0)
-        d_force[idx] = force;
+        d_force[idx] = make_scalar4(static_cast<Scalar>(force.x),
+                                    static_cast<Scalar>(force.y),
+                                    static_cast<Scalar>(force.z),
+                                    static_cast<Scalar>(force.w));
 
     if (compute_virial)
         {
@@ -381,14 +395,15 @@ gpu_compute_pair_forces_shared_kernel(Scalar4* d_force,
         virialzz = reducer.Sum(virialzz);
 
         // if we are the first thread in the cta, write out virial to global mem
+        // promote ForceReal -> Scalar for output storage
         if (active && threadIdx.x % tpp == 0)
             {
-            d_virial[0 * virial_pitch + idx] = virialxx;
-            d_virial[1 * virial_pitch + idx] = virialxy;
-            d_virial[2 * virial_pitch + idx] = virialxz;
-            d_virial[3 * virial_pitch + idx] = virialyy;
-            d_virial[4 * virial_pitch + idx] = virialyz;
-            d_virial[5 * virial_pitch + idx] = virialzz;
+            d_virial[0 * virial_pitch + idx] = static_cast<Scalar>(virialxx);
+            d_virial[1 * virial_pitch + idx] = static_cast<Scalar>(virialxy);
+            d_virial[2 * virial_pitch + idx] = static_cast<Scalar>(virialxz);
+            d_virial[3 * virial_pitch + idx] = static_cast<Scalar>(virialyy);
+            d_virial[4 * virial_pitch + idx] = static_cast<Scalar>(virialyz);
+            d_virial[5 * virial_pitch + idx] = static_cast<Scalar>(virialzz);
             }
         }
     }
@@ -436,7 +451,7 @@ struct PairForceComputeKernel
 
             Index2D typpair_idx(pair_args.ntypes);
             size_t param_shared_bytes
-                = (2 * sizeof(Scalar) + sizeof(typename evaluator::param_type))
+                = (2 * sizeof(ForceReal) + sizeof(typename evaluator::param_type))
                   * typpair_idx.getNumElements();
 
             unsigned int max_block_size;

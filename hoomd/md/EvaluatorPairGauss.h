@@ -46,8 +46,8 @@ class EvaluatorPairGauss
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar epsilon;
-        Scalar sigma;
+        ForceReal epsilon;
+        ForceReal sigma;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -66,12 +66,12 @@ class EvaluatorPairGauss
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            sigma = v["sigma"].cast<Scalar>();
-            epsilon = v["epsilon"].cast<Scalar>();
+            sigma = v["sigma"].cast<ForceReal>();
+            epsilon = v["epsilon"].cast<ForceReal>();
             }
 
         // used to facilitate unit testing
-        param_type(Scalar eps, Scalar sig, bool managed = false)
+        param_type(ForceReal eps, ForceReal sig, bool managed = false)
             {
             sigma = sig;
             epsilon = eps;
@@ -97,7 +97,7 @@ class EvaluatorPairGauss
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairGauss(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairGauss(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), epsilon(_params.epsilon), sigma(_params.sigma)
         {
         }
@@ -111,7 +111,7 @@ class EvaluatorPairGauss
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -122,21 +122,21 @@ class EvaluatorPairGauss
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar sigma_sq = sigma * sigma;
-            Scalar r_over_sigma_sq = rsq / sigma_sq;
-            Scalar exp_val = fast::exp(-Scalar(1.0) / Scalar(2.0) * r_over_sigma_sq);
+            ForceReal sigma_sq = sigma * sigma;
+            ForceReal r_over_sigma_sq = rsq / sigma_sq;
+            ForceReal exp_val = fast::exp(-ForceReal(1.0) / ForceReal(2.0) * r_over_sigma_sq);
 
             force_divr = epsilon / sigma_sq * exp_val;
             pair_eng = epsilon * exp_val;
 
             if (energy_shift)
                 {
-                pair_eng -= epsilon * fast::exp(-Scalar(1.0) / Scalar(2.0) * rcutsq / sigma_sq);
+                pair_eng -= epsilon * fast::exp(-ForceReal(1.0) / ForceReal(2.0) * rcutsq / sigma_sq);
                 }
             return true;
             }
@@ -144,12 +144,12 @@ class EvaluatorPairGauss
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -170,10 +170,10 @@ class EvaluatorPairGauss
 #endif
 
     protected:
-    Scalar rsq;     //!< Stored rsq from the constructor
-    Scalar rcutsq;  //!< Stored rcutsq from the constructor
-    Scalar epsilon; //!< epsilon parameter extracted from the params passed to the constructor
-    Scalar sigma;   //!< sigma parameter extracted from the params passed to the constructor
+    ForceReal rsq;     //!< Stored rsq from the constructor
+    ForceReal rcutsq;  //!< Stored rcutsq from the constructor
+    ForceReal epsilon; //!< epsilon parameter extracted from the params passed to the constructor
+    ForceReal sigma;   //!< sigma parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

@@ -49,8 +49,8 @@ class EvaluatorPairEwald
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar kappa;
-        Scalar alpha;
+        ForceReal kappa;
+        ForceReal alpha;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -66,8 +66,8 @@ class EvaluatorPairEwald
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            kappa = v["kappa"].cast<Scalar>();
-            alpha = v["alpha"].cast<Scalar>();
+            kappa = v["kappa"].cast<ForceReal>();
+            alpha = v["alpha"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -90,7 +90,7 @@ class EvaluatorPairEwald
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairEwald(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairEwald(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), kappa(_params.kappa), alpha(_params.alpha)
         {
         }
@@ -104,7 +104,7 @@ class EvaluatorPairEwald
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj)
+    DEVICE void setCharge(ForceReal qi, ForceReal qj)
         {
         qiqj = qi * qj;
         }
@@ -118,27 +118,27 @@ class EvaluatorPairEwald
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         if (rsq < rcutsq && qiqj != 0)
             {
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r = Scalar(1.0) / rinv;
-            Scalar r2inv = Scalar(1.0) / rsq;
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r = ForceReal(1.0) / rinv;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
 
-            Scalar arg1 = kappa * r + alpha / (Scalar(2.0) * kappa);
-            Scalar arg2 = kappa * r - alpha / (Scalar(2.0) * kappa);
-            Scalar expfac1 = fast::exp(alpha * r);
-            Scalar expfac2 = fast::exp(-alpha * r);
-            Scalar val
-                = Scalar(0.5) * (fast::erfc(arg1) * expfac1 + fast::erfc(arg2) * expfac2) * rinv;
+            ForceReal arg1 = kappa * r + alpha / (ForceReal(2.0) * kappa);
+            ForceReal arg2 = kappa * r - alpha / (ForceReal(2.0) * kappa);
+            ForceReal expfac1 = fast::exp(alpha * r);
+            ForceReal expfac2 = fast::exp(-alpha * r);
+            ForceReal val
+                = ForceReal(0.5) * (fast::erfc(arg1) * expfac1 + fast::erfc(arg2) * expfac2) * rinv;
 
             force_divr = qiqj * r2inv
                          * (val
-                            + expfac2 * Scalar(2.0) * kappa * fast::exp(-arg2 * arg2)
-                                  / fast::sqrt(Scalar(M_PI))
-                            + alpha * Scalar(0.5) * expfac2 * fast::erfc(arg2)
-                            - alpha * Scalar(0.5) * expfac1 * fast::erfc(arg1));
+                            + expfac2 * ForceReal(2.0) * kappa * fast::exp(-arg2 * arg2)
+                                  / fast::sqrt(ForceReal(M_PI))
+                            + alpha * ForceReal(0.5) * expfac2 * fast::erfc(arg2)
+                            - alpha * ForceReal(0.5) * expfac1 * fast::erfc(arg1));
             pair_eng = qiqj * val;
 
             return true;
@@ -147,12 +147,12 @@ class EvaluatorPairEwald
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -173,11 +173,11 @@ class EvaluatorPairEwald
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar kappa;  //!< Splitting parameter
-    Scalar alpha;  //!< Debye screening parameter
-    Scalar qiqj;   //!< product of qi and qj
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal kappa;  //!< Splitting parameter
+    ForceReal alpha;  //!< Debye screening parameter
+    ForceReal qiqj;   //!< product of qi and qj
     };
 
     } // end namespace md

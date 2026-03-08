@@ -204,10 +204,12 @@ template<class evaluator> void PotentialPairDPDThermo<evaluator>::computeForces(
                 energy_shift = true;
 
             // compute the force and potential energy
-            Scalar force_divr = Scalar(0.0);
-            Scalar force_divr_cons = Scalar(0.0);
-            Scalar pair_eng = Scalar(0.0);
-            evaluator eval(rsq, rcutsq, param);
+            ForceReal fr_force_divr = ForceReal(0.0);
+            ForceReal fr_force_divr_cons = ForceReal(0.0);
+            ForceReal fr_pair_eng = ForceReal(0.0);
+            evaluator eval(static_cast<ForceReal>(rsq),
+                           static_cast<ForceReal>(rcutsq),
+                           param);
 
             // Special Potential Pair DPD Requirements
             const Scalar currentTemp = m_T->operator()(timestep);
@@ -216,12 +218,15 @@ template<class evaluator> void PotentialPairDPDThermo<evaluator>::computeForces(
             unsigned int tagi = h_tag.data[i];
             unsigned int tagj = h_tag.data[j];
             eval.set_seed_ij_timestep(seed, tagi, tagj, timestep);
-            eval.setDeltaT(this->m_deltaT);
-            eval.setRDotV(rdotv);
-            eval.setT(currentTemp);
+            eval.setDeltaT(static_cast<ForceReal>(this->m_deltaT));
+            eval.setRDotV(static_cast<ForceReal>(rdotv));
+            eval.setT(static_cast<ForceReal>(currentTemp));
 
-            bool evaluated
-                = eval.evalForceEnergyThermo(force_divr, force_divr_cons, pair_eng, energy_shift);
+            bool evaluated = eval.evalForceEnergyThermo(
+                fr_force_divr, fr_force_divr_cons, fr_pair_eng, energy_shift);
+            Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+            Scalar force_divr_cons = static_cast<Scalar>(fr_force_divr_cons);
+            Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
 
             if (evaluated)
                 {

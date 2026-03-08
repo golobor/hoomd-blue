@@ -341,6 +341,13 @@ void ParticleData::allocate(unsigned int N)
     GPUArray<Scalar4> pos(N, m_exec_conf);
     m_pos.swap(pos);
 
+#ifdef HOOMD_MIXED_PRECISION
+    // position corrections for mixed precision
+    GPUArray<Scalar4> pos_correction(N, m_exec_conf);
+    m_pos_correction.swap(pos_correction);
+    m_pos_correction.zeroFill();
+#endif
+
     // velocities
     GPUArray<Scalar4> vel(N, m_exec_conf);
     m_vel.swap(vel);
@@ -420,6 +427,13 @@ void ParticleData::allocateAlternateArrays(unsigned int N)
     // positions
     GPUArray<Scalar4> pos_alt(N, m_exec_conf);
     m_pos_alt.swap(pos_alt);
+
+#ifdef HOOMD_MIXED_PRECISION
+    // position correction alt
+    GPUArray<Scalar4> pos_correction_alt(N, m_exec_conf);
+    m_pos_correction_alt.swap(pos_correction_alt);
+    m_pos_correction_alt.zeroFill();
+#endif
 
     // velocities
     GPUArray<Scalar4> vel_alt(N, m_exec_conf);
@@ -557,6 +571,9 @@ void ParticleData::reallocate(unsigned int max_n)
     m_max_nparticles = max_n;
 
     m_pos.resize(max_n);
+#ifdef HOOMD_MIXED_PRECISION
+    m_pos_correction.resize(max_n);
+#endif
     m_vel.resize(max_n);
     m_accel.resize(max_n);
     m_charge.resize(max_n);
@@ -594,6 +611,9 @@ void ParticleData::reallocate(unsigned int max_n)
         {
         // reallocate alternate arrays
         m_pos_alt.resize(max_n);
+#ifdef HOOMD_MIXED_PRECISION
+        m_pos_correction_alt.resize(max_n);
+#endif
         m_vel_alt.resize(max_n);
         m_accel_alt.resize(max_n);
         m_charge_alt.resize(max_n);

@@ -76,9 +76,9 @@ class EvaluatorPairDPDThermoLJ
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar sigma_6;
-        Scalar epsilon_x_4;
-        Scalar gamma;
+        ForceReal sigma_6;
+        ForceReal epsilon_x_4;
+        ForceReal gamma;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -97,11 +97,11 @@ class EvaluatorPairDPDThermoLJ
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            auto sigma(v["sigma"].cast<Scalar>());
-            auto epsilon(v["epsilon"].cast<Scalar>());
+            auto sigma(v["sigma"].cast<ForceReal>());
+            auto epsilon(v["epsilon"].cast<ForceReal>());
             sigma_6 = sigma * sigma * sigma * sigma * sigma * sigma;
-            epsilon_x_4 = Scalar(4.0) * epsilon;
-            gamma = v["gamma"].cast<Scalar>();
+            epsilon_x_4 = ForceReal(4.0) * epsilon;
+            gamma = v["gamma"].cast<ForceReal>();
             if (gamma == 0)
                 throw std::invalid_argument(
                     "Cannot set gamma to 0, try using DPDConservative instead.");
@@ -123,7 +123,7 @@ class EvaluatorPairDPDThermoLJ
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairDPDThermoLJ(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairDPDThermoLJ(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), lj1(_params.epsilon_x_4 * _params.sigma_6 * _params.sigma_6),
           lj2(_params.epsilon_x_4 * _params.sigma_6), gamma(_params.gamma)
         {
@@ -140,19 +140,19 @@ class EvaluatorPairDPDThermoLJ
         }
 
     //! Set the timestep size
-    DEVICE void setDeltaT(Scalar dt)
+    DEVICE void setDeltaT(ForceReal dt)
         {
         m_deltaT = dt;
         }
 
     //! Set the velocity term
-    DEVICE void setRDotV(Scalar dot)
+    DEVICE void setRDotV(ForceReal dot)
         {
         m_dot = dot;
         }
 
     //! Set the temperature
-    DEVICE void setT(Scalar Temp)
+    DEVICE void setT(ForceReal Temp)
         {
         m_T = Temp;
         }
@@ -166,7 +166,7 @@ class EvaluatorPairDPDThermoLJ
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -177,21 +177,21 @@ class EvaluatorPairDPDThermoLJ
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r6inv = r2inv * r2inv * r2inv;
-            force_divr = r2inv * r6inv * (Scalar(12.0) * lj1 * r6inv - Scalar(6.0) * lj2);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r6inv = r2inv * r2inv * r2inv;
+            force_divr = r2inv * r6inv * (ForceReal(12.0) * lj1 * r6inv - ForceReal(6.0) * lj2);
 
             pair_eng = r6inv * (lj1 * r6inv - lj2);
 
             if (energy_shift)
                 {
-                Scalar rcut2inv = Scalar(1.0) / rcutsq;
-                Scalar rcut6inv = rcut2inv * rcut2inv * rcut2inv;
+                ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+                ForceReal rcut6inv = rcut2inv * rcut2inv * rcut2inv;
                 pair_eng -= rcut6inv * (lj1 * rcut6inv - lj2);
                 }
             return true;
@@ -213,18 +213,18 @@ class EvaluatorPairDPDThermoLJ
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
 
-    DEVICE bool evalForceEnergyThermo(Scalar& force_divr,
-                                      Scalar& force_divr_cons,
-                                      Scalar& pair_eng,
+    DEVICE bool evalForceEnergyThermo(ForceReal& force_divr,
+                                      ForceReal& force_divr_cons,
+                                      ForceReal& pair_eng,
                                       bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r6inv = r2inv * r2inv * r2inv;
-            Scalar rcutinv = fast::rsqrt(rcutsq);
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r6inv = r2inv * r2inv * r2inv;
+            ForceReal rcutinv = fast::rsqrt(rcutsq);
 
             // force calculation
 
@@ -246,10 +246,10 @@ class EvaluatorPairDPDThermoLJ
                 hoomd::Counter(m_oi, m_oj));
 
             // Generate a single random number
-            Scalar alpha = hoomd::UniformDistribution<Scalar>(-1, 1)(rng);
+            ForceReal alpha = hoomd::UniformDistribution<ForceReal>(-1, 1)(rng);
 
             // conservative lj
-            force_divr = r2inv * r6inv * (Scalar(12.0) * lj1 * r6inv - Scalar(6.0) * lj2);
+            force_divr = r2inv * r6inv * (ForceReal(12.0) * lj1 * r6inv - ForceReal(6.0) * lj2);
             force_divr_cons = force_divr;
 
             //  Drag Term
@@ -257,15 +257,15 @@ class EvaluatorPairDPDThermoLJ
 
             //  Random Force
             force_divr
-                += fast::rsqrt(m_deltaT / (m_T * gamma * Scalar(6.0))) * (rinv - rcutinv) * alpha;
+                += fast::rsqrt(m_deltaT / (m_T * gamma * ForceReal(6.0))) * (rinv - rcutinv) * alpha;
 
             // conservative energy only
             pair_eng = r6inv * (lj1 * r6inv - lj2);
 
             if (energy_shift)
                 {
-                Scalar rcut2inv = Scalar(1.0) / rcutsq;
-                Scalar rcut6inv = rcut2inv * rcut2inv * rcut2inv;
+                ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+                ForceReal rcut6inv = rcut2inv * rcut2inv * rcut2inv;
                 pair_eng -= rcut6inv * (lj1 * rcut6inv - lj2);
                 }
 
@@ -275,12 +275,12 @@ class EvaluatorPairDPDThermoLJ
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -301,18 +301,18 @@ class EvaluatorPairDPDThermoLJ
 #endif
 
     protected:
-    Scalar rsq;          //!< Stored rsq from the constructor
-    Scalar rcutsq;       //!< Stored rcutsq from the constructor
-    Scalar lj1;          //!< lj1 parameter extracted from the params passed to the constructor
-    Scalar lj2;          //!< lj2 parameter extracted from the params passed to the constructor
-    Scalar gamma;        //!< gamma parameter for potential extracted from params by constructor
+    ForceReal rsq;          //!< Stored rsq from the constructor
+    ForceReal rcutsq;       //!< Stored rcutsq from the constructor
+    ForceReal lj1;          //!< lj1 parameter extracted from the params passed to the constructor
+    ForceReal lj2;          //!< lj2 parameter extracted from the params passed to the constructor
+    ForceReal gamma;        //!< gamma parameter for potential extracted from params by constructor
     uint16_t m_seed;     //!< User set seed for thermostat PRNG
     unsigned int m_i;    //!< index of first particle (should it be tag?).  For use in PRNG
     unsigned int m_j;    //!< index of second particle (should it be tag?). For use in PRNG
     uint64_t m_timestep; //!< timestep for use in PRNG
-    Scalar m_T;          //!< Temperature for Themostat
-    Scalar m_dot;        //!< Velocity difference dotted with displacement vector
-    Scalar m_deltaT;     //!<  timestep size stored from constructor
+    ForceReal m_T;          //!< Temperature for Themostat
+    ForceReal m_dot;        //!< Velocity difference dotted with displacement vector
+    ForceReal m_deltaT;     //!<  timestep size stored from constructor
     };
 
 #undef DEVICE

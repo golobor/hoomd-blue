@@ -46,9 +46,9 @@ class EvaluatorPairMoliere
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar qi;
-        Scalar qj;
-        Scalar aF;
+        ForceReal qi;
+        ForceReal qj;
+        ForceReal aF;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -64,9 +64,9 @@ class EvaluatorPairMoliere
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            qi = v["qi"].cast<Scalar>();
-            qj = v["qj"].cast<Scalar>();
-            aF = v["aF"].cast<Scalar>();
+            qi = v["qi"].cast<ForceReal>();
+            qj = v["qj"].cast<ForceReal>();
+            aF = v["aF"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -85,7 +85,7 @@ class EvaluatorPairMoliere
         \param _rcutsq Squared distance at which the potential goes to zero.
         \param _params Per type-pair parameters of this potential
     */
-    DEVICE EvaluatorPairMoliere(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairMoliere(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), Zsq(_params.qi * _params.qj), aF(_params.aF)
         {
         }
@@ -99,7 +99,7 @@ class EvaluatorPairMoliere
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy.
     /*! \param force_divr Output parameter to write the computed force divided by r
@@ -109,34 +109,34 @@ class EvaluatorPairMoliere
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && Zsq != 0 && aF != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar rinv = fast::rsqrt(rsq);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal rinv = fast::rsqrt(rsq);
 
             // precalculate the exponential terms
-            Scalar exp1 = Scalar(0.35) * fast::exp(Scalar(-0.3) / aF / rinv);
-            Scalar exp2 = Scalar(0.55) * fast::exp(Scalar(-1.2) / aF / rinv);
-            Scalar exp3 = Scalar(0.1) * fast::exp(Scalar(-6.0) / aF / rinv);
+            ForceReal exp1 = ForceReal(0.35) * fast::exp(ForceReal(-0.3) / aF / rinv);
+            ForceReal exp2 = ForceReal(0.55) * fast::exp(ForceReal(-1.2) / aF / rinv);
+            ForceReal exp3 = ForceReal(0.1) * fast::exp(ForceReal(-6.0) / aF / rinv);
 
             // evaluate the force
             force_divr = rinv * (exp1 + exp2 + exp3);
-            force_divr += Scalar(1.0) / aF
-                          * (Scalar(0.3) * exp1 + Scalar(1.2) * exp2 + Scalar(6.0) * exp3);
+            force_divr += ForceReal(1.0) / aF
+                          * (ForceReal(0.3) * exp1 + ForceReal(1.2) * exp2 + ForceReal(6.0) * exp3);
             force_divr *= Zsq * r2inv;
 
             // evaluate the pair energy
             pair_eng = Zsq * rinv * (exp1 + exp2 + exp3);
             if (energy_shift)
                 {
-                Scalar rcutinv = fast::rsqrt(rcutsq);
+                ForceReal rcutinv = fast::rsqrt(rcutsq);
 
-                Scalar expcut1 = Scalar(0.35) * fast::exp(Scalar(-0.3) / aF / rcutinv);
-                Scalar expcut2 = Scalar(0.55) * fast::exp(Scalar(-1.2) / aF / rcutinv);
-                Scalar expcut3 = Scalar(0.1) * fast::exp(Scalar(-6.0) / aF / rcutinv);
+                ForceReal expcut1 = ForceReal(0.35) * fast::exp(ForceReal(-0.3) / aF / rcutinv);
+                ForceReal expcut2 = ForceReal(0.55) * fast::exp(ForceReal(-1.2) / aF / rcutinv);
+                ForceReal expcut3 = ForceReal(0.1) * fast::exp(ForceReal(-6.0) / aF / rcutinv);
 
                 pair_eng -= Zsq * rcutinv * (expcut1 + expcut2 + expcut3);
                 }
@@ -147,12 +147,12 @@ class EvaluatorPairMoliere
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -173,10 +173,10 @@ class EvaluatorPairMoliere
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar Zsq;    //!< Zsq parameter extracted from the params passed to the constructor
-    Scalar aF;     //!< aF parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal Zsq;    //!< Zsq parameter extracted from the params passed to the constructor
+    ForceReal aF;     //!< aF parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

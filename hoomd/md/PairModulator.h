@@ -139,10 +139,10 @@ template<typename PairEvaluator, typename DirectionalEnvelope> class PairModulat
       \param _q_j Quaternion of the j^{th} particle
       \param _params Per type pair parameters of the potential
     */
-    DEVICE PairModulator(const Scalar3& _dr,
+    DEVICE PairModulator(const ForceReal3& _dr,
                          const Scalar4& _q_i,
                          const Scalar4& _q_j,
-                         const Scalar _rcutsq,
+                         const ForceReal _rcutsq,
                          const param_type& _params)
         : dr(_dr), rsq(dot(_dr, _dr)), rcutsq(_rcutsq), q_i(_q_i), q_j(_q_j), params(_params),
           shape_i(nullptr), shape_j(nullptr), m_charge_i(0), m_charge_j(0)
@@ -154,7 +154,7 @@ template<typename PairEvaluator, typename DirectionalEnvelope> class PairModulat
         return (PairEvaluator::needsCharge() || DirectionalEnvelope::needsCharge());
         }
 
-    DEVICE void setCharge(Scalar qi, Scalar qj)
+    DEVICE void setCharge(ForceReal qi, ForceReal qj)
         {
         m_charge_i = qi;
         m_charge_j = qj;
@@ -193,37 +193,40 @@ template<typename PairEvaluator, typename DirectionalEnvelope> class PairModulat
       method. Cutoff tests are performed in PotentialPair. \return True if force and energy are
       evaluated, false if not because r>rcut.
     */
-    DEVICE bool evaluate(Scalar3& force,
-                         Scalar& pair_eng,
+    DEVICE bool evaluate(ForceReal3& force,
+                         ForceReal& pair_eng,
                          bool energy_shift,
-                         Scalar3& torque_i,
-                         Scalar3& torque_j)
+                         ForceReal3& torque_i,
+                         ForceReal3& torque_j)
         {
-        force = make_scalar3(0, 0, 0);
-        pair_eng = Scalar(0);
-        torque_i = make_scalar3(0, 0, 0);
-        torque_j = make_scalar3(0, 0, 0);
+        force = make_forcereal3(0, 0, 0);
+        pair_eng = ForceReal(0);
+        torque_i = make_forcereal3(0, 0, 0);
+        torque_j = make_forcereal3(0, 0, 0);
 
         for (unsigned int envelope_i = 0; envelope_i < shape_i->envelope.size(); envelope_i++)
             {
             for (unsigned int envelope_j = 0; envelope_j < shape_j->envelope.size(); envelope_j++)
                 {
-                Scalar3 this_force = make_scalar3(0, 0, 0);
-                Scalar3 grad_envelopes = make_scalar3(0, 0, 0);
-                Scalar this_pair_eng = Scalar(0);
-                Scalar3 this_torque_i = make_scalar3(0, 0, 0);
-                Scalar3 this_torque_j = make_scalar3(0, 0, 0);
-                Scalar force_divr(Scalar(0));
-                Scalar envelope(Scalar(0));
+                ForceReal3 this_force = make_forcereal3(0, 0, 0);
+                ForceReal3 grad_envelopes = make_forcereal3(0, 0, 0);
+                ForceReal this_pair_eng = ForceReal(0);
+                ForceReal3 this_torque_i = make_forcereal3(0, 0, 0);
+                ForceReal3 this_torque_j = make_forcereal3(0, 0, 0);
+                ForceReal fr_force_divr(ForceReal(0));
+                ForceReal envelope(ForceReal(0));
 
                 PairEvaluator pair_eval(rsq, rcutsq, params.pair_p);
                 pair_eval.setCharge(m_charge_i, m_charge_j);
 
                 // compute pair potential
-                if (!pair_eval.evalForceAndEnergy(force_divr, this_pair_eng, energy_shift))
+                ForceReal fr_this_pair_eng(ForceReal(0));
+                if (!pair_eval.evalForceAndEnergy(fr_force_divr, fr_this_pair_eng, energy_shift))
                     {
                     return false;
                     }
+                ForceReal force_divr = fr_force_divr;
+                this_pair_eng = fr_this_pair_eng;
 
                 DirectionalEnvelope envel_eval(dr,
                                                q_i,
@@ -284,16 +287,16 @@ template<typename PairEvaluator, typename DirectionalEnvelope> class PairModulat
 #endif
 
     protected:
-    Scalar3 dr;
-    Scalar rsq;
-    Scalar rcutsq;
+    ForceReal3 dr;
+    ForceReal rsq;
+    ForceReal rcutsq;
     const Scalar4& q_i;
     const Scalar4& q_j;
     const param_type& params;
     const shape_type* shape_i;
     const shape_type* shape_j;
 
-    Scalar m_charge_i, m_charge_j;
+    ForceReal m_charge_i, m_charge_j;
     };
 
     } // end namespace md

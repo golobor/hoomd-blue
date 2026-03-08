@@ -387,6 +387,16 @@ DEVICE inline Scalar3 vec_to_scalar3(const vec3<Scalar>& a)
     return make_scalar3(a.x, a.y, a.z);
     }
 
+//! Convenience function for converting a vec3 to a ForceReal3
+/*! Narrows Scalar or LongReal components to ForceReal (may be lossy in mixed precision). */
+template<typename Real>
+DEVICE inline ForceReal3 vec_to_forcereal3(const vec3<Real>& a)
+    {
+    return make_forcereal3(static_cast<ForceReal>(a.x),
+                           static_cast<ForceReal>(a.y),
+                           static_cast<ForceReal>(a.z));
+    }
+
 //! Convenience function for converting a vec3 and a w to a Scalar4
 DEVICE inline Scalar4 vec_to_scalar4(const vec3<Scalar>& a, Scalar w)
     {

@@ -251,21 +251,30 @@ inline void PotentialPairAlchemical<evaluator, extra_pkg, alpha_particle_type>::
     // calculate alchemical derivatives if needed
     if (pkg.calculate_derivatives && in_rcut && mask.any())
         {
-        std::array<Scalar, evaluator::num_alchemical_parameters> alchemical_derivatives = {};
-        eval.evalAlchemyDerivatives(alchemical_derivatives, alphas);
+        std::array<ForceReal, evaluator::num_alchemical_parameters> fr_alchemical_derivatives = {};
+        std::array<ForceReal, evaluator::num_alchemical_parameters> fr_alphas;
+        for (unsigned int a = 0; a < evaluator::num_alchemical_parameters; a++)
+            fr_alphas[a] = static_cast<ForceReal>(alphas[a]);
+        eval.evalAlchemyDerivatives(fr_alchemical_derivatives, fr_alphas);
         for (unsigned int k = 0; k < evaluator::num_alchemical_parameters; k++)
             {
             if (mask[k])
                 {
-                pkg.force_handles[alchemy_index][i] += alchemical_derivatives[k] * Scalar(-0.5);
-                pkg.force_handles[alchemy_index][j] += alchemical_derivatives[k] * Scalar(-0.5);
+                Scalar deriv = static_cast<Scalar>(fr_alchemical_derivatives[k]);
+                pkg.force_handles[alchemy_index][i] += deriv * Scalar(-0.5);
+                pkg.force_handles[alchemy_index][j] += deriv * Scalar(-0.5);
                 }
             alchemy_index += m_alchemy_index.getNumElements();
             }
         }
 
     // update parameter values with current alphas (MUST! be performed after dAlpha calculations)
-    eval.updateAlchemyParams(alphas);
+    {
+    std::array<ForceReal, evaluator::num_alchemical_parameters> fr_alphas;
+    for (unsigned int a = 0; a < evaluator::num_alchemical_parameters; a++)
+        fr_alphas[a] = static_cast<ForceReal>(alphas[a]);
+    eval.updateAlchemyParams(fr_alphas);
+    }
     }
 
 template<class evaluator, typename extra_pkg, typename alpha_particle_type>
@@ -405,15 +414,21 @@ void PotentialPairAlchemical<evaluator, extra_pkg, alpha_particle_type>::compute
                     }
 
                 // compute the force and potential energy
-                Scalar force_divr = Scalar(0.0);
-                Scalar pair_eng = Scalar(0.0);
-                evaluator eval(rsq, rcutsq, param);
+                ForceReal fr_force_divr = ForceReal(0.0);
+                ForceReal fr_pair_eng = ForceReal(0.0);
+                evaluator eval(static_cast<ForceReal>(rsq),
+                               static_cast<ForceReal>(rcutsq),
+                               param);
                 if (evaluator::needsCharge())
-                    eval.setCharge(qi, qj);
+                    eval.setCharge(static_cast<ForceReal>(qi),
+                                   static_cast<ForceReal>(qj));
 
                 pkgPerNeighbor(i, j, typei, typej, (rsq < rcutsq), eval, pkg);
 
-                bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, energy_shift);
+                bool evaluated
+                    = eval.evalForceAndEnergy(fr_force_divr, fr_pair_eng, energy_shift);
+                Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+                Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
 
                 if (evaluated)
                     {

@@ -149,6 +149,7 @@ set(_hoomd_headers
     MeshGroupData.h
     MeshDefinition.h
     Messenger.h
+    MixedPrecisionPos.h
     MPIConfiguration.h
     ParticleData.cuh
     ParticleData.h

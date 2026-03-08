@@ -20,6 +20,7 @@ namespace kernel
     {
 //! Kernel driver for the first part of the Brownian update called by TwoStepBDGPU
 hipError_t gpu_brownian_step_one(Scalar4* d_pos,
+                                 Scalar4* d_pos_correction,
                                  Scalar4* d_vel,
                                  int3* d_image,
                                  const BoxDim& box,

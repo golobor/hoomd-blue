@@ -45,7 +45,7 @@ namespace md
    \left(r_{\mathrm{cut}}^2 - r^2 \right)\f]
 
     The DPD Conservative potential does not need charge. One parameter is specified and
-   stored in a Scalar. \a A is placed in \a param.
+   stored in a ForceReal. \a A is placed in \a param.
 
     EvaluatorPairDPDThermo::evalForceEnergyThermo evaluates the function:
     \f{eqnarray*}
@@ -67,7 +67,7 @@ namespace md
    - v_j \f$, and \f$ \theta_{ij} \f$ is a uniformly distributed random number in the range [-1, 1].
 
     The DPD Thermostat potential does not need charge. Two parameters are specified and
-   stored in a Scalar. \a A and \a gamma are placed in \a param.
+   stored in a ForceReal. \a A and \a gamma are placed in \a param.
 
     These are related to the standard lj parameters sigma and epsilon by:
     - \a A = \f$ A \f$
@@ -80,8 +80,8 @@ class EvaluatorPairDPDThermoDPD
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar A;
-        Scalar gamma;
+        ForceReal A;
+        ForceReal gamma;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -96,11 +96,11 @@ class EvaluatorPairDPDThermoDPD
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            A = v["A"].cast<Scalar>();
+            A = v["A"].cast<ForceReal>();
             // protect against a user setting gamma to 0 in dpd
             if (v.contains("gamma"))
                 {
-                auto gam = v["gamma"].cast<Scalar>();
+                auto gam = v["gamma"].cast<ForceReal>();
                 if (gam == 0)
                     throw std::invalid_argument(
                         "Cannot set gamma to 0 in DPD, try using DPDConservative instead.");
@@ -134,7 +134,7 @@ class EvaluatorPairDPDThermoDPD
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairDPDThermoDPD(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairDPDThermoDPD(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), a(_params.A), gamma(_params.gamma)
         {
         }
@@ -150,19 +150,19 @@ class EvaluatorPairDPDThermoDPD
         }
 
     //! Set the timestep size
-    DEVICE void setDeltaT(Scalar dt)
+    DEVICE void setDeltaT(ForceReal dt)
         {
         m_deltaT = dt;
         }
 
     //! Set the velocity term
-    DEVICE void setRDotV(Scalar dot)
+    DEVICE void setRDotV(ForceReal dot)
         {
         m_dot = dot;
         }
 
     //! Set the temperature
-    DEVICE void setT(Scalar Temp)
+    DEVICE void setT(ForceReal Temp)
         {
         m_T = Temp;
         }
@@ -176,7 +176,7 @@ class EvaluatorPairDPDThermoDPD
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy using the conservative force only
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -187,19 +187,19 @@ class EvaluatorPairDPDThermoDPD
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r = Scalar(1.0) / rinv;
-            Scalar rcutinv = fast::rsqrt(rcutsq);
-            Scalar rcut = Scalar(1.0) / rcutinv;
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r = ForceReal(1.0) / rinv;
+            ForceReal rcutinv = fast::rsqrt(rcutsq);
+            ForceReal rcut = ForceReal(1.0) / rcutinv;
 
             // force is easy to calculate
             force_divr = a * (rinv - rcutinv);
-            pair_eng = a * (rcut - r) - Scalar(1.0 / 2.0) * a * rcutinv * (rcutsq - rsq);
+            pair_eng = a * (rcut - r) - ForceReal(1.0 / 2.0) * a * rcutinv * (rcutsq - rsq);
 
             return true;
             }
@@ -219,18 +219,18 @@ class EvaluatorPairDPDThermoDPD
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceEnergyThermo(Scalar& force_divr,
-                                      Scalar& force_divr_cons,
-                                      Scalar& pair_eng,
+    DEVICE bool evalForceEnergyThermo(ForceReal& force_divr,
+                                      ForceReal& force_divr_cons,
+                                      ForceReal& pair_eng,
                                       bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar rinv = fast::rsqrt(rsq);
-            Scalar r = Scalar(1.0) / rinv;
-            Scalar rcutinv = fast::rsqrt(rcutsq);
-            Scalar rcut = Scalar(1.0) / rcutinv;
+            ForceReal rinv = fast::rsqrt(rsq);
+            ForceReal r = ForceReal(1.0) / rinv;
+            ForceReal rcutinv = fast::rsqrt(rcutsq);
+            ForceReal rcut = ForceReal(1.0) / rcutinv;
 
             // force calculation
 
@@ -252,10 +252,10 @@ class EvaluatorPairDPDThermoDPD
                 hoomd::Counter(m_oi, m_oj));
 
             // Generate a single random number
-            Scalar alpha = hoomd::UniformDistribution<Scalar>(-1, 1)(rng);
+            ForceReal alpha = hoomd::UniformDistribution<ForceReal>(-1, 1)(rng);
 
             // conservative dpd
-            // force_divr = FDIV(a,r)*(Scalar(1.0) - r*rcutinv);
+            // force_divr = FDIV(a,r)*(ForceReal(1.0) - r*rcutinv);
             force_divr = a * (rinv - rcutinv);
 
             //  conservative force only
@@ -266,10 +266,10 @@ class EvaluatorPairDPDThermoDPD
 
             //  Random Force
             force_divr
-                += fast::rsqrt(m_deltaT / (m_T * gamma * Scalar(6.0))) * (rinv - rcutinv) * alpha;
+                += fast::rsqrt(m_deltaT / (m_T * gamma * ForceReal(6.0))) * (rinv - rcutinv) * alpha;
 
             // conservative energy only
-            pair_eng = a * (rcut - r) - Scalar(1.0 / 2.0) * a * rcutinv * (rcutsq - rsq);
+            pair_eng = a * (rcut - r) - ForceReal(1.0 / 2.0) * a * rcutinv * (rcutsq - rsq);
 
             return true;
             }
@@ -277,12 +277,12 @@ class EvaluatorPairDPDThermoDPD
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -303,17 +303,17 @@ class EvaluatorPairDPDThermoDPD
 #endif
 
     protected:
-    Scalar rsq;          //!< Stored rsq from the constructor
-    Scalar rcutsq;       //!< Stored rcutsq from the constructor
-    Scalar a;            //!< a parameter for potential extracted from params by constructor
-    Scalar gamma;        //!< gamma parameter for potential extracted from params by constructor
+    ForceReal rsq;          //!< Stored rsq from the constructor
+    ForceReal rcutsq;       //!< Stored rcutsq from the constructor
+    ForceReal a;            //!< a parameter for potential extracted from params by constructor
+    ForceReal gamma;        //!< gamma parameter for potential extracted from params by constructor
     uint16_t m_seed;     //!< User set seed for thermostat PRNG
     unsigned int m_i;    //!< index of first particle (should it be tag?).  For use in PRNG
     unsigned int m_j;    //!< index of second particle (should it be tag?). For use in PRNG
     uint64_t m_timestep; //!< timestep for use in PRNG
-    Scalar m_T;          //!< Temperature for Themostat
-    Scalar m_dot;        //!< Velocity difference dotted with displacement vector
-    Scalar m_deltaT;     //!<  timestep size stored from constructor
+    ForceReal m_T;          //!< Temperature for Themostat
+    ForceReal m_dot;        //!< Velocity difference dotted with displacement vector
+    ForceReal m_deltaT;     //!<  timestep size stored from constructor
     };
 
 #undef DEVICE

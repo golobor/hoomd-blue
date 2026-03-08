@@ -56,8 +56,8 @@ class EvaluatorPairFourier
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar a[3]; //!< Fourier component coefficents
-        Scalar b[3]; //!< Fourier component coefficents
+        ForceReal a[3]; //!< Fourier component coefficents
+        ForceReal b[3]; //!< Fourier component coefficents
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -85,8 +85,8 @@ class EvaluatorPairFourier
 
             for (int i = 0; i < 3; i++)
                 {
-                a[i] = pybind11::cast<Scalar>(py_a[i]);
-                b[i] = pybind11::cast<Scalar>(py_b[i]);
+                a[i] = pybind11::cast<ForceReal>(py_a[i]);
+                b[i] = pybind11::cast<ForceReal>(py_b[i]);
                 }
             }
 
@@ -106,7 +106,7 @@ class EvaluatorPairFourier
         \param _params Per type pair parameters of this potential
     */
 
-    DEVICE EvaluatorPairFourier(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairFourier(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), params(_params)
         {
         }
@@ -120,7 +120,7 @@ class EvaluatorPairFourier
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -132,45 +132,45 @@ class EvaluatorPairFourier
         \return True if they are evaluated or false if they are not because we are beyond the
        cuttoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar half_period = fast::sqrt(rcutsq);
-            Scalar period_scale = M_PI / half_period;
-            Scalar r = fast::sqrt(rsq);
-            Scalar x = r * period_scale;
-            Scalar r1inv = Scalar(1) / r;
-            Scalar r2inv = Scalar(1) / rsq;
-            Scalar r3inv = r1inv * r2inv;
-            Scalar r12inv = r3inv * r3inv * r3inv * r3inv;
-            Scalar a1 = 0;
-            Scalar b1 = 0;
+            ForceReal half_period = fast::sqrt(rcutsq);
+            ForceReal period_scale = M_PI / half_period;
+            ForceReal r = fast::sqrt(rsq);
+            ForceReal x = r * period_scale;
+            ForceReal r1inv = ForceReal(1) / r;
+            ForceReal r2inv = ForceReal(1) / rsq;
+            ForceReal r3inv = r1inv * r2inv;
+            ForceReal r12inv = r3inv * r3inv * r3inv * r3inv;
+            ForceReal a1 = 0;
+            ForceReal b1 = 0;
             for (int i = 2; i < 5; i++)
                 {
-                Scalar pow_neg1_i = (i & 1) ? -1.0 : 1.0;
+                ForceReal pow_neg1_i = (i & 1) ? -1.0 : 1.0;
                 a1 = a1 + pow_neg1_i * params.a[i - 2];
                 b1 = b1 + i * pow_neg1_i * params.b[i - 2];
                 }
-            Scalar theta = x;
-            Scalar s;
-            Scalar c;
+            ForceReal theta = x;
+            ForceReal s;
+            ForceReal c;
             fast::sincos(theta, s, c);
-            Scalar fourier_part = a1 * c + b1 * s;
+            ForceReal fourier_part = a1 * c + b1 * s;
             force_divr = a1 * s - b1 * c;
 
             for (int i = 2; i < 5; i++)
                 {
-                theta = Scalar(i) * x;
+                theta = ForceReal(i) * x;
                 fast::sincos(theta, s, c);
                 fourier_part += params.a[i - 2] * c + params.b[i - 2] * s;
-                force_divr += params.a[i - 2] * Scalar(i) * s - params.b[i - 2] * Scalar(i) * c;
+                force_divr += params.a[i - 2] * ForceReal(i) * s - params.b[i - 2] * ForceReal(i) * c;
                 }
 
             force_divr = r1inv
-                         * (r1inv * r12inv * Scalar(12) + r2inv * period_scale * force_divr
-                            + Scalar(2) * r3inv * fourier_part);
+                         * (r1inv * r12inv * ForceReal(12) + r2inv * period_scale * force_divr
+                            + ForceReal(2) * r3inv * fourier_part);
             pair_eng = r12inv + r2inv * fourier_part;
 
             return true;
@@ -179,12 +179,12 @@ class EvaluatorPairFourier
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -205,8 +205,8 @@ class EvaluatorPairFourier
 #endif
 
     protected:
-    Scalar rsq;               //!< Stored rsq from the constructor
-    Scalar rcutsq;            //!< Stored rcutsq from the constructor
+    ForceReal rsq;               //!< Stored rsq from the constructor
+    ForceReal rcutsq;            //!< Stored rcutsq from the constructor
     const param_type& params; //!< Fourier component coefficents
     };
 

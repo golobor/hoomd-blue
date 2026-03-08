@@ -261,13 +261,16 @@ void PotentialBond<evaluator, Bonds>::computeForces(uint64_t timestep)
         Scalar rsq = dot(dx, dx);
 
         // compute the force and potential energy
-        Scalar force_divr = Scalar(0.0);
-        Scalar bond_eng = Scalar(0.0);
-        evaluator eval(rsq, h_params.data[h_typeval.data[i].type]);
+        ForceReal fr_force_divr = ForceReal(0.0);
+        ForceReal fr_bond_eng = ForceReal(0.0);
+        evaluator eval(static_cast<ForceReal>(rsq), h_params.data[h_typeval.data[i].type]);
         if (evaluator::needsCharge())
-            eval.setCharge(charge_a, charge_b);
+            eval.setCharge(static_cast<ForceReal>(charge_a), static_cast<ForceReal>(charge_b));
 
-        bool evaluated = eval.evalForceAndEnergy(force_divr, bond_eng);
+        bool evaluated = eval.evalForceAndEnergy(fr_force_divr, fr_bond_eng);
+
+        Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+        Scalar bond_eng = static_cast<Scalar>(fr_bond_eng);
 
         // Bond energy must be halved
         bond_eng *= Scalar(0.5);
@@ -349,17 +352,17 @@ Scalar PotentialBond<evaluator, Bonds>::energyDiff(unsigned int idx_a,
     Scalar rsqcd = dot(xcd, xcd);
 
     // compute the force and potential energy
-    Scalar force_divr = Scalar(0.0);
-    Scalar bond_eng1 = Scalar(0.0);
-    Scalar bond_eng2 = Scalar(0.0);
-    evaluator eval1(rsqab, h_params.data[type_id]);
-    evaluator eval2(rsqcd, h_params.data[type_id]);
+    ForceReal fr_force_divr = ForceReal(0.0);
+    ForceReal fr_bond_eng1 = ForceReal(0.0);
+    ForceReal fr_bond_eng2 = ForceReal(0.0);
+    evaluator eval1(static_cast<ForceReal>(rsqab), h_params.data[type_id]);
+    evaluator eval2(static_cast<ForceReal>(rsqcd), h_params.data[type_id]);
 
-    eval1.evalForceAndEnergy(force_divr, bond_eng1);
-    bool evaluated = eval2.evalForceAndEnergy(force_divr, bond_eng2);
+    eval1.evalForceAndEnergy(fr_force_divr, fr_bond_eng1);
+    bool evaluated = eval2.evalForceAndEnergy(fr_force_divr, fr_bond_eng2);
 
     if (evaluated)
-        return (bond_eng2 - bond_eng1);
+        return (static_cast<Scalar>(fr_bond_eng2) - static_cast<Scalar>(fr_bond_eng1));
     else
         return DBL_MAX;
     }

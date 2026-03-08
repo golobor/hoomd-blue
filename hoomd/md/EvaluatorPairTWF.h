@@ -41,9 +41,9 @@ class EvaluatorPairTWF
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar sigma;
-        Scalar alpha;
-        Scalar prefactor;
+        ForceReal sigma;
+        ForceReal alpha;
+        ForceReal prefactor;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -62,12 +62,12 @@ class EvaluatorPairTWF
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            sigma = v["sigma"].cast<Scalar>();
-            alpha = v["alpha"].cast<Scalar>();
-            prefactor = 4.0 * v["epsilon"].cast<Scalar>() / (alpha * alpha);
+            sigma = v["sigma"].cast<ForceReal>();
+            alpha = v["alpha"].cast<ForceReal>();
+            prefactor = 4.0 * v["epsilon"].cast<ForceReal>() / (alpha * alpha);
             }
 
-        param_type(Scalar sigma, Scalar epsilon, Scalar alpha, bool managed = false)
+        param_type(ForceReal sigma, ForceReal epsilon, ForceReal alpha, bool managed = false)
             : sigma(sigma), alpha(alpha), prefactor(4 * epsilon / (alpha * alpha))
             {
             }
@@ -88,7 +88,7 @@ class EvaluatorPairTWF
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairTWF(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairTWF(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), params(_params)
         {
         }
@@ -103,7 +103,7 @@ class EvaluatorPairTWF
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -114,13 +114,13 @@ class EvaluatorPairTWF
         \return True if they are evaluated or false if they are not because
         we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
             // Compute common terms to equations
-            Scalar sigma2 = params.sigma * params.sigma;
+            ForceReal sigma2 = params.sigma * params.sigma;
             // If particles are overlapping return maximum possible energy
             // and force since this is an invalid state and should be
             // infinite energy and force.
@@ -133,22 +133,22 @@ class EvaluatorPairTWF
                 return true;
                 }
 
-            Scalar common_term = 1.0 / (rsq / sigma2 - 1.0);
-            Scalar common_term3 = common_term * common_term * common_term;
-            Scalar common_term6 = common_term3 * common_term3;
+            ForceReal common_term = 1.0 / (rsq / sigma2 - 1.0);
+            ForceReal common_term3 = common_term * common_term * common_term;
+            ForceReal common_term6 = common_term3 * common_term3;
             // Compute force and energy
             pair_eng = params.prefactor * (common_term6 - params.alpha * common_term3);
             // The force term is -(dE / dr) * (1 / r).
-            Scalar force_term = 6 * common_term / sigma2;
+            ForceReal force_term = 6 * common_term / sigma2;
             force_divr
                 = params.prefactor * force_term * (2 * common_term6 - params.alpha * common_term3);
 
             if (energy_shift)
                 {
-                Scalar common_term_shift = 1.0 / (rcutsq / sigma2 - 1.0);
-                Scalar common_term3_shift
+                ForceReal common_term_shift = 1.0 / (rcutsq / sigma2 - 1.0);
+                ForceReal common_term3_shift
                     = common_term_shift * common_term_shift * common_term_shift;
-                Scalar common_term6_shift = common_term3_shift * common_term3_shift;
+                ForceReal common_term6_shift = common_term3_shift * common_term3_shift;
                 pair_eng
                     -= params.prefactor * (common_term6_shift - params.alpha * common_term3_shift);
                 }
@@ -158,12 +158,12 @@ class EvaluatorPairTWF
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -184,8 +184,8 @@ class EvaluatorPairTWF
 #endif
 
     protected:
-    Scalar rsq;        //!< Stored rsq from the constructor
-    Scalar rcutsq;     //!< Stored rcutsq from the constructor
+    ForceReal rsq;        //!< Stored rsq from the constructor
+    ForceReal rcutsq;     //!< Stored rcutsq from the constructor
     param_type params; //!< parameters passed to the constructor
     };
 

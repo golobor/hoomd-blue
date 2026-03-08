@@ -68,7 +68,7 @@ class EvaluatorPairZBL
         \param _rcutsq Squared distance at which the potential goes to zero.
         \param _params Per type-pair parameters of this potential
     */
-    DEVICE EvaluatorPairZBL(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairZBL(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), Zsq(_params.qi * _params.qj), aF(_params.aF)
         {
         }
@@ -82,7 +82,7 @@ class EvaluatorPairZBL
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy.
     /*! \param force_divr Output parameter to write the computed force divided by r
@@ -92,25 +92,25 @@ class EvaluatorPairZBL
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && Zsq != 0 && aF != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar rinv = fast::rsqrt(rsq);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal rinv = fast::rsqrt(rsq);
 
             // precalculate the exponential terms
-            Scalar exp1 = Scalar(0.1818) * fast::exp(Scalar(-3.2) / aF / rinv);
-            Scalar exp2 = Scalar(0.5099) * fast::exp(Scalar(-0.9423) / aF / rinv);
-            Scalar exp3 = Scalar(0.2802) * fast::exp(Scalar(-0.4029) / aF / rinv);
-            Scalar exp4 = Scalar(0.02817) * fast::exp(Scalar(-0.2016) / aF / rinv);
+            ForceReal exp1 = ForceReal(0.1818) * fast::exp(ForceReal(-3.2) / aF / rinv);
+            ForceReal exp2 = ForceReal(0.5099) * fast::exp(ForceReal(-0.9423) / aF / rinv);
+            ForceReal exp3 = ForceReal(0.2802) * fast::exp(ForceReal(-0.4029) / aF / rinv);
+            ForceReal exp4 = ForceReal(0.02817) * fast::exp(ForceReal(-0.2016) / aF / rinv);
 
             // evaluate the force
             force_divr = rinv * (exp1 + exp2 + exp3 + exp4);
-            force_divr += Scalar(1.0) / aF
-                          * (Scalar(3.2) * exp1 + Scalar(0.9423) * exp2 + Scalar(0.4029) * exp3
-                             + Scalar(0.2016) * exp4);
+            force_divr += ForceReal(1.0) / aF
+                          * (ForceReal(3.2) * exp1 + ForceReal(0.9423) * exp2 + ForceReal(0.4029) * exp3
+                             + ForceReal(0.2016) * exp4);
             force_divr *= Zsq * r2inv;
 
             // evaluate the pair energy
@@ -122,12 +122,12 @@ class EvaluatorPairZBL
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -148,10 +148,10 @@ class EvaluatorPairZBL
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar Zsq;    //!< Zsq parameter extracted from the params passed to the constructor
-    Scalar aF;     //!< aF parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal Zsq;    //!< Zsq parameter extracted from the params passed to the constructor
+    ForceReal aF;     //!< aF parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

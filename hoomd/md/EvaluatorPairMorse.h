@@ -47,9 +47,9 @@ class EvaluatorPairMorse
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar D0;
-        Scalar alpha;
-        Scalar r0;
+        ForceReal D0;
+        ForceReal alpha;
+        ForceReal r0;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -65,12 +65,12 @@ class EvaluatorPairMorse
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            D0 = v["D0"].cast<Scalar>();
-            alpha = v["alpha"].cast<Scalar>();
-            r0 = v["r0"].cast<Scalar>();
+            D0 = v["D0"].cast<ForceReal>();
+            alpha = v["alpha"].cast<ForceReal>();
+            r0 = v["r0"].cast<ForceReal>();
             }
 
-        param_type(Scalar d, Scalar a, Scalar r, bool managed = false)
+        param_type(ForceReal d, ForceReal a, ForceReal r, bool managed = false)
             {
             D0 = d;
             alpha = a;
@@ -93,7 +93,7 @@ class EvaluatorPairMorse
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairMorse(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairMorse(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), D0(_params.D0), alpha(_params.alpha), r0(_params.r0)
         {
         }
@@ -107,7 +107,7 @@ class EvaluatorPairMorse
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -118,22 +118,22 @@ class EvaluatorPairMorse
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq)
             {
-            Scalar r = fast::sqrt(rsq);
-            Scalar Exp_factor = fast::exp(-alpha * (r - r0));
+            ForceReal r = fast::sqrt(rsq);
+            ForceReal Exp_factor = fast::exp(-alpha * (r - r0));
 
-            pair_eng = D0 * Exp_factor * (Exp_factor - Scalar(2.0));
-            force_divr = Scalar(2.0) * D0 * alpha * Exp_factor * (Exp_factor - Scalar(1.0)) / r;
+            pair_eng = D0 * Exp_factor * (Exp_factor - ForceReal(2.0));
+            force_divr = ForceReal(2.0) * D0 * alpha * Exp_factor * (Exp_factor - ForceReal(1.0)) / r;
 
             if (energy_shift)
                 {
-                Scalar rcut = fast::sqrt(rcutsq);
-                Scalar Exp_factor_cut = fast::exp(-alpha * (rcut - r0));
-                pair_eng -= D0 * Exp_factor_cut * (Exp_factor_cut - Scalar(2.0));
+                ForceReal rcut = fast::sqrt(rcutsq);
+                ForceReal Exp_factor_cut = fast::exp(-alpha * (rcut - r0));
+                pair_eng -= D0 * Exp_factor_cut * (Exp_factor_cut - ForceReal(2.0));
                 }
             return true;
             }
@@ -141,12 +141,12 @@ class EvaluatorPairMorse
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -167,11 +167,11 @@ class EvaluatorPairMorse
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar D0;     //!< Depth of the Morse potential at its minimum
-    Scalar alpha;  //!< Controls width of the potential well
-    Scalar r0;     //!< Offset, i.e., position of the potential minimum
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal D0;     //!< Depth of the Morse potential at its minimum
+    ForceReal alpha;  //!< Controls width of the potential well
+    ForceReal r0;     //!< Offset, i.e., position of the potential minimum
     };
 
     } // end namespace md

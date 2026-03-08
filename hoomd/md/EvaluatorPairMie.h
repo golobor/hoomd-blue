@@ -49,12 +49,12 @@ class EvaluatorPairMie
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar m1;
-        Scalar m2;
-        Scalar m3;
-        Scalar m4;
-        Scalar sigma;
-        Scalar epsilon;
+        ForceReal m1;
+        ForceReal m2;
+        ForceReal m3;
+        ForceReal m4;
+        ForceReal sigma;
+        ForceReal epsilon;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -70,13 +70,13 @@ class EvaluatorPairMie
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            m3 = v["n"].cast<Scalar>();
-            m4 = v["m"].cast<Scalar>();
+            m3 = v["n"].cast<ForceReal>();
+            m4 = v["m"].cast<ForceReal>();
 
-            epsilon = v["epsilon"].cast<Scalar>();
-            sigma = v["sigma"].cast<Scalar>();
+            epsilon = v["epsilon"].cast<ForceReal>();
+            sigma = v["sigma"].cast<ForceReal>();
 
-            Scalar outFront = (m3 / (m3 - m4)) * fast::pow(m3 / m4, m4 / (m3 - m4));
+            ForceReal outFront = (m3 / (m3 - m4)) * fast::pow(m3 / m4, m4 / (m3 - m4));
             m1 = outFront * epsilon * fast::pow(sigma, m3);
             m2 = outFront * epsilon * fast::pow(sigma, m4);
             }
@@ -101,7 +101,7 @@ class EvaluatorPairMie
         \param -m Second, smaller exponent that captures attraction
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairMie(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairMie(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), mie1(_params.m1), mie2(_params.m2), mie3(_params.m3),
           mie4(_params.m4)
         {
@@ -116,7 +116,7 @@ class EvaluatorPairMie
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -127,22 +127,22 @@ class EvaluatorPairMie
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && mie1 != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar rninv = fast::pow(r2inv, mie3 / Scalar(2.0));
-            Scalar rminv = fast::pow(r2inv, mie4 / Scalar(2.0));
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal rninv = fast::pow(r2inv, mie3 / ForceReal(2.0));
+            ForceReal rminv = fast::pow(r2inv, mie4 / ForceReal(2.0));
             force_divr = r2inv * (mie3 * mie1 * rninv - mie4 * mie2 * rminv);
 
             pair_eng = mie1 * rninv - mie2 * rminv;
 
             if (energy_shift)
                 {
-                Scalar rcutninv = fast::pow(rcutsq, -mie3 / Scalar(2.0));
-                Scalar rcutminv = fast::pow(rcutsq, -mie4 / Scalar(2.0));
+                ForceReal rcutninv = fast::pow(rcutsq, -mie3 / ForceReal(2.0));
+                ForceReal rcutminv = fast::pow(rcutsq, -mie4 / ForceReal(2.0));
                 pair_eng -= mie1 * rcutninv - mie2 * rcutminv;
                 }
             return true;
@@ -151,12 +151,12 @@ class EvaluatorPairMie
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -177,12 +177,12 @@ class EvaluatorPairMie
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar mie1;   //!< mie1 parameter extracted from the params passed to the constructor
-    Scalar mie2;   //!< mie2 parameter extracted from the params passed to the constructor
-    Scalar mie3;   //!< mie3 parameter extracted from the params passed to the constructor
-    Scalar mie4;   //!< mie4 parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal mie1;   //!< mie1 parameter extracted from the params passed to the constructor
+    ForceReal mie2;   //!< mie2 parameter extracted from the params passed to the constructor
+    ForceReal mie3;   //!< mie3 parameter extracted from the params passed to the constructor
+    ForceReal mie4;   //!< mie4 parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

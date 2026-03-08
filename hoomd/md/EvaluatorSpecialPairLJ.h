@@ -88,9 +88,9 @@ class EvaluatorSpecialPairLJ
     /*! \param _rsq Squared distance between the particles
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorSpecialPairLJ(Scalar _rsq, const param_type& _params)
-        : rsq(_rsq), lj1(_params.epsilon_x_4 * _params.sigma_6 * _params.sigma_6),
-          lj2(_params.epsilon_x_4 * _params.sigma_6), rcutsq(_params.r_cutsq)
+    DEVICE EvaluatorSpecialPairLJ(ForceReal _rsq, const param_type& _params)
+        : rsq(_rsq), lj1(ForceReal(_params.epsilon_x_4 * _params.sigma_6 * _params.sigma_6)),
+          lj2(ForceReal(_params.epsilon_x_4 * _params.sigma_6)), rcutsq(ForceReal(_params.r_cutsq))
         {
         }
 
@@ -104,7 +104,7 @@ class EvaluatorSpecialPairLJ
     /*! \param qa Charge of particle a
         \param qb Charge of particle b
     */
-    DEVICE void setCharge(Scalar qa, Scalar qb) { }
+    DEVICE void setCharge(ForceReal qa, ForceReal qb) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -113,14 +113,14 @@ class EvaluatorSpecialPairLJ
         \return True if they are evaluated or false if the bond
                 energy is not defined
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& bond_eng)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& bond_eng)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r6inv = r2inv * r2inv * r2inv;
-            force_divr = r2inv * r6inv * (Scalar(12.0) * lj1 * r6inv - Scalar(6.0) * lj2);
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r6inv = r2inv * r2inv * r2inv;
+            force_divr = r2inv * r6inv * (ForceReal(12.0) * lj1 * r6inv - ForceReal(6.0) * lj2);
 
             bond_eng = r6inv * (lj1 * r6inv - lj2);
             }
@@ -138,10 +138,10 @@ class EvaluatorSpecialPairLJ
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar lj1;    //!< lj1 parameter extracted from the params passed to the constructor
-    Scalar lj2;    //!< lj2 parameter extracted from the params passed to the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal lj1;    //!< lj1 parameter extracted from the params passed to the constructor
+    ForceReal lj2;    //!< lj2 parameter extracted from the params passed to the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
     };
 
     } // end namespace md

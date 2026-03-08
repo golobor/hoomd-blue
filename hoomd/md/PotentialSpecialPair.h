@@ -274,13 +274,16 @@ template<class evaluator> void PotentialSpecialPair<evaluator>::computeForces(ui
         const param_type& param = h_params.data[h_typeval.data[i].type];
 
         // compute the force and potential energy
-        Scalar force_divr = Scalar(0.0);
-        Scalar bond_eng = Scalar(0.0);
-        evaluator eval(rsq, param);
+        ForceReal fr_force_divr = ForceReal(0.0);
+        ForceReal fr_bond_eng = ForceReal(0.0);
+        evaluator eval(ForceReal(rsq), param);
         if (evaluator::needsCharge())
-            eval.setCharge(charge_a, charge_b);
+            eval.setCharge(ForceReal(charge_a), ForceReal(charge_b));
 
-        bool evaluated = eval.evalForceAndEnergy(force_divr, bond_eng);
+        bool evaluated = eval.evalForceAndEnergy(fr_force_divr, fr_bond_eng);
+
+        Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+        Scalar bond_eng = static_cast<Scalar>(fr_bond_eng);
 
         // Bond energy must be halved
         bond_eng *= Scalar(0.5);

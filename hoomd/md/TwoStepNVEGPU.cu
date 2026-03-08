@@ -6,6 +6,7 @@
 // This file is part of the HOOMD-blue project, released under the BSD 3-Clause License.
 
 #include "TwoStepNVEGPU.cuh"
+#include "hoomd/MixedPrecisionPos.h"
 #include "hoomd/VectorMath.h"
 
 #include <assert.h>
@@ -44,6 +45,7 @@ namespace kernel
    transactions on compute 1.3 hardware and more cache hits on Fermi.
 */
 __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
+                                        Scalar4* d_pos_correction,
                                         Scalar4* d_vel,
                                         const Scalar3* d_accel,
                                         int3* d_image,
@@ -68,7 +70,7 @@ __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
         // v(t+deltaT/2) = v(t) + (1/2)a*deltaT
 
         // read the particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 postype = d_pos[idx];
+        Scalar4 postype = loadPosFull(d_pos, d_pos_correction, idx);
         Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
         // read the particle's velocity and acceleration (MEM TRANSFER: 32 bytes)
@@ -103,7 +105,8 @@ __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
         box.wrap(pos, image);
 
         // write out the results (MEM_TRANSFER: 48 bytes)
-        d_pos[idx] = make_scalar4(pos.x, pos.y, pos.z, postype.w);
+        storePosFull(d_pos, d_pos_correction, idx,
+                     make_scalar4(pos.x, pos.y, pos.z, postype.w));
         d_vel[idx] = make_scalar4(vel.x, vel.y, vel.z, velmass.w);
         d_image[idx] = image;
         }
@@ -125,6 +128,7 @@ __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
     See gpu_nve_step_one_kernel() for full documentation, this function is just a driver.
 */
 hipError_t gpu_nve_step_one(Scalar4* d_pos,
+                            Scalar4* d_pos_correction,
                             Scalar4* d_vel,
                             const Scalar3* d_accel,
                             int3* d_image,
@@ -157,6 +161,7 @@ hipError_t gpu_nve_step_one(Scalar4* d_pos,
                        0,
                        0,
                        d_pos,
+                       d_pos_correction,
                        d_vel,
                        d_accel,
                        d_image,

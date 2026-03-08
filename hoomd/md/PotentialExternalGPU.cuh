@@ -126,12 +126,12 @@ __global__ void gpu_compute_external_forces_kernel(Scalar4* d_force,
 
     // read in the position of our particle.
     Scalar4 posi = d_pos[idx];
-    Scalar qi;
+    ForceReal qi;
 
     if (evaluator::needsCharge())
-        qi = d_charge[idx];
+        qi = ForceReal(d_charge[idx]);
     else
-        qi = Scalar(0.0); // Silence compiler warning
+        qi = ForceReal(0.0); // Silence compiler warning
 
     // initialize the force to 0
     Scalar3 force = make_scalar3(Scalar(0.0), Scalar(0.0), Scalar(0.0));

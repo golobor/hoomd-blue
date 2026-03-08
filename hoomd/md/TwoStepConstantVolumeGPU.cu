@@ -2,6 +2,7 @@
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
 #include "TwoStepConstantVolumeGPU.cuh"
+#include "hoomd/MixedPrecisionPos.h"
 #include "hip/hip_runtime.h"
 #include <assert.h>
 
@@ -32,6 +33,7 @@ namespace kernel
    efficiently.
 */
 __global__ void gpu_nvt_rescale_step_one_kernel(Scalar4* d_pos,
+                                                Scalar4* d_pos_correction,
                                                 Scalar4* d_vel,
                                                 const Scalar3* d_accel,
                                                 int3* d_image,
@@ -51,7 +53,7 @@ __global__ void gpu_nvt_rescale_step_one_kernel(Scalar4* d_pos,
         unsigned int idx = d_group_members[group_idx];
 
         // update positions to the next timestep and update velocities to the next half step
-        Scalar4 postype = d_pos[idx];
+        Scalar4 postype = loadPosFull(d_pos, d_pos_correction, idx);
         Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
         Scalar4 velmass = d_vel[idx];
@@ -80,7 +82,8 @@ __global__ void gpu_nvt_rescale_step_one_kernel(Scalar4* d_pos,
         box.wrap(pos, image);
 
         // write out the results
-        d_pos[idx] = make_scalar4(pos.x, pos.y, pos.z, postype.w);
+        storePosFull(d_pos, d_pos_correction, idx,
+                     make_scalar4(pos.x, pos.y, pos.z, postype.w));
         d_vel[idx] = make_scalar4(vel.x, vel.y, vel.z, velmass.w);
         d_image[idx] = image;
         }
@@ -98,6 +101,7 @@ __global__ void gpu_nvt_rescale_step_one_kernel(Scalar4* d_pos,
     \param deltaT Amount of real time to step forward in one time step
 */
 hipError_t gpu_nvt_rescale_step_one(Scalar4* d_pos,
+                                    Scalar4* d_pos_correction,
                                     Scalar4* d_vel,
                                     const Scalar3* d_accel,
                                     int3* d_image,
@@ -130,6 +134,7 @@ hipError_t gpu_nvt_rescale_step_one(Scalar4* d_pos,
                        0,
                        0,
                        d_pos,
+                       d_pos_correction,
                        d_vel,
                        d_accel,
                        d_image,

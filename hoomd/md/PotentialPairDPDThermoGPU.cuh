@@ -271,22 +271,31 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
                 if (shift_mode == 1)
                     energy_shift = true;
 
-                evaluator eval(rsq, rcutsq, param);
+                evaluator eval(static_cast<ForceReal>(rsq),
+                               static_cast<ForceReal>(rcutsq),
+                               param);
 
                 // evaluate the potential
-                Scalar force_divr = Scalar(0.0);
-                Scalar force_divr_cons = Scalar(0.0);
-                Scalar pair_eng = Scalar(0.0);
+                ForceReal fr_force_divr = ForceReal(0.0);
+                ForceReal fr_force_divr_cons = ForceReal(0.0);
+                ForceReal fr_pair_eng = ForceReal(0.0);
 
                 // Special Potential Pair DPD Requirements
                 // use particle i's and j's tags
                 unsigned int tagj = __ldg(d_tag + cur_j);
                 eval.set_seed_ij_timestep(d_seed, tagi, tagj, d_timestep);
-                eval.setDeltaT(d_deltaT);
-                eval.setRDotV(rdotv);
-                eval.setT(d_T);
+                eval.setDeltaT(static_cast<ForceReal>(d_deltaT));
+                eval.setRDotV(static_cast<ForceReal>(rdotv));
+                eval.setT(static_cast<ForceReal>(d_T));
 
-                eval.evalForceEnergyThermo(force_divr, force_divr_cons, pair_eng, energy_shift);
+                eval.evalForceEnergyThermo(fr_force_divr,
+                                           fr_force_divr_cons,
+                                           fr_pair_eng,
+                                           energy_shift);
+
+                Scalar force_divr = static_cast<Scalar>(fr_force_divr);
+                Scalar force_divr_cons = static_cast<Scalar>(fr_force_divr_cons);
+                Scalar pair_eng = static_cast<Scalar>(fr_pair_eng);
 
                 // calculate the virial (FLOPS: 3)
                 if (compute_virial)

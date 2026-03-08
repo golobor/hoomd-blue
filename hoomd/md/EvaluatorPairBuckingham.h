@@ -65,9 +65,9 @@ class EvaluatorPairBuckingham
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar A;
-        Scalar rho;
-        Scalar C;
+        ForceReal A;
+        ForceReal rho;
+        ForceReal C;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -83,9 +83,9 @@ class EvaluatorPairBuckingham
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            A = v["A"].cast<Scalar>();
-            rho = v["rho"].cast<Scalar>();
-            C = v["C"].cast<Scalar>();
+            A = v["A"].cast<ForceReal>();
+            rho = v["rho"].cast<ForceReal>();
+            C = v["C"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -104,7 +104,7 @@ class EvaluatorPairBuckingham
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairBuckingham(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairBuckingham(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), A(_params.A), rho(_params.rho), C(_params.C)
         {
         }
@@ -118,7 +118,7 @@ class EvaluatorPairBuckingham
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -129,28 +129,28 @@ class EvaluatorPairBuckingham
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
-        if (rsq < rcutsq && rho > Scalar(0.0))
+        if (rsq < rcutsq && rho > ForceReal(0.0))
             {
-            Scalar r = fast::sqrt(rsq);
-            Scalar Exp_factor = A * fast::exp(-r / rho);
+            ForceReal r = fast::sqrt(rsq);
+            ForceReal Exp_factor = A * fast::exp(-r / rho);
 
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r6inv = r2inv * r2inv * r2inv;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r6inv = r2inv * r2inv * r2inv;
 
-            force_divr = (Exp_factor / (rho * r)) - (r2inv * r6inv * Scalar(6.0) * C);
+            force_divr = (Exp_factor / (rho * r)) - (r2inv * r6inv * ForceReal(6.0) * C);
 
             pair_eng = Exp_factor - r6inv * C;
 
             if (energy_shift)
                 {
-                Scalar rcut = fast::sqrt(rcutsq);
-                Scalar Exp_factor_cut = A * fast::exp(-rcut / rho);
+                ForceReal rcut = fast::sqrt(rcutsq);
+                ForceReal Exp_factor_cut = A * fast::exp(-rcut / rho);
 
-                Scalar rcut2inv = Scalar(1.0) / rcutsq;
-                Scalar rcut6inv = rcut2inv * rcut2inv * rcut2inv;
+                ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+                ForceReal rcut6inv = rcut2inv * rcut2inv * rcut2inv;
                 pair_eng -= Exp_factor_cut - rcut6inv * C;
                 }
             return true;
@@ -159,12 +159,12 @@ class EvaluatorPairBuckingham
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -185,11 +185,11 @@ class EvaluatorPairBuckingham
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar A;      //!< Buckingham parameter extracted from the params passed to the constructor
-    Scalar rho;    //!< Buckingham parameter extracted from the params passed to the constructor
-    Scalar C;      //!< Buckingham parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal A;      //!< Buckingham parameter extracted from the params passed to the constructor
+    ForceReal rho;    //!< Buckingham parameter extracted from the params passed to the constructor
+    ForceReal C;      //!< Buckingham parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

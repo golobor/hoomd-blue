@@ -50,9 +50,9 @@ class EvaluatorPairExpandedLJ
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar sigma_6;
-        Scalar epsilon_x_4;
-        Scalar delta;
+        ForceReal sigma_6;
+        ForceReal epsilon_x_4;
+        ForceReal delta;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -71,13 +71,13 @@ class EvaluatorPairExpandedLJ
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            auto sigma(v["sigma"].cast<Scalar>());
-            auto epsilon(v["epsilon"].cast<Scalar>());
-            delta = v["delta"].cast<Scalar>();
+            auto sigma(v["sigma"].cast<ForceReal>());
+            auto epsilon(v["epsilon"].cast<ForceReal>());
+            delta = v["delta"].cast<ForceReal>();
 
-            Scalar sigma_3 = sigma * sigma * sigma;
+            ForceReal sigma_3 = sigma * sigma * sigma;
             sigma_6 = sigma_3 * sigma_3;
-            epsilon_x_4 = Scalar(4.0) * epsilon;
+            epsilon_x_4 = ForceReal(4.0) * epsilon;
 
             // parameters used by the evaluator
             // lj1 = 4.0 * epsilon * pow(sigma, 12.0);
@@ -88,11 +88,11 @@ class EvaluatorPairExpandedLJ
             }
 
         // this constructor facilitates unit testing
-        param_type(Scalar sigma, Scalar epsilon, Scalar delta, bool managed = false)
+        param_type(ForceReal sigma, ForceReal epsilon, ForceReal delta, bool managed = false)
             {
-            Scalar sigma_3 = sigma * sigma * sigma;
+            ForceReal sigma_3 = sigma * sigma * sigma;
             sigma_6 = sigma_3 * sigma_3;
-            epsilon_x_4 = Scalar(4.0) * epsilon;
+            epsilon_x_4 = ForceReal(4.0) * epsilon;
             }
 
         pybind11::dict asDict()
@@ -111,7 +111,7 @@ class EvaluatorPairExpandedLJ
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairExpandedLJ(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairExpandedLJ(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), lj1(_params.epsilon_x_4 * _params.sigma_6 * _params.sigma_6),
           lj2(_params.epsilon_x_4 * _params.sigma_6), delta(_params.delta)
         {
@@ -126,7 +126,7 @@ class EvaluatorPairExpandedLJ
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) const { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) const { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -137,32 +137,32 @@ class EvaluatorPairExpandedLJ
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // precompute some quantities
-        Scalar rinv = fast::rsqrt(rsq);
-        Scalar r = Scalar(1.0) / rinv;
+        ForceReal rinv = fast::rsqrt(rsq);
+        ForceReal r = ForceReal(1.0) / rinv;
 
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar rmd = r - delta;
-            Scalar rmdinv = Scalar(1.0) / rmd;
-            Scalar rmd2inv = rmdinv * rmdinv;
-            Scalar rmd6inv = rmd2inv * rmd2inv * rmd2inv;
+            ForceReal rmd = r - delta;
+            ForceReal rmdinv = ForceReal(1.0) / rmd;
+            ForceReal rmd2inv = rmdinv * rmdinv;
+            ForceReal rmd6inv = rmd2inv * rmd2inv * rmd2inv;
             force_divr
-                = rinv * rmdinv * rmd6inv * (Scalar(12.0) * lj1 * rmd6inv - Scalar(6.0) * lj2);
+                = rinv * rmdinv * rmd6inv * (ForceReal(12.0) * lj1 * rmd6inv - ForceReal(6.0) * lj2);
 
             pair_eng = rmd6inv * (lj1 * rmd6inv - lj2);
 
             if (energy_shift)
                 {
-                Scalar r_cut = fast::sqrt(rcutsq);
-                Scalar r_cut_shifted = r_cut - delta;
-                Scalar r_cut_shifted_inv = Scalar(1.0) / r_cut_shifted;
+                ForceReal r_cut = fast::sqrt(rcutsq);
+                ForceReal r_cut_shifted = r_cut - delta;
+                ForceReal r_cut_shifted_inv = ForceReal(1.0) / r_cut_shifted;
 
-                Scalar r_cut2_inv = r_cut_shifted_inv * r_cut_shifted_inv;
-                Scalar r_cut6_inv = r_cut2_inv * r_cut2_inv * r_cut2_inv;
+                ForceReal r_cut2_inv = r_cut_shifted_inv * r_cut_shifted_inv;
+                ForceReal r_cut6_inv = r_cut2_inv * r_cut2_inv * r_cut2_inv;
                 pair_eng -= r_cut6_inv * (lj1 * r_cut6_inv - lj2);
                 }
             return true;
@@ -171,12 +171,12 @@ class EvaluatorPairExpandedLJ
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -198,11 +198,11 @@ class EvaluatorPairExpandedLJ
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar lj1;    //!< lj1 parameter extracted from the params passed to the constructor
-    Scalar lj2;    //!< lj2 parameter extracted from the params passed to the constructor
-    Scalar delta;  //!< outward radial shift to apply to LJ potential
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal lj1;    //!< lj1 parameter extracted from the params passed to the constructor
+    ForceReal lj2;    //!< lj2 parameter extracted from the params passed to the constructor
+    ForceReal delta;  //!< outward radial shift to apply to LJ potential
     };
 
     } // end namespace md

@@ -393,6 +393,108 @@ struct
         return vec3<Scalar>(minImage(vec_to_scalar3(v)));
         }
 
+#ifdef HOOMD_MIXED_PRECISION
+    //! Minimum image in ForceReal precision (float) for mixed-precision force kernels
+    /*! \param v ForceReal3 vector
+        \return minimum image of v in ForceReal precision
+        \note Box dimensions are narrowed to ForceReal for this computation. This is safe
+        because the minimum image vector is always O(L), well within float range.
+    */
+    HOSTDEVICE ForceReal3 minImageForceReal(const ForceReal3& v) const
+        {
+        ForceReal3 w = v;
+        ForceReal3 L_f;
+        Scalar3 L = getL();
+        L_f.x = static_cast<ForceReal>(L.x);
+        L_f.y = static_cast<ForceReal>(L.y);
+        L_f.z = static_cast<ForceReal>(L.z);
+        ForceReal3 Linv_f;
+        Linv_f.x = static_cast<ForceReal>(m_Linv.x);
+        Linv_f.y = static_cast<ForceReal>(m_Linv.y);
+        Linv_f.z = static_cast<ForceReal>(m_Linv.z);
+
+#ifdef __HIPCC__
+        if (m_periodic.z)
+            {
+            ForceReal img = rintf(w.z * Linv_f.z);
+            w.z -= L_f.z * img;
+            w.y -= L_f.z * static_cast<ForceReal>(m_yz) * img;
+            w.x -= L_f.z * static_cast<ForceReal>(m_xz) * img;
+            }
+
+        if (m_periodic.y)
+            {
+            ForceReal img = rintf(w.y * Linv_f.y);
+            w.y -= L_f.y * img;
+            w.x -= L_f.y * static_cast<ForceReal>(m_xy) * img;
+            }
+
+        if (m_periodic.x)
+            {
+            w.x -= L_f.x * rintf(w.x * Linv_f.x);
+            }
+#else
+        // CPU path: branches
+        Scalar3 hi_s = m_hi;
+        Scalar3 lo_s = m_lo;
+        ForceReal3 hi_f = {static_cast<ForceReal>(hi_s.x),
+                           static_cast<ForceReal>(hi_s.y),
+                           static_cast<ForceReal>(hi_s.z)};
+        ForceReal3 lo_f = {static_cast<ForceReal>(lo_s.x),
+                           static_cast<ForceReal>(lo_s.y),
+                           static_cast<ForceReal>(lo_s.z)};
+
+        if (m_periodic.z)
+            {
+            if (w.z >= hi_f.z)
+                {
+                w.z -= L_f.z;
+                w.y -= L_f.z * static_cast<ForceReal>(m_yz);
+                w.x -= L_f.z * static_cast<ForceReal>(m_xz);
+                }
+            else if (w.z < lo_f.z)
+                {
+                w.z += L_f.z;
+                w.y += L_f.z * static_cast<ForceReal>(m_yz);
+                w.x += L_f.z * static_cast<ForceReal>(m_xz);
+                }
+            }
+
+        if (m_periodic.y)
+            {
+            if (w.y >= hi_f.y)
+                {
+                int i = int(w.y * Linv_f.y + ForceReal(0.5));
+                w.y -= (ForceReal)i * L_f.y;
+                w.x -= (ForceReal)i * L_f.y * static_cast<ForceReal>(m_xy);
+                }
+            else if (w.y < lo_f.y)
+                {
+                int i = int(-w.y * Linv_f.y + ForceReal(0.5));
+                w.y += (ForceReal)i * L_f.y;
+                w.x += (ForceReal)i * L_f.y * static_cast<ForceReal>(m_xy);
+                }
+            }
+
+        if (m_periodic.x)
+            {
+            if (w.x >= hi_f.x)
+                {
+                int i = int(w.x * Linv_f.x + ForceReal(0.5));
+                w.x -= (ForceReal)i * L_f.x;
+                }
+            else if (w.x < lo_f.x)
+                {
+                int i = int(-w.x * Linv_f.x + ForceReal(0.5));
+                w.x += (ForceReal)i * L_f.x;
+                }
+            }
+#endif
+
+        return w;
+        }
+#endif // HOOMD_MIXED_PRECISION
+
     //! Wrap a vector back into the box
     /*! \param w Vector to wrap, updated to the minimum image obeying the periodic settings
         \param img Image of the vector, updated to reflect the new image

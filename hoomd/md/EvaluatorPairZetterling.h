@@ -48,12 +48,12 @@ class EvaluatorPairZetterling
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar A;
-        Scalar alpha;
-        Scalar kf;
-        Scalar B;
-        Scalar sigma;
-        Scalar n;
+        ForceReal A;
+        ForceReal alpha;
+        ForceReal kf;
+        ForceReal B;
+        ForceReal sigma;
+        ForceReal n;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -72,12 +72,12 @@ class EvaluatorPairZetterling
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            A = v["A"].cast<Scalar>();
-            alpha = v["alpha"].cast<Scalar>();
-            kf = v["kf"].cast<Scalar>();
-            B = v["B"].cast<Scalar>();
-            sigma = v["sigma"].cast<Scalar>();
-            n = v["n"].cast<Scalar>();
+            A = v["A"].cast<ForceReal>();
+            alpha = v["alpha"].cast<ForceReal>();
+            kf = v["kf"].cast<ForceReal>();
+            B = v["B"].cast<ForceReal>();
+            sigma = v["sigma"].cast<ForceReal>();
+            n = v["n"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -99,7 +99,7 @@ class EvaluatorPairZetterling
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairZetterling(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairZetterling(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), params(_params)
         {
         }
@@ -114,7 +114,7 @@ class EvaluatorPairZetterling
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force
@@ -126,43 +126,43 @@ class EvaluatorPairZetterling
      *  \return True if they are evaluated or false if they are not because
      *  we are beyond the cutoff
      */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         if (rsq < rcutsq)
             {
             // Get quantities need for both energy and force calculation
-            Scalar r(fast::sqrt(rsq));
-            Scalar eval_sin, eval_cos;
-            fast::sincos(Scalar(2.0) * params.kf * r, eval_sin, eval_cos);
-            Scalar screening(fast::exp(params.alpha * r));
-            Scalar inv_r(Scalar(1.0) / r);
-            Scalar inv_r_2(Scalar(1.0) / rsq);
-            Scalar inv_r_3(inv_r_2 * inv_r);
-            Scalar inv_r_5(inv_r_3 * inv_r_2);
-            Scalar power_sigma_over_r(fast::pow(params.sigma * inv_r, params.n));
+            ForceReal r(fast::sqrt(rsq));
+            ForceReal eval_sin, eval_cos;
+            fast::sincos(ForceReal(2.0) * params.kf * r, eval_sin, eval_cos);
+            ForceReal screening(fast::exp(params.alpha * r));
+            ForceReal inv_r(ForceReal(1.0) / r);
+            ForceReal inv_r_2(ForceReal(1.0) / rsq);
+            ForceReal inv_r_3(inv_r_2 * inv_r);
+            ForceReal inv_r_5(inv_r_3 * inv_r_2);
+            ForceReal power_sigma_over_r(fast::pow(params.sigma * inv_r, params.n));
 
             // Compute energy
-            Scalar term1(params.A * screening * eval_cos * inv_r_3);
-            Scalar term2(params.B * power_sigma_over_r);
+            ForceReal term1(params.A * screening * eval_cos * inv_r_3);
+            ForceReal term2(params.B * power_sigma_over_r);
             pair_eng = term1 + term2;
 
             // Compute force
-            Scalar deriv_term1(
+            ForceReal deriv_term1(
                 -params.A * screening
-                * ((params.alpha * r - Scalar(3.0)) * eval_cos - 2 * params.kf * r * eval_sin)
+                * ((params.alpha * r - ForceReal(3.0)) * eval_cos - 2 * params.kf * r * eval_sin)
                 * inv_r_5);
-            Scalar deriv_term2(params.B * params.n * power_sigma_over_r * inv_r_2);
+            ForceReal deriv_term2(params.B * params.n * power_sigma_over_r * inv_r_2);
             force_divr = deriv_term1 + deriv_term2;
 
             if (energy_shift)
                 {
-                Scalar r_cut(fast::sqrt(rcutsq));
-                Scalar screening_r_cut(fast::exp(params.alpha * r_cut));
-                Scalar inv_rcut(Scalar(1.0) / r_cut);
-                Scalar inv_rcut_3(inv_rcut * inv_rcut * inv_rcut);
-                Scalar term1_rcut(params.A * screening_r_cut
-                                  * fast::cos(Scalar(2.0) * params.kf * r_cut) * inv_rcut_3);
-                Scalar term2_rcut(params.B * fast::pow(params.sigma * inv_rcut, params.n));
+                ForceReal r_cut(fast::sqrt(rcutsq));
+                ForceReal screening_r_cut(fast::exp(params.alpha * r_cut));
+                ForceReal inv_rcut(ForceReal(1.0) / r_cut);
+                ForceReal inv_rcut_3(inv_rcut * inv_rcut * inv_rcut);
+                ForceReal term1_rcut(params.A * screening_r_cut
+                                  * fast::cos(ForceReal(2.0) * params.kf * r_cut) * inv_rcut_3);
+                ForceReal term2_rcut(params.B * fast::pow(params.sigma * inv_rcut, params.n));
                 pair_eng -= term1_rcut + term2_rcut;
                 }
 
@@ -174,12 +174,12 @@ class EvaluatorPairZetterling
             }
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -200,8 +200,8 @@ class EvaluatorPairZetterling
 #endif
 
     protected:
-    Scalar rsq;        /// Stored rsq from the constructor
-    Scalar rcutsq;     /// Stored rcutsq from the constructor
+    ForceReal rsq;        /// Stored rsq from the constructor
+    ForceReal rcutsq;     /// Stored rcutsq from the constructor
     param_type params; /// Stored pair parameters for a given type pair
     };
 

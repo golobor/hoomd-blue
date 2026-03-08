@@ -56,8 +56,8 @@ class EvaluatorPairLJ1208
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar sigma_4;
-        Scalar epsilon_x_4;
+        ForceReal sigma_4;
+        ForceReal epsilon_x_4;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -73,16 +73,16 @@ class EvaluatorPairLJ1208
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            auto sigma(v["sigma"].cast<Scalar>());
-            auto epsilon(v["epsilon"].cast<Scalar>());
+            auto sigma(v["sigma"].cast<ForceReal>());
+            auto epsilon(v["epsilon"].cast<ForceReal>());
 
             sigma_4 = sigma * sigma * sigma * sigma;
-            epsilon_x_4 = Scalar(4.0) * epsilon;
+            epsilon_x_4 = ForceReal(4.0) * epsilon;
 
             // parameters used in implementation
-            // lj1 = 4.0 * epsilon * pow(sigma, Scalar(12.0));
+            // lj1 = 4.0 * epsilon * pow(sigma, ForceReal(12.0));
             // -> lj1 = epsilon_x_4 * sigma_4 * sigma_4 * sigma_4
-            // lj2 = 4.0 * epsilon * pow(sigma, Scalar(8.0));
+            // lj2 = 4.0 * epsilon * pow(sigma, ForceReal(8.0));
             // -> lj2 = epsilon_x_4 * sigma_4 * sigma_4
             }
 
@@ -106,7 +106,7 @@ class EvaluatorPairLJ1208
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairLJ1208(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairLJ1208(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq),
           lj1(_params.epsilon_x_4 * _params.sigma_4 * _params.sigma_4 * _params.sigma_4),
           lj2(_params.epsilon_x_4 * _params.sigma_4 * _params.sigma_4)
@@ -122,7 +122,7 @@ class EvaluatorPairLJ1208
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -133,24 +133,24 @@ class EvaluatorPairLJ1208
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq < rcutsq && lj1 != 0)
             {
-            Scalar r2inv = Scalar(1.0) / rsq;
-            Scalar r4inv = r2inv * r2inv;
-            Scalar r8inv = r4inv * r4inv;
+            ForceReal r2inv = ForceReal(1.0) / rsq;
+            ForceReal r4inv = r2inv * r2inv;
+            ForceReal r8inv = r4inv * r4inv;
 
-            force_divr = r2inv * r8inv * (Scalar(12.0) * lj1 * r4inv - Scalar(8.0) * lj2);
+            force_divr = r2inv * r8inv * (ForceReal(12.0) * lj1 * r4inv - ForceReal(8.0) * lj2);
 
             pair_eng = r8inv * (lj1 * r4inv - lj2);
 
             if (energy_shift)
                 {
-                Scalar rcut2inv = Scalar(1.0) / rcutsq;
-                Scalar rcut4inv = rcut2inv * rcut2inv;
-                Scalar rcut8inv = rcut4inv * rcut4inv;
+                ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+                ForceReal rcut4inv = rcut2inv * rcut2inv;
+                ForceReal rcut8inv = rcut4inv * rcut4inv;
                 pair_eng -= rcut8inv * (lj1 * rcut4inv - lj2);
                 }
             return true;
@@ -159,12 +159,12 @@ class EvaluatorPairLJ1208
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -185,10 +185,10 @@ class EvaluatorPairLJ1208
 #endif
 
     protected:
-    Scalar rsq;    //!< Stored rsq from the constructor
-    Scalar rcutsq; //!< Stored rcutsq from the constructor
-    Scalar lj1;    //!< lj1 parameter extracted from the params passed to the constructor
-    Scalar lj2;    //!< lj2 parameter extracted from the params passed to the constructor
+    ForceReal rsq;    //!< Stored rsq from the constructor
+    ForceReal rcutsq; //!< Stored rcutsq from the constructor
+    ForceReal lj1;    //!< lj1 parameter extracted from the params passed to the constructor
+    ForceReal lj2;    //!< lj2 parameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

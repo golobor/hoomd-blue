@@ -7,6 +7,7 @@
 
 #include "TwoStepBDGPU.cuh"
 #include "hoomd/HOOMDMath.h"
+#include "hoomd/MixedPrecisionPos.h"
 #include "hoomd/VectorMath.h"
 
 #include "hoomd/RNGIdentifiers.h"
@@ -51,6 +52,7 @@ namespace kernel
     This kernel must be launched with enough dynamic shared memory per block to read in d_gamma
 */
 __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
+                                             Scalar4* d_pos_correction,
                                              Scalar4* d_vel,
                                              int3* d_image,
                                              const BoxDim box,
@@ -110,7 +112,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
 
         // determine the particle to work on
         unsigned int idx = d_group_members[group_idx];
-        Scalar4 postype = d_pos[idx];
+        Scalar4 postype = loadPosFull(d_pos, d_pos_correction, idx);
         Scalar4 vel = d_vel[idx];
         Scalar4 net_force = d_net_force[idx];
         int3 image = d_image[idx];
@@ -187,7 +189,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
             }
 
         // write out data
-        d_pos[idx] = postype;
+        storePosFull(d_pos, d_pos_correction, idx, postype);
         d_vel[idx] = vel;
         d_image[idx] = image;
 
@@ -320,6 +322,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
     This is just a driver for gpu_brownian_step_one_kernel(), see it for details.
 */
 hipError_t gpu_brownian_step_one(Scalar4* d_pos,
+                                 Scalar4* d_pos_correction,
                                  Scalar4* d_vel,
                                  int3* d_image,
                                  const BoxDim& box,
@@ -365,6 +368,7 @@ hipError_t gpu_brownian_step_one(Scalar4* d_pos,
                        shared_bytes,
                        0,
                        d_pos,
+                       d_pos_correction,
                        d_vel,
                        d_image,
                        box,

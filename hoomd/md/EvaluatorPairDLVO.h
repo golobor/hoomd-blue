@@ -38,11 +38,11 @@ class EvaluatorPairDLVO
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar kappa;
-        Scalar Z;
-        Scalar A;
-        Scalar a1;
-        Scalar a2;
+        ForceReal kappa;
+        ForceReal Z;
+        ForceReal A;
+        ForceReal a1;
+        ForceReal a2;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -61,11 +61,11 @@ class EvaluatorPairDLVO
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            kappa = v["kappa"].cast<Scalar>();
-            Z = v["Z"].cast<Scalar>();
-            A = v["A"].cast<Scalar>();
-            a1 = v["a1"].cast<Scalar>();
-            a2 = v["a2"].cast<Scalar>();
+            kappa = v["kappa"].cast<ForceReal>();
+            Z = v["Z"].cast<ForceReal>();
+            A = v["A"].cast<ForceReal>();
+            a1 = v["a1"].cast<ForceReal>();
+            a2 = v["a2"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -86,7 +86,7 @@ class EvaluatorPairDLVO
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairDLVO(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairDLVO(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), kappa(_params.kappa), Z(_params.Z), A(_params.A)
         {
         radsum = _params.a1 + _params.a2;
@@ -94,7 +94,7 @@ class EvaluatorPairDLVO
         radprod = _params.a1 * _params.a2;
         radsumsq = _params.a1 * _params.a1 + _params.a2 * _params.a2;
         radsubsq = _params.a1 * _params.a1 - _params.a2 * _params.a2;
-        delta = radsum - Scalar(1.0);
+        delta = radsum - ForceReal(1.0);
         }
 
     //! DLVO doesn't use charge
@@ -106,7 +106,7 @@ class EvaluatorPairDLVO
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -117,49 +117,49 @@ class EvaluatorPairDLVO
 
         \return True if they are evaluated or false if they are not because we are beyond the cutoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // precompute some quantities
-        Scalar rinv = fast::rsqrt(rsq);
-        Scalar r = Scalar(1.0) / rinv;
-        Scalar rcutinv = fast::rsqrt(rcutsq);
-        Scalar rcut = Scalar(1.0) / rcutinv;
+        ForceReal rinv = fast::rsqrt(rsq);
+        ForceReal r = ForceReal(1.0) / rinv;
+        ForceReal rcutinv = fast::rsqrt(rcutsq);
+        ForceReal rcut = ForceReal(1.0) / rcutinv;
 
         // compute the force divided by r in force_divr
         if (r < rcut && kappa != 0)
             {
-            Scalar rmds = r - radsum;
-            Scalar rmdsqs = r * r - radsum * radsum;
-            Scalar rmdsqm = r * r - radsub * radsub;
-            Scalar radsuminv = Scalar(1.0) / radsum;
-            Scalar rmdsqsinv = Scalar(1.0) / rmdsqs;
-            Scalar rmdsqminv = Scalar(1.0) / rmdsqm;
-            Scalar exp_val = fast::exp(-kappa * rmds);
-            Scalar forcerep_divr = kappa * radprod * radsuminv * Z * exp_val / r;
-            Scalar fatrterm1 = r * r * r * r + radsubsq * radsubsq - Scalar(2.0) * r * r * radsumsq;
-            Scalar fatrterm1inv = Scalar(1.0) / fatrterm1 * Scalar(1.0) / fatrterm1;
-            Scalar forceatr_divr
-                = -Scalar(32.0) * A / Scalar(3.0) * radprod * radprod * radprod * fatrterm1inv;
+            ForceReal rmds = r - radsum;
+            ForceReal rmdsqs = r * r - radsum * radsum;
+            ForceReal rmdsqm = r * r - radsub * radsub;
+            ForceReal radsuminv = ForceReal(1.0) / radsum;
+            ForceReal rmdsqsinv = ForceReal(1.0) / rmdsqs;
+            ForceReal rmdsqminv = ForceReal(1.0) / rmdsqm;
+            ForceReal exp_val = fast::exp(-kappa * rmds);
+            ForceReal forcerep_divr = kappa * radprod * radsuminv * Z * exp_val / r;
+            ForceReal fatrterm1 = r * r * r * r + radsubsq * radsubsq - ForceReal(2.0) * r * r * radsumsq;
+            ForceReal fatrterm1inv = ForceReal(1.0) / fatrterm1 * ForceReal(1.0) / fatrterm1;
+            ForceReal forceatr_divr
+                = -ForceReal(32.0) * A / ForceReal(3.0) * radprod * radprod * radprod * fatrterm1inv;
             force_divr = forcerep_divr + forceatr_divr;
 
-            Scalar engt1 = radprod * rmdsqsinv * A / Scalar(3.0);
-            Scalar engt2 = radprod * rmdsqminv * A / Scalar(3.0);
-            Scalar engt3 = slow::log(rmdsqs * rmdsqminv) * A / Scalar(6.0);
+            ForceReal engt1 = radprod * rmdsqsinv * A / ForceReal(3.0);
+            ForceReal engt2 = radprod * rmdsqminv * A / ForceReal(3.0);
+            ForceReal engt3 = slow::log(rmdsqs * rmdsqminv) * A / ForceReal(6.0);
             pair_eng = r * forcerep_divr / kappa - engt1 - engt2 - engt3;
             if (energy_shift)
                 {
-                Scalar rcutt = rcut;
-                Scalar rmdscut = rcutt - radsum;
-                Scalar rmdsqscut = rcutt * rcutt - radsum * radsum;
-                Scalar rmdsqmcut = rcutt * rcutt - radsub * radsub;
-                Scalar rmdsqsinvcut = Scalar(1.0) / rmdsqscut;
-                Scalar rmdsqminvcut = Scalar(1.0) / rmdsqmcut;
+                ForceReal rcutt = rcut;
+                ForceReal rmdscut = rcutt - radsum;
+                ForceReal rmdsqscut = rcutt * rcutt - radsum * radsum;
+                ForceReal rmdsqmcut = rcutt * rcutt - radsub * radsub;
+                ForceReal rmdsqsinvcut = ForceReal(1.0) / rmdsqscut;
+                ForceReal rmdsqminvcut = ForceReal(1.0) / rmdsqmcut;
 
-                Scalar engt1cut = radprod * rmdsqsinvcut * A / Scalar(3.0);
-                Scalar engt2cut = radprod * rmdsqminvcut * A / Scalar(3.0);
-                Scalar engt3cut = slow::log(rmdsqscut * rmdsqminvcut) * A / Scalar(6.0);
-                Scalar exp_valcut = fast::exp(-kappa * rmdscut);
-                Scalar forcerepcut_divr = kappa * radprod * radsuminv * Z * exp_valcut / rcutt;
+                ForceReal engt1cut = radprod * rmdsqsinvcut * A / ForceReal(3.0);
+                ForceReal engt2cut = radprod * rmdsqminvcut * A / ForceReal(3.0);
+                ForceReal engt3cut = slow::log(rmdsqscut * rmdsqminvcut) * A / ForceReal(6.0);
+                ForceReal exp_valcut = fast::exp(-kappa * rmdscut);
+                ForceReal forcerepcut_divr = kappa * radprod * radsuminv * Z * exp_valcut / rcutt;
                 pair_eng -= rcutt * forcerepcut_divr / kappa - engt1cut - engt2cut - engt3cut;
                 }
             return true;
@@ -168,12 +168,12 @@ class EvaluatorPairDLVO
             return false;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -194,17 +194,17 @@ class EvaluatorPairDLVO
 #endif
 
     protected:
-    Scalar rsq;      //!< Stored rsq from the constructor
-    Scalar rcutsq;   //!< Stored rcutsq from the constructor
-    Scalar kappa;    //!< kappa parameter extracted from the params passed to the constructor
-    Scalar Z;        //!< Z parameter extracted from the params passed to the constructor
-    Scalar A;        //!< A parameter extracted from the params passed to the constructor
-    Scalar radsum;   //!< radsum parameter extracted from the call to setDiameter
-    Scalar radsub;   //!< radsub parameter extracted from the call to setDiameter
-    Scalar radprod;  //!< radprod parameter extracted from the call to setDiameter
-    Scalar radsumsq; //!< radsumsq parameter extracted from the call to setDiameter
-    Scalar radsubsq; //!< radsubsq parameter extracted from the call to setDiameter
-    Scalar delta;    //!< Diameter sum minus one
+    ForceReal rsq;      //!< Stored rsq from the constructor
+    ForceReal rcutsq;   //!< Stored rcutsq from the constructor
+    ForceReal kappa;    //!< kappa parameter extracted from the params passed to the constructor
+    ForceReal Z;        //!< Z parameter extracted from the params passed to the constructor
+    ForceReal A;        //!< A parameter extracted from the params passed to the constructor
+    ForceReal radsum;   //!< radsum parameter extracted from the call to setDiameter
+    ForceReal radsub;   //!< radsub parameter extracted from the call to setDiameter
+    ForceReal radprod;  //!< radprod parameter extracted from the call to setDiameter
+    ForceReal radsumsq; //!< radsumsq parameter extracted from the call to setDiameter
+    ForceReal radsubsq; //!< radsubsq parameter extracted from the call to setDiameter
+    ForceReal delta;    //!< Diameter sum minus one
     };
 
     } // end namespace md

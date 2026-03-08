@@ -59,6 +59,13 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
     ArrayHandle<int3> d_image(m_pdata->getImages(),
                               access_location::device,
                               access_mode::readwrite);
+#ifdef HOOMD_MIXED_PRECISION
+    ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
+                                          access_location::device,
+                                          access_mode::readwrite);
+#else
+    struct { Scalar4* data = nullptr; } d_pos_correction;
+#endif
 
     ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
     ArrayHandle<Scalar> d_gamma(m_gamma, access_location::device, access_mode::read);
@@ -101,6 +108,7 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
 
     // perform the update on the GPU
     gpu_brownian_step_one(d_pos.data,
+                          d_pos_correction.data,
                           d_vel.data,
                           d_image.data,
                           box,

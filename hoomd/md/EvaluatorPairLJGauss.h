@@ -48,9 +48,9 @@ class EvaluatorPairLJGauss
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar epsilon;
-        Scalar sigma;
-        Scalar r0;
+        ForceReal epsilon;
+        ForceReal sigma;
+        ForceReal r0;
 
         DEVICE void load_shared(char*& ptr, unsigned int& available_bytes) { }
 
@@ -69,9 +69,9 @@ class EvaluatorPairLJGauss
 
         param_type(pybind11::dict v, bool managed = false)
             {
-            epsilon = v["epsilon"].cast<Scalar>();
-            sigma = v["sigma"].cast<Scalar>();
-            r0 = v["r0"].cast<Scalar>();
+            epsilon = v["epsilon"].cast<ForceReal>();
+            sigma = v["sigma"].cast<ForceReal>();
+            r0 = v["r0"].cast<ForceReal>();
             }
 
         pybind11::dict asDict()
@@ -92,7 +92,7 @@ class EvaluatorPairLJGauss
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairLJGauss(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairLJGauss(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), epsilon(_params.epsilon), sigma(_params.sigma), r0(_params.r0)
         {
         }
@@ -107,7 +107,7 @@ class EvaluatorPairLJGauss
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Get the number of alchemical parameters
     static const unsigned int num_alchemical_parameters = 3;
@@ -121,7 +121,7 @@ class EvaluatorPairLJGauss
         \return True if they are evaluated or false if they are not because we are beyond the
        cuttoff
     */
-    DEVICE bool evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, bool energy_shift)
+    DEVICE bool evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, bool energy_shift)
         {
         // compute the force divided by r in force_divr
         if (rsq >= rcutsq)
@@ -129,38 +129,38 @@ class EvaluatorPairLJGauss
             return false;
             }
 
-        Scalar r = fast::sqrt(rsq);
-        Scalar sigma2 = sigma * sigma;
-        Scalar rdiff = r - r0;
-        Scalar rdiff_sigma2 = rdiff / sigma2;
-        Scalar exp_val = fast::exp(-Scalar(0.5) * rdiff_sigma2 * rdiff);
-        Scalar r2inv = Scalar(1.0) / rsq;
-        Scalar r6inv = r2inv * r2inv * r2inv;
+        ForceReal r = fast::sqrt(rsq);
+        ForceReal sigma2 = sigma * sigma;
+        ForceReal rdiff = r - r0;
+        ForceReal rdiff_sigma2 = rdiff / sigma2;
+        ForceReal exp_val = fast::exp(-ForceReal(0.5) * rdiff_sigma2 * rdiff);
+        ForceReal r2inv = ForceReal(1.0) / rsq;
+        ForceReal r6inv = r2inv * r2inv * r2inv;
 
-        force_divr = (r2inv * r6inv * Scalar(12.0) * (r6inv - Scalar(1.0)))
+        force_divr = (r2inv * r6inv * ForceReal(12.0) * (r6inv - ForceReal(1.0)))
                      - (exp_val * epsilon * rdiff_sigma2 / r);
-        pair_eng = r6inv * (r6inv - Scalar(2.0)) - exp_val * epsilon;
+        pair_eng = r6inv * (r6inv - ForceReal(2.0)) - exp_val * epsilon;
 
         if (energy_shift)
             {
-            Scalar rcut2inv = Scalar(1.0) / rcutsq;
-            Scalar rcut6inv = rcut2inv * rcut2inv * rcut2inv;
-            Scalar r_cut_minus_r0 = fast::sqrt(rcutsq) - r0;
+            ForceReal rcut2inv = ForceReal(1.0) / rcutsq;
+            ForceReal rcut6inv = rcut2inv * rcut2inv * rcut2inv;
+            ForceReal r_cut_minus_r0 = fast::sqrt(rcutsq) - r0;
 
             pair_eng
-                -= rcut6inv * (rcut6inv - Scalar(2.0))
-                   - (epsilon * fast::exp(-Scalar(0.5) * r_cut_minus_r0 * r_cut_minus_r0 / sigma2));
+                -= rcut6inv * (rcut6inv - ForceReal(2.0))
+                   - (epsilon * fast::exp(-ForceReal(0.5) * r_cut_minus_r0 * r_cut_minus_r0 / sigma2));
             }
 
         return true;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -191,7 +191,7 @@ class EvaluatorPairLJGauss
         Interoperate with PotentialPairAlchemical to modify the given potential parameters:
         p -> p * alpha, where p is a parameter.
     */
-    DEVICE void updateAlchemyParams(const std::array<Scalar, num_alchemical_parameters>& alphas)
+    DEVICE void updateAlchemyParams(const std::array<ForceReal, num_alchemical_parameters>& alphas)
         {
         epsilon *= alphas[0];
         sigma *= alphas[1];
@@ -205,7 +205,7 @@ class EvaluatorPairLJGauss
     */
     DEVICE static param_type
     updateAlchemyParams(const param_type& initial_params,
-                        std::array<Scalar, num_alchemical_parameters>& alphas)
+                        std::array<ForceReal, num_alchemical_parameters>& alphas)
         {
         param_type params(initial_params);
         params.epsilon *= alphas[0];
@@ -219,18 +219,18 @@ class EvaluatorPairLJGauss
         Interoperate with PotentialPairAlchemical to compute dU/d alpha.
     */
     DEVICE void
-    evalAlchemyDerivatives(std::array<Scalar, num_alchemical_parameters>& alchemical_derivatives,
-                           const std::array<Scalar, num_alchemical_parameters>& alphas)
+    evalAlchemyDerivatives(std::array<ForceReal, num_alchemical_parameters>& alchemical_derivatives,
+                           const std::array<ForceReal, num_alchemical_parameters>& alphas)
         {
             {
-            Scalar r = fast::sqrt(rsq);
-            Scalar sigma2 = sigma * sigma;
-            Scalar inva1 = 1.0 / alphas[1];
-            Scalar invsiga1sq = inva1 * inva1 * (1 / sigma2);
-            Scalar rdiff = r - alphas[2] * r0;
-            Scalar rdiffsq = rdiff * rdiff;
-            Scalar exp_term = fast::exp(-Scalar(0.5) * rdiffsq * invsiga1sq);
-            Scalar c = -alphas[0] * epsilon * exp_term * invsiga1sq;
+            ForceReal r = fast::sqrt(rsq);
+            ForceReal sigma2 = sigma * sigma;
+            ForceReal inva1 = 1.0 / alphas[1];
+            ForceReal invsiga1sq = inva1 * inva1 * (1 / sigma2);
+            ForceReal rdiff = r - alphas[2] * r0;
+            ForceReal rdiffsq = rdiff * rdiff;
+            ForceReal exp_term = fast::exp(-ForceReal(0.5) * rdiffsq * invsiga1sq);
+            ForceReal c = -alphas[0] * epsilon * exp_term * invsiga1sq;
             alchemical_derivatives[0] = -epsilon * exp_term;
             alchemical_derivatives[1] = c * rdiffsq * inva1;
             alchemical_derivatives[2] = c * r0 * rdiff;
@@ -253,11 +253,11 @@ class EvaluatorPairLJGauss
 #endif
 
     protected:
-    Scalar rsq;     //!< Stored rsq from the constructor
-    Scalar rcutsq;  //!< Stored rcutsq from the constructor
-    Scalar epsilon; //!< epsilon parameter extracted from the params passed to the constructor
-    Scalar sigma;   //!< sigma parameter extracted from the params passed to the constructor
-    Scalar r0;      //!< r0 prarameter extracted from the params passed to the constructor
+    ForceReal rsq;     //!< Stored rsq from the constructor
+    ForceReal rcutsq;  //!< Stored rcutsq from the constructor
+    ForceReal epsilon; //!< epsilon parameter extracted from the params passed to the constructor
+    ForceReal sigma;   //!< sigma parameter extracted from the params passed to the constructor
+    ForceReal r0;      //!< r0 prarameter extracted from the params passed to the constructor
     };
 
     } // end namespace md

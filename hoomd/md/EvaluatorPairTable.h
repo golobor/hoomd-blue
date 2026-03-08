@@ -44,9 +44,9 @@ class EvaluatorPairTable
     //! Define the parameter type used by this pair potential evaluator
     struct param_type
         {
-        Scalar rmin;                  //!< the distance of the first index of the table potential
-        ManagedArray<Scalar> V_table; //!< the tabulated energy
-        ManagedArray<Scalar> F_table; //!< the tabulated force specifically - (dV / dr)
+        ForceReal rmin;                  //!< the distance of the first index of the table potential
+        ManagedArray<ForceReal> V_table; //!< the tabulated energy
+        ManagedArray<ForceReal> F_table; //!< the tabulated force specifically - (dV / dr)
 
         //! Load dynamic data members into shared memory and increase pointer
         /*! \param ptr Pointer to load data to (will be incremented)
@@ -92,21 +92,29 @@ class EvaluatorPairTable
                 }
 
             size_t width = V_py.size();
-            rmin = v["r_min"].cast<Scalar>();
-            V_table = ManagedArray<Scalar>(static_cast<unsigned int>(width), managed);
-            F_table = ManagedArray<Scalar>(static_cast<unsigned int>(width), managed);
+            rmin = v["r_min"].cast<ForceReal>();
+            V_table = ManagedArray<ForceReal>(static_cast<unsigned int>(width), managed);
+            F_table = ManagedArray<ForceReal>(static_cast<unsigned int>(width), managed);
             std::copy(V_py.data(0), V_py.data(0) + width, V_table.get());
             std::copy(F_py.data(0), F_py.data(0) + width, F_table.get());
             }
 
         pybind11::dict asDict() const
             {
-            const auto V = pybind11::array_t<Scalar>(V_table.size(), V_table.get());
-            const auto F = pybind11::array_t<Scalar>(F_table.size(), F_table.get());
+            // Copy ForceReal (float) data to ForceReal (double) arrays for Python
+            auto V = pybind11::array_t<Scalar>(V_table.size());
+            auto F = pybind11::array_t<Scalar>(F_table.size());
+            auto V_buf = V.mutable_unchecked<1>();
+            auto F_buf = F.mutable_unchecked<1>();
+            for (unsigned int i = 0; i < V_table.size(); ++i)
+                {
+                V_buf(i) = static_cast<ForceReal>(V_table[i]);
+                F_buf(i) = static_cast<ForceReal>(F_table[i]);
+                }
             auto params = pybind11::dict();
             params["U"] = V;
             params["F"] = F;
-            params["r_min"] = rmin;
+            params["r_min"] = static_cast<ForceReal>(rmin);
             return params;
             }
 #endif
@@ -122,7 +130,7 @@ class EvaluatorPairTable
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairTable(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairTable(ForceReal _rsq, ForceReal _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), rmin(_params.rmin), V_table(_params.V_table),
           F_table(_params.F_table)
         {
@@ -138,7 +146,7 @@ class EvaluatorPairTable
     /*! \param qi Charge of particle i
         \param qj Charge of particle j
     */
-    DEVICE void setCharge(Scalar qi, Scalar qj) { }
+    DEVICE void setCharge(ForceReal qi, ForceReal qj) { }
 
     //! Evaluate the force and energy
     /*! \param force_divr Output parameter to write the computed force divided by r.
@@ -149,28 +157,28 @@ class EvaluatorPairTable
         range.
     */
     DEVICE bool
-    evalForceAndEnergy(Scalar& force_divr, Scalar& pair_eng, const bool energy_shift) const
+    evalForceAndEnergy(ForceReal& force_divr, ForceReal& pair_eng, const bool energy_shift) const
         {
         unsigned int width = V_table.size();
 
-        const Scalar r = fast::sqrt(rsq);
+        const ForceReal r = fast::sqrt(rsq);
         // compute the force divided by r in force_divr
         if (rsq >= rcutsq || r < rmin)
             {
             return false;
             }
-        const Scalar rcut = fast::sqrt(rcutsq);
-        const Scalar delta_r = (rcut - rmin) / static_cast<Scalar>(width);
+        const ForceReal rcut = fast::sqrt(rcutsq);
+        const ForceReal delta_r = (rcut - rmin) / static_cast<ForceReal>(width);
         // precomputed term
-        const Scalar value_f = (r - rmin) / delta_r;
+        const ForceReal value_f = (r - rmin) / delta_r;
 
         // compute index into the table and read in values
         unsigned int value_i = static_cast<unsigned int>(slow::floor(value_f));
         // unpack the data
-        const Scalar V0 = V_table[value_i];
-        const Scalar F0 = F_table[value_i];
-        Scalar V1 = 0;
-        Scalar F1 = 0;
+        const ForceReal V0 = V_table[value_i];
+        const ForceReal F0 = F_table[value_i];
+        ForceReal V1 = 0;
+        ForceReal F1 = 0;
         if (value_i + 1 < width)
             {
             V1 = V_table[value_i + 1];
@@ -178,14 +186,14 @@ class EvaluatorPairTable
             }
 
         // compute the linear interpolation coefficient
-        const Scalar f = value_f - Scalar(value_i);
+        const ForceReal f = value_f - ForceReal(value_i);
 
         // interpolate to get V and F;
-        const Scalar V = V0 + f * (V1 - V0);
-        const Scalar F = F0 + f * (F1 - F0);
+        const ForceReal V = V0 + f * (V1 - V0);
+        const ForceReal F = F0 + f * (F1 - F0);
 
         // return the force divided by r
-        if (rsq > Scalar(0.0))
+        if (rsq > ForceReal(0.0))
             {
             force_divr = F / r;
             }
@@ -193,12 +201,12 @@ class EvaluatorPairTable
         return true;
         }
 
-    DEVICE Scalar evalPressureLRCIntegral()
+    DEVICE ForceReal evalPressureLRCIntegral()
         {
         return 0;
         }
 
-    DEVICE Scalar evalEnergyLRCIntegral()
+    DEVICE ForceReal evalEnergyLRCIntegral()
         {
         return 0;
         }
@@ -219,12 +227,12 @@ class EvaluatorPairTable
 #endif
 
     protected:
-    Scalar rsq;                          //!< distance squared
-    Scalar rcutsq;                       //!< the potential cuttoff distance squared
+    ForceReal rsq;                          //!< distance squared
+    ForceReal rcutsq;                       //!< the potential cuttoff distance squared
     size_t width;                        //!< the distance between table indices
-    Scalar rmin;                         //!< the distance of the first index of the table potential
-    const ManagedArray<Scalar>& V_table; //!< the tabulated energy
-    const ManagedArray<Scalar>& F_table; //!< the tabulated force specifically - (dV / dr)
+    ForceReal rmin;                         //!< the distance of the first index of the table potential
+    const ManagedArray<ForceReal>& V_table; //!< the tabulated energy
+    const ManagedArray<ForceReal>& F_table; //!< the tabulated force specifically - (dV / dr)
     };
 
     } // end namespace md
