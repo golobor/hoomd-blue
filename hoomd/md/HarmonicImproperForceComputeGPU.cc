@@ -78,8 +78,8 @@ void HarmonicImproperForceComputeGPU::computeForces(uint64_t timestep)
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
     BoxDim box = m_pdata->getBox();
 
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
     ArrayHandle<Scalar2> d_params(m_params, access_location::device, access_mode::read);
 
     // run the kernel in parallel on all GPUs

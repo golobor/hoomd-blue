@@ -47,7 +47,7 @@ hipError_t gpu_rattle_nve_step_one(Scalar4* d_pos,
 hipError_t gpu_rattle_nve_angular_step_one(Scalar4* d_orientation,
                                            Scalar4* d_angmom,
                                            const Scalar3* d_inertia,
-                                           const Scalar4* d_net_torque,
+                                           const ForceReal4* d_net_torque,
                                            unsigned int* d_group_members,
                                            const unsigned int group_size,
                                            Scalar deltaT,
@@ -60,7 +60,7 @@ hipError_t gpu_rattle_nve_step_two(Scalar4* d_pos,
                                    Scalar3* d_accel,
                                    unsigned int* d_group_members,
                                    const unsigned int group_size,
-                                   Scalar4* d_net_force,
+                                   ForceReal4* d_net_force,
                                    Manifold manifold,
                                    Scalar tolerance,
                                    Scalar deltaT,
@@ -72,7 +72,7 @@ hipError_t gpu_rattle_nve_step_two(Scalar4* d_pos,
 hipError_t gpu_rattle_nve_angular_step_two(const Scalar4* d_orientation,
                                            Scalar4* d_angmom,
                                            const Scalar3* d_inertia,
-                                           const Scalar4* d_net_torque,
+                                           const ForceReal4* d_net_torque,
                                            unsigned int* d_group_members,
                                            const unsigned int group_size,
                                            Scalar deltaT,
@@ -83,8 +83,8 @@ template<class Manifold>
 hipError_t gpu_include_rattle_force_nve(const Scalar4* d_pos,
                                         const Scalar4* d_vel,
                                         Scalar3* d_accel,
-                                        Scalar4* d_net_force,
-                                        Scalar* d_net_virial,
+                                        ForceReal4* d_net_force,
+                                        ForceReal* d_net_virial,
                                         unsigned int* d_group_members,
                                         const unsigned int group_size,
                                         size_t net_virial_pitch,
@@ -120,7 +120,7 @@ __global__ void gpu_rattle_nve_step_two_kernel(Scalar4* d_pos,
                                                Scalar3* d_accel,
                                                unsigned int* d_group_members,
                                                const unsigned int nwork,
-                                               Scalar4* d_net_force,
+                                               ForceReal4* d_net_force,
                                                Manifold manifold,
                                                Scalar tolerance,
                                                Scalar deltaT,
@@ -146,7 +146,7 @@ __global__ void gpu_rattle_nve_step_two_kernel(Scalar4* d_pos,
 
         if (!zero_force)
             {
-            Scalar4 net_force = d_net_force[idx];
+            ForceReal4 net_force = d_net_force[idx];
             accel = make_scalar3(net_force.x, net_force.y, net_force.z);
             // MEM TRANSFER: 4 bytes   FLOPS: 3
             Scalar mass = vel.w;
@@ -245,7 +245,7 @@ hipError_t gpu_rattle_nve_step_two(Scalar4* d_pos,
                                    Scalar3* d_accel,
                                    unsigned int* d_group_members,
                                    const unsigned int group_size,
-                                   Scalar4* d_net_force,
+                                   ForceReal4* d_net_force,
                                    Manifold manifold,
                                    Scalar tolerance,
                                    Scalar deltaT,
@@ -293,8 +293,8 @@ template<class Manifold>
 __global__ void gpu_include_rattle_force_nve_kernel(const Scalar4* d_pos,
                                                     const Scalar4* d_vel,
                                                     Scalar3* d_accel,
-                                                    Scalar4* d_net_force,
-                                                    Scalar* d_net_virial,
+                                                    ForceReal4* d_net_force,
+                                                    ForceReal* d_net_virial,
                                                     unsigned int* d_group_members,
                                                     const unsigned int nwork,
                                                     size_t net_virial_pitch,
@@ -331,7 +331,7 @@ __global__ void gpu_include_rattle_force_nve_kernel(const Scalar4* d_pos,
             accel = d_accel[idx];
 
         // read the particle's velocity and acceleration (MEM TRANSFER: 32 bytes)
-        Scalar4 forcetype = d_net_force[idx];
+        ForceReal4 forcetype = d_net_force[idx];
         Scalar3 force = make_scalar3(forcetype.x, forcetype.y, forcetype.z);
 
         Scalar virial0 = d_net_virial[0 * net_virial_pitch + idx];
@@ -388,7 +388,7 @@ __global__ void gpu_include_rattle_force_nve_kernel(const Scalar4* d_pos,
         virial4 -= 0.5 * lambda * (normal.y * pos.z + normal.z * pos.y);
         virial5 -= lambda * normal.z * pos.z;
 
-        d_net_force[idx] = make_scalar4(force.x, force.y, force.z, forcetype.w);
+        d_net_force[idx] = make_forcereal4(ForceReal(force.x), ForceReal(force.y), ForceReal(force.z), forcetype.w);
         d_accel[idx] = accel;
         d_net_virial[0 * net_virial_pitch + idx] = virial0;
         d_net_virial[1 * net_virial_pitch + idx] = virial1;
@@ -403,8 +403,8 @@ template<class Manifold>
 hipError_t gpu_include_rattle_force_nve(const Scalar4* d_pos,
                                         const Scalar4* d_vel,
                                         Scalar3* d_accel,
-                                        Scalar4* d_net_force,
-                                        Scalar* d_net_virial,
+                                        ForceReal4* d_net_force,
+                                        ForceReal* d_net_virial,
                                         unsigned int* d_group_members,
                                         const unsigned int group_size,
                                         size_t net_virial_pitch,

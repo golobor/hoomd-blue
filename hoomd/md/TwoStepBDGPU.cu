@@ -59,10 +59,10 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
                                              const unsigned int* d_tag,
                                              const unsigned int* d_group_members,
                                              const unsigned int nwork,
-                                             const Scalar4* d_net_force,
+                                             const ForceReal4* d_net_force,
                                              const Scalar3* d_gamma_r,
                                              Scalar4* d_orientation,
-                                             Scalar4* d_torque,
+                                             ForceReal4* d_torque,
                                              const Scalar3* d_inertia,
                                              Scalar4* d_angmom,
                                              const Scalar* d_gamma,
@@ -114,7 +114,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
         unsigned int idx = d_group_members[group_idx];
         Scalar4 postype = loadPosFull(d_pos, d_pos_correction, idx);
         Scalar4 vel = d_vel[idx];
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
         int3 image = d_image[idx];
 
         // read in the tag of our particle.
@@ -213,7 +213,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
                 {
                 vec3<Scalar> p_vec;
                 quat<Scalar> q(d_orientation[idx]);
-                vec3<Scalar> t(d_torque[idx]);
+                ForceReal4 t_raw = d_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
                 vec3<Scalar> I(d_inertia[idx]);
 
                 // check if the shape is degenerate
@@ -329,10 +329,10 @@ hipError_t gpu_brownian_step_one(Scalar4* d_pos,
                                  const unsigned int* d_tag,
                                  const unsigned int* d_group_members,
                                  const unsigned int group_size,
-                                 const Scalar4* d_net_force,
+                                 const ForceReal4* d_net_force,
                                  const Scalar3* d_gamma_r,
                                  Scalar4* d_orientation,
-                                 Scalar4* d_torque,
+                                 ForceReal4* d_torque,
                                  const Scalar3* d_inertia,
                                  Scalar4* d_angmom,
                                  const langevin_step_two_args& langevin_args,

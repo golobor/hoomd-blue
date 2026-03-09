@@ -31,8 +31,8 @@ namespace kernel
 */
 __global__ void gpu_compute_active_force_set_forces_kernel(const unsigned int group_size,
                                                            unsigned int* d_index_array,
-                                                           Scalar4* d_force,
-                                                           Scalar4* d_torque,
+                                                           ForceReal4* d_force,
+                                                           ForceReal4* d_torque,
                                                            const Scalar4* d_pos,
                                                            const Scalar4* d_orientation,
                                                            const Scalar4* d_f_act,
@@ -52,13 +52,13 @@ __global__ void gpu_compute_active_force_set_forces_kernel(const unsigned int gr
     vec3<Scalar> f(fact.w * fact.x, fact.w * fact.y, fact.w * fact.z);
     quat<Scalar> quati(__ldg(d_orientation + idx));
     vec3<Scalar> fi = rotate(quati, f);
-    d_force[idx] = vec_to_scalar4(fi, 0);
+    d_force[idx] = make_forcereal4(ForceReal(fi.x), ForceReal(fi.y), ForceReal(fi.z), ForceReal(0));
 
     Scalar4 tact = __ldg(d_t_act + type);
 
     vec3<Scalar> t(tact.w * tact.x, tact.w * tact.y, tact.w * tact.z);
     vec3<Scalar> ti = rotate(quati, t);
-    d_torque[idx] = vec_to_scalar4(ti, 0);
+    d_torque[idx] = make_forcereal4(ForceReal(ti.x), ForceReal(ti.y), ForceReal(ti.z), ForceReal(0));
     }
 
 //! Kernel for applying rotational diffusion to active force vectors on the GPU
@@ -138,8 +138,8 @@ __global__ void gpu_compute_active_force_rotational_diffusion_kernel(const unsig
 
 hipError_t gpu_compute_active_force_set_forces(const unsigned int group_size,
                                                unsigned int* d_index_array,
-                                               Scalar4* d_force,
-                                               Scalar4* d_torque,
+                                               ForceReal4* d_force,
+                                               ForceReal4* d_torque,
                                                const Scalar4* d_pos,
                                                const Scalar4* d_orientation,
                                                const Scalar4* d_f_act,

@@ -39,10 +39,10 @@ const int gpu_tersoff_max_tpp = 64;
 struct tersoff_args_t
     {
     //! Construct a tersoff_args_t
-    tersoff_args_t(Scalar4* _d_force,
+    tersoff_args_t(ForceReal4* _d_force,
                    const unsigned int _N,
                    const unsigned int _Nghosts,
-                   Scalar* _d_virial,
+                   ForceReal* _d_virial,
                    size_t _virial_pitch,
                    bool _compute_virial,
                    const Scalar4* _d_pos,
@@ -62,10 +62,10 @@ struct tersoff_args_t
           size_nlist(_size_nlist), ntypes(_ntypes), block_size(_block_size), tpp(_tpp),
           devprop(_devprop) { };
 
-    Scalar4* d_force;           //!< Force to write out
+    ForceReal4* d_force;           //!< Force to write out
     const unsigned int N;       //!< Number of particles
     const unsigned int Nghosts; //!< Number of ghost particles
-    Scalar* d_virial;           //!< Virial to write out
+    ForceReal* d_virial;           //!< Virial to write out
     const size_t virial_pitch;  //!< Pitch for N*6 virial array
     bool compute_virial;        //!< True if we are supposed to compute the virial
     const Scalar4* d_pos;       //!< particle positions
@@ -169,9 +169,9 @@ inline __device__ float myAtomicAdd(float* address, float val)
     The neighborlist is arranged in columns so that reads are fully coalesced when doing this.
 */
 template<class evaluator, unsigned char compute_virial, int tpp>
-__global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
+__global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                                                   const unsigned int N,
-                                                  Scalar* d_virial,
+                                                  ForceReal* d_virial,
                                                   size_t virial_pitch,
                                                   const Scalar4* d_pos,
                                                   const BoxDim box,
@@ -225,14 +225,14 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
     Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
 
     // initialize the force to 0
-    Scalar4 forcei = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 forcei = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
-    Scalar viriali_xx(0.0);
-    Scalar viriali_xy(0.0);
-    Scalar viriali_xz(0.0);
-    Scalar viriali_yy(0.0);
-    Scalar viriali_yz(0.0);
-    Scalar viriali_zz(0.0);
+    ForceReal viriali_xx(0.0);
+    ForceReal viriali_xy(0.0);
+    ForceReal viriali_xz(0.0);
+    ForceReal viriali_yy(0.0);
+    ForceReal viriali_yz(0.0);
+    ForceReal viriali_zz(0.0);
 
     // check if this is the Tersoff/SquareDensity potential or the RevCross
     if (evaluator::flag_for_RevCross)
@@ -262,7 +262,7 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
             Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
             // initialize the force on j
-            Scalar4 forcej = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+            ForceReal4 forcej = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
             // compute r_ij (FLOPS: 3)
             Scalar3 dxij = posi - posj;
@@ -359,8 +359,8 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
 
                         if (temp_evaluated)
                             {
-                            Scalar4 forcek
-                                = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+                            ForceReal4 forcek
+                                = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
                             // set up the evaluator
                             eval.setRik(rik_sq);
@@ -481,7 +481,7 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
                 Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
                 // initialize the force on j
-                Scalar4 forcej = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+                ForceReal4 forcej = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
                 // compute r_ij (FLOPS: 3)
                 Scalar3 dxij = posi - posj;
@@ -553,14 +553,14 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
             Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
             // initialize the force on j
-            Scalar4 forcej = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+            ForceReal4 forcej = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
-            Scalar virialj_xx(0.0);
-            Scalar virialj_xy(0.0);
-            Scalar virialj_xz(0.0);
-            Scalar virialj_yy(0.0);
-            Scalar virialj_yz(0.0);
-            Scalar virialj_zz(0.0);
+            ForceReal virialj_xx(0.0);
+            ForceReal virialj_xy(0.0);
+            ForceReal virialj_xz(0.0);
+            ForceReal virialj_yy(0.0);
+            ForceReal virialj_yz(0.0);
+            ForceReal virialj_zz(0.0);
 
             // compute r_ij (FLOPS: 3)
             Scalar3 dxij = posi - posj;
@@ -716,8 +716,8 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
 
                         if (cur_k != cur_j && temp_evaluated)
                             {
-                            Scalar4 forcek
-                                = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+                            ForceReal4 forcek
+                                = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
                             // compute rik
                             Scalar3 dxik = posi - posk;
@@ -810,23 +810,23 @@ __global__ void gpu_compute_triplet_forces_kernel(Scalar4* d_force,
                                     Scalar force_div2r_ij = Scalar(0.5) * force_divr_ij.z;
                                     Scalar force_div2r_ik = Scalar(0.5) * force_divr_ik.z;
                                     myAtomicAdd(&d_virial[0 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.x * dxij.x
-                                                    + force_div2r_ik * dxik.x * dxik.x);
+                                                ForceReal(force_div2r_ij * dxij.x * dxij.x
+                                                    + force_div2r_ik * dxik.x * dxik.x));
                                     myAtomicAdd(&d_virial[1 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.x * dxij.y
-                                                    + force_div2r_ik * dxik.x * dxik.y);
+                                                ForceReal(force_div2r_ij * dxij.x * dxij.y
+                                                    + force_div2r_ik * dxik.x * dxik.y));
                                     myAtomicAdd(&d_virial[2 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.x * dxij.z
-                                                    + force_div2r_ik * dxik.x * dxik.z);
+                                                ForceReal(force_div2r_ij * dxij.x * dxij.z
+                                                    + force_div2r_ik * dxik.x * dxik.z));
                                     myAtomicAdd(&d_virial[3 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.y * dxij.y
-                                                    + force_div2r_ik * dxik.y * dxik.y);
+                                                ForceReal(force_div2r_ij * dxij.y * dxij.y
+                                                    + force_div2r_ik * dxik.y * dxik.y));
                                     myAtomicAdd(&d_virial[4 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.y * dxij.z
-                                                    + force_div2r_ik * dxik.y * dxik.z);
+                                                ForceReal(force_div2r_ij * dxij.y * dxij.z
+                                                    + force_div2r_ik * dxik.y * dxik.z));
                                     myAtomicAdd(&d_virial[5 * virial_pitch + cur_k],
-                                                force_div2r_ij * dxij.z * dxij.z
-                                                    + force_div2r_ik * dxik.z * dxik.z);
+                                                ForceReal(force_div2r_ij * dxij.z * dxij.z
+                                                    + force_div2r_ik * dxik.z * dxik.z));
                                     }
                                 }
                             }
@@ -936,8 +936,8 @@ template<class evaluator, unsigned int compute_virial, int tpp> struct TersoffCo
                 }
 
             // zero the forces
-            hipMemset(pair_args.d_force, 0, sizeof(Scalar4) * (pair_args.N + pair_args.Nghosts));
-            hipMemset(pair_args.d_virial, 0, sizeof(Scalar) * pair_args.virial_pitch * 6);
+            hipMemset(pair_args.d_force, 0, sizeof(ForceReal4) * (pair_args.N + pair_args.Nghosts));
+            hipMemset(pair_args.d_virial, 0, sizeof(ForceReal) * pair_args.virial_pitch * 6);
 
             // setup the grid to run the kernel
             dim3 grid(pair_args.N / (run_block_size / pair_args.tpp) + 1, 1, 1);

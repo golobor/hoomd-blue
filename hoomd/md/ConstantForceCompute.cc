@@ -142,8 +142,8 @@ void ConstantForceCompute::setForces()
     //  array handles
     ArrayHandle<Scalar3> h_f_actVec(m_constant_force, access_location::host, access_mode::read);
     ArrayHandle<Scalar3> h_t_actVec(m_constant_torque, access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
 
     // sanity check
@@ -160,10 +160,10 @@ void ConstantForceCompute::setForces()
         unsigned int type = __scalar_as_int(h_pos.data[idx].w);
 
         vec3<Scalar> fi(h_f_actVec.data[type].x, h_f_actVec.data[type].y, h_f_actVec.data[type].z);
-        h_force.data[idx] = vec_to_scalar4(fi, 0);
+        h_force.data[idx] = make_forcereal4(ForceReal(fi.x), ForceReal(fi.y), ForceReal(fi.z), ForceReal(0));
 
         vec3<Scalar> ti(h_t_actVec.data[type].x, h_t_actVec.data[type].y, h_t_actVec.data[type].z);
-        h_torque.data[idx] = vec_to_scalar4(ti, 0);
+        h_torque.data[idx] = make_forcereal4(ForceReal(ti.x), ForceReal(ti.y), ForceReal(ti.z), ForceReal(0));
         }
     }
 

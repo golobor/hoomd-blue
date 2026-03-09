@@ -154,6 +154,7 @@ void SFCPackTuner::applySortOrder()
 
     // construct a temporary holding array for the sorted data
     Scalar4* scal4_tmp = new Scalar4[m_pdata->getN()];
+    ForceReal4* freal4_tmp = new ForceReal4[m_pdata->getN()];
 
     // sort positions and types
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
@@ -203,7 +204,7 @@ void SFCPackTuner::applySortOrder()
 
         // in case anyone access it from frame to frame, sort the net virial
         {
-        ArrayHandle<Scalar> h_net_virial(m_pdata->getNetVirial(),
+        ArrayHandle<ForceReal> h_net_virial(m_pdata->getNetVirial(),
                                          access_location::host,
                                          access_mode::readwrite);
         size_t virial_pitch = m_pdata->getNetVirial().getPitch();
@@ -219,25 +220,25 @@ void SFCPackTuner::applySortOrder()
 
         // sort net force, net torque, and orientation
         {
-        ArrayHandle<Scalar4> h_net_force(m_pdata->getNetForce(),
+        ArrayHandle<ForceReal4> h_net_force(m_pdata->getNetForce(),
                                          access_location::host,
                                          access_mode::readwrite);
 
         for (unsigned int i = 0; i < m_pdata->getN(); i++)
-            scal4_tmp[i] = h_net_force.data[m_sort_order[i]];
+            freal4_tmp[i] = h_net_force.data[m_sort_order[i]];
         for (unsigned int i = 0; i < m_pdata->getN(); i++)
-            h_net_force.data[i] = scal4_tmp[i];
+            h_net_force.data[i] = freal4_tmp[i];
         }
 
         {
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::readwrite);
 
         for (unsigned int i = 0; i < m_pdata->getN(); i++)
-            scal4_tmp[i] = h_net_torque.data[m_sort_order[i]];
+            freal4_tmp[i] = h_net_torque.data[m_sort_order[i]];
         for (unsigned int i = 0; i < m_pdata->getN(); i++)
-            h_net_torque.data[i] = scal4_tmp[i];
+            h_net_torque.data[i] = freal4_tmp[i];
         }
 
         {
@@ -279,6 +280,7 @@ void SFCPackTuner::applySortOrder()
 
     delete[] scal_tmp;
     delete[] scal4_tmp;
+    delete[] freal4_tmp;
     delete[] scal3_tmp;
     delete[] uint_tmp;
     delete[] int3_tmp;

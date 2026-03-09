@@ -77,10 +77,10 @@ void ActiveForceComputeGPU::setForces()
     {
     //  array handles
     ArrayHandle<Scalar4> d_f_actVec(m_f_activeVec, access_location::device, access_mode::read);
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar4> d_t_actVec(m_t_activeVec, access_location::device, access_mode::read);
-    ArrayHandle<Scalar4> d_torque(m_torque, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_torque(m_torque, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
     ArrayHandle<Scalar4> d_orientation(m_pdata->getOrientationArray(),

@@ -187,7 +187,7 @@ hipError_t gpu_nve_step_one(Scalar4* d_pos,
 __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
                                                 Scalar4* d_angmom,
                                                 const Scalar3* d_inertia,
-                                                const Scalar4* d_net_torque,
+                                                const ForceReal4* d_net_torque,
                                                 const unsigned int* d_group_members,
                                                 const unsigned int nwork,
                                                 Scalar deltaT,
@@ -204,7 +204,7 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
         // read the particle's orientation, conjugate quaternion, moment of inertia and net torque
         quat<Scalar> q(d_orientation[idx]);
         quat<Scalar> p(d_angmom[idx]);
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         vec3<Scalar> I(d_inertia[idx]);
 
         // rotate torque into principal frame
@@ -314,7 +314,7 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 hipError_t gpu_nve_angular_step_one(Scalar4* d_orientation,
                                     Scalar4* d_angmom,
                                     const Scalar3* d_inertia,
-                                    const Scalar4* d_net_torque,
+                                    const ForceReal4* d_net_torque,
                                     unsigned int* d_group_members,
                                     const unsigned int group_size,
                                     Scalar deltaT,
@@ -364,7 +364,7 @@ hipError_t gpu_nve_angular_step_one(Scalar4* d_orientation,
 __global__ void gpu_nve_angular_step_two_kernel(const Scalar4* d_orientation,
                                                 Scalar4* d_angmom,
                                                 const Scalar3* d_inertia,
-                                                const Scalar4* d_net_torque,
+                                                const ForceReal4* d_net_torque,
                                                 unsigned int* d_group_members,
                                                 const unsigned int nwork,
                                                 Scalar deltaT,
@@ -381,7 +381,7 @@ __global__ void gpu_nve_angular_step_two_kernel(const Scalar4* d_orientation,
         // read the particle's orientation, conjugate quaternion, moment of inertia and net torque
         quat<Scalar> q(d_orientation[idx]);
         quat<Scalar> p(d_angmom[idx]);
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         vec3<Scalar> I(d_inertia[idx]);
 
         // rotate torque into principal frame
@@ -422,7 +422,7 @@ __global__ void gpu_nve_angular_step_two_kernel(const Scalar4* d_orientation,
 hipError_t gpu_nve_angular_step_two(const Scalar4* d_orientation,
                                     Scalar4* d_angmom,
                                     const Scalar3* d_inertia,
-                                    const Scalar4* d_net_torque,
+                                    const ForceReal4* d_net_torque,
                                     unsigned int* d_group_members,
                                     const unsigned int group_size,
                                     Scalar deltaT,

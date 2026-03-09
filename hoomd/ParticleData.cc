@@ -376,21 +376,21 @@ void ParticleData::allocate(unsigned int N)
     GPUArray<unsigned int> body(N, m_exec_conf);
     m_body.swap(body);
 
-    GPUArray<Scalar4> net_force(N, m_exec_conf);
+    GPUArray<ForceReal4> net_force(N, m_exec_conf);
     m_net_force.swap(net_force);
-    GPUArray<Scalar> net_virial(N, 6, m_exec_conf);
+    GPUArray<ForceReal> net_virial(N, 6, m_exec_conf);
     m_net_virial.swap(net_virial);
-    GPUArray<Scalar4> net_torque(N, m_exec_conf);
+    GPUArray<ForceReal4> net_torque(N, m_exec_conf);
     m_net_torque.swap(net_torque);
 
         {
-        ArrayHandle<Scalar4> h_net_force(m_net_force,
+        ArrayHandle<ForceReal4> h_net_force(m_net_force,
                                          access_location::host,
                                          access_mode::overwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_net_torque,
+        ArrayHandle<ForceReal4> h_net_torque(m_net_torque,
                                           access_location::host,
                                           access_mode::overwrite);
-        ArrayHandle<Scalar> h_net_virial(m_net_virial,
+        ArrayHandle<ForceReal> h_net_virial(m_net_virial,
                                          access_location::host,
                                          access_mode::overwrite);
 
@@ -476,25 +476,25 @@ void ParticleData::allocateAlternateArrays(unsigned int N)
     m_inertia_alt.swap(inertia_alt);
 
     // Net force
-    GPUArray<Scalar4> net_force_alt(N, m_exec_conf);
+    GPUArray<ForceReal4> net_force_alt(N, m_exec_conf);
     m_net_force_alt.swap(net_force_alt);
 
     // Net virial
-    GPUArray<Scalar> net_virial_alt(N, 6, m_exec_conf);
+    GPUArray<ForceReal> net_virial_alt(N, 6, m_exec_conf);
     m_net_virial_alt.swap(net_virial_alt);
 
     // Net torque
-    GPUArray<Scalar4> net_torque_alt(N, m_exec_conf);
+    GPUArray<ForceReal4> net_torque_alt(N, m_exec_conf);
     m_net_torque_alt.swap(net_torque_alt);
 
         {
-        ArrayHandle<Scalar4> h_net_force_alt(m_net_force_alt,
+        ArrayHandle<ForceReal4> h_net_force_alt(m_net_force_alt,
                                              access_location::host,
                                              access_mode::overwrite);
-        ArrayHandle<Scalar4> h_net_torque_alt(m_net_torque_alt,
+        ArrayHandle<ForceReal4> h_net_torque_alt(m_net_torque_alt,
                                               access_location::host,
                                               access_mode::overwrite);
-        ArrayHandle<Scalar> h_net_virial_alt(m_net_virial_alt,
+        ArrayHandle<ForceReal> h_net_virial_alt(m_net_virial_alt,
                                              access_location::host,
                                              access_mode::overwrite);
         m_net_force_alt.zeroFill();
@@ -586,13 +586,13 @@ void ParticleData::reallocate(unsigned int max_n)
     m_net_virial.resize(max_n, 6);
     m_net_torque.resize(max_n);
         {
-        ArrayHandle<Scalar4> h_net_force(m_net_force,
+        ArrayHandle<ForceReal4> h_net_force(m_net_force,
                                          access_location::host,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_net_torque,
+        ArrayHandle<ForceReal4> h_net_torque(m_net_torque,
                                           access_location::host,
                                           access_mode::readwrite);
-        ArrayHandle<Scalar> h_net_virial(m_net_virial,
+        ArrayHandle<ForceReal> h_net_virial(m_net_virial,
                                          access_location::host,
                                          access_mode::readwrite);
 
@@ -630,13 +630,13 @@ void ParticleData::reallocate(unsigned int max_n)
         m_net_virial_alt.resize(max_n, 6);
 
             {
-            ArrayHandle<Scalar4> h_net_force_alt(m_net_force_alt,
+            ArrayHandle<ForceReal4> h_net_force_alt(m_net_force_alt,
                                                  access_location::host,
                                                  access_mode::overwrite);
-            ArrayHandle<Scalar4> h_net_torque_alt(m_net_torque_alt,
+            ArrayHandle<ForceReal4> h_net_torque_alt(m_net_torque_alt,
                                                   access_location::host,
                                                   access_mode::overwrite);
-            ArrayHandle<Scalar> h_net_virial_alt(m_net_virial_alt,
+            ArrayHandle<ForceReal> h_net_virial_alt(m_net_virial_alt,
                                                  access_location::host,
                                                  access_mode::overwrite);
 
@@ -1756,8 +1756,9 @@ Scalar4 ParticleData::getPNetForce(unsigned int tag) const
     Scalar4 result = make_scalar4(0.0, 0.0, 0.0, 0.0);
     if (found)
         {
-        ArrayHandle<Scalar4> h_net_force(m_net_force, access_location::host, access_mode::read);
-        result = h_net_force.data[idx];
+        ArrayHandle<ForceReal4> h_net_force(m_net_force, access_location::host, access_mode::read);
+        ForceReal4 f_raw = h_net_force.data[idx];
+        result = make_scalar4(Scalar(f_raw.x), Scalar(f_raw.y), Scalar(f_raw.z), Scalar(f_raw.w));
         }
 #ifdef ENABLE_MPI
     if (m_decomposition)
@@ -1782,8 +1783,9 @@ Scalar4 ParticleData::getNetTorque(unsigned int tag) const
     Scalar4 result = make_scalar4(0.0, 0.0, 0.0, 0.0);
     if (found)
         {
-        ArrayHandle<Scalar4> h_net_torque(m_net_torque, access_location::host, access_mode::read);
-        result = h_net_torque.data[idx];
+        ArrayHandle<ForceReal4> h_net_torque(m_net_torque, access_location::host, access_mode::read);
+        ForceReal4 t_raw = h_net_torque.data[idx];
+        result = make_scalar4(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z), Scalar(t_raw.w));
         }
 #ifdef ENABLE_MPI
     if (m_decomposition)
@@ -1811,7 +1813,7 @@ Scalar ParticleData::getPNetVirial(unsigned int tag, unsigned int component) con
     Scalar result = Scalar(0.0);
     if (found)
         {
-        ArrayHandle<Scalar> h_net_virial(m_net_virial, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_net_virial(m_net_virial, access_location::host, access_mode::read);
         result = h_net_virial.data[m_net_virial.getPitch() * component + i];
         }
 #ifdef ENABLE_MPI
@@ -2703,13 +2705,13 @@ void ParticleData::removeParticles(std::vector<detail::pdata_element>& out,
         ArrayHandle<Scalar3> h_inertia(getMomentsOfInertiaArray(),
                                        access_location::host,
                                        access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_force(getNetForce(),
+        ArrayHandle<ForceReal4> h_net_force(getNetForce(),
                                          access_location::host,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::readwrite);
-        ArrayHandle<Scalar> h_net_virial(getNetVirial(),
+        ArrayHandle<ForceReal> h_net_virial(getNetVirial(),
                                          access_location::host,
                                          access_mode::readwrite);
 
@@ -2745,13 +2747,13 @@ void ParticleData::removeParticles(std::vector<detail::pdata_element>& out,
         ArrayHandle<Scalar3> h_inertia_alt(m_inertia_alt,
                                            access_location::host,
                                            access_mode::overwrite);
-        ArrayHandle<Scalar4> h_net_force_alt(m_net_force_alt,
+        ArrayHandle<ForceReal4> h_net_force_alt(m_net_force_alt,
                                              access_location::host,
                                              access_mode::overwrite);
-        ArrayHandle<Scalar4> h_net_torque_alt(m_net_torque_alt,
+        ArrayHandle<ForceReal4> h_net_torque_alt(m_net_torque_alt,
                                               access_location::host,
                                               access_mode::overwrite);
-        ArrayHandle<Scalar> h_net_virial_alt(m_net_virial_alt,
+        ArrayHandle<ForceReal> h_net_virial_alt(m_net_virial_alt,
                                              access_location::host,
                                              access_mode::overwrite);
         ArrayHandle<unsigned int> h_tag_alt(m_tag_alt,
@@ -2887,13 +2889,13 @@ void ParticleData::addParticles(const std::vector<detail::pdata_element>& in)
         ArrayHandle<Scalar3> h_inertia(getMomentsOfInertiaArray(),
                                        access_location::host,
                                        access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_force(getNetForce(),
+        ArrayHandle<ForceReal4> h_net_force(getNetForce(),
                                          access_location::host,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::readwrite);
-        ArrayHandle<Scalar> h_net_virial(getNetVirial(),
+        ArrayHandle<ForceReal> h_net_virial(getNetVirial(),
                                          access_location::host,
                                          access_mode::readwrite);
         ArrayHandle<unsigned int> h_tag(getTags(), access_location::host, access_mode::readwrite);
@@ -2995,11 +2997,11 @@ void ParticleData::removeParticlesGPU(GPUVector<detail::pdata_element>& out,
         ArrayHandle<Scalar3> d_inertia(getMomentsOfInertiaArray(),
                                        access_location::device,
                                        access_mode::read);
-        ArrayHandle<Scalar4> d_net_force(getNetForce(), access_location::device, access_mode::read);
-        ArrayHandle<Scalar4> d_net_torque(getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_force(getNetForce(), access_location::device, access_mode::read);
+        ArrayHandle<ForceReal4> d_net_torque(getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
-        ArrayHandle<Scalar> d_net_virial(getNetVirial(),
+        ArrayHandle<ForceReal> d_net_virial(getNetVirial(),
                                          access_location::device,
                                          access_mode::read);
         ArrayHandle<unsigned int> d_tag(getTags(), access_location::device, access_mode::read);
@@ -3029,13 +3031,13 @@ void ParticleData::removeParticlesGPU(GPUVector<detail::pdata_element>& out,
         ArrayHandle<Scalar3> d_inertia_alt(m_inertia_alt,
                                            access_location::device,
                                            access_mode::overwrite);
-        ArrayHandle<Scalar4> d_net_force_alt(m_net_force_alt,
+        ArrayHandle<ForceReal4> d_net_force_alt(m_net_force_alt,
                                              access_location::device,
                                              access_mode::overwrite);
-        ArrayHandle<Scalar4> d_net_torque_alt(m_net_torque_alt,
+        ArrayHandle<ForceReal4> d_net_torque_alt(m_net_torque_alt,
                                               access_location::device,
                                               access_mode::overwrite);
-        ArrayHandle<Scalar> d_net_virial_alt(m_net_virial_alt,
+        ArrayHandle<ForceReal> d_net_virial_alt(m_net_virial_alt,
                                              access_location::device,
                                              access_mode::overwrite);
         ArrayHandle<unsigned int> d_tag_alt(m_tag_alt,
@@ -3177,13 +3179,13 @@ void ParticleData::addParticlesGPU(const GPUVector<detail::pdata_element>& in)
         ArrayHandle<Scalar3> d_inertia(getMomentsOfInertiaArray(),
                                        access_location::device,
                                        access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_force(getNetForce(),
+        ArrayHandle<ForceReal4> d_net_force(getNetForce(),
                                          access_location::device,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::readwrite);
-        ArrayHandle<Scalar> d_net_virial(getNetVirial(),
+        ArrayHandle<ForceReal> d_net_virial(getNetVirial(),
                                          access_location::device,
                                          access_mode::readwrite);
         ArrayHandle<unsigned int> d_tag(getTags(), access_location::device, access_mode::readwrite);

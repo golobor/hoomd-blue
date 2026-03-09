@@ -103,10 +103,10 @@ template<class evaluator> void PotentialExternal<evaluator>::computeForces(uint6
                                        access_location::host,
                                        access_mode::read);
 
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
 
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
     ArrayHandle<Scalar> h_charge(m_pdata->getCharges(), access_location::host, access_mode::read);
 
     ArrayHandle<param_type> h_params(m_params, access_location::host, access_mode::read);
@@ -129,18 +129,18 @@ template<class evaluator> void PotentialExternal<evaluator>::computeForces(uint6
     for (unsigned int idx = 0; idx < nparticles; idx++)
         {
         // get the current particle properties
-        Scalar3 X = make_scalar3(h_pos.data[idx].x, h_pos.data[idx].y, h_pos.data[idx].z);
+        ForceReal3 X = make_forcereal3(ForceReal(h_pos.data[idx].x), ForceReal(h_pos.data[idx].y), ForceReal(h_pos.data[idx].z));
         unsigned int type = __scalar_as_int(h_pos.data[idx].w);
         quat<Scalar> q(h_orientation.data[idx]);
-        Scalar3 F, T;
-        Scalar energy;
-        Scalar virial[6];
+        ForceReal3 F, T;
+        ForceReal energy;
+        ForceReal virial[6];
 
         evaluator eval(X, q, box, h_params.data[type], *m_field);
 
         if (evaluator::needsCharge())
             {
-            Scalar qi = h_charge.data[idx];
+            ForceReal qi = ForceReal(h_charge.data[idx]);
             eval.setCharge(qi);
             }
         eval.evalForceTorqueEnergyAndVirial(F, T, energy, virial);

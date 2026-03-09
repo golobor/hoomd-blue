@@ -39,8 +39,8 @@ hipError_t gpu_compute_volume_constraint_volume(Scalar* d_sum_volume,
                                                 unsigned int num_blocks);
 
 //! Kernel driver that computes the forces for MeshVolumeConservationGPU
-hipError_t gpu_compute_volume_constraint_force(Scalar4* d_force,
-                                               Scalar* d_virial,
+hipError_t gpu_compute_volume_constraint_force(ForceReal4* d_force,
+                                               ForceReal* d_virial,
                                                const size_t virial_pitch,
                                                const unsigned int N,
                                                const unsigned int* gN,

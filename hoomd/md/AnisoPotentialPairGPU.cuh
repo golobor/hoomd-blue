@@ -41,9 +41,9 @@ namespace kernel
 struct a_pair_args_t
     {
     //! Construct a pair_args_t
-    a_pair_args_t(Scalar4* _d_force,
-                  Scalar4* _d_torque,
-                  Scalar* _d_virial,
+    a_pair_args_t(ForceReal4* _d_force,
+                  ForceReal4* _d_torque,
+                  ForceReal* _d_virial,
                   size_t _virial_pitch,
                   const unsigned int _N,
                   const unsigned int _n_max,
@@ -71,9 +71,9 @@ struct a_pair_args_t
           threads_per_particle(_threads_per_particle), devprop(_devprop),
           update_shape_param(_update_shape_param) { };
 
-    Scalar4* d_force;             //!< Force to write out
-    Scalar4* d_torque;            //!< Torque to write out
-    Scalar* d_virial;             //!< Virial to write out
+    ForceReal4* d_force;             //!< Force to write out
+    ForceReal4* d_torque;            //!< Torque to write out
+    ForceReal* d_virial;             //!< Virial to write out
     const size_t virial_pitch;    //!< The pitch of the 2D array of virial matrix elements
     const unsigned int N;         //!< number of particles
     const unsigned int n_max;     //!< maximum size of particle data arrays
@@ -140,9 +140,9 @@ struct a_pair_args_t
 */
 template<class evaluator, unsigned int shift_mode, unsigned int compute_virial, int tpp>
 __global__ void
-gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
-                                     Scalar4* d_torque,
-                                     Scalar* d_virial,
+gpu_compute_pair_aniso_forces_kernel(ForceReal4* d_force,
+                                     ForceReal4* d_torque,
+                                     ForceReal* d_virial,
                                      const size_t virial_pitch,
                                      const unsigned int N,
                                      const Scalar4* d_pos,
@@ -367,14 +367,14 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
     // promote ForceReal -> Scalar for output storage
     if (active && threadIdx.x % tpp == 0)
         {
-        d_force[idx] = make_scalar4(static_cast<Scalar>(force.x),
-                                    static_cast<Scalar>(force.y),
-                                    static_cast<Scalar>(force.z),
-                                    static_cast<Scalar>(force.w));
-        d_torque[idx] = make_scalar4(static_cast<Scalar>(torque.x),
-                                     static_cast<Scalar>(torque.y),
-                                     static_cast<Scalar>(torque.z),
-                                     Scalar(0));
+        d_force[idx] = make_forcereal4(force.x,
+                                    force.y,
+                                    force.z,
+                                    force.w);
+        d_torque[idx] = make_forcereal4(torque.x,
+                                     torque.y,
+                                     torque.z,
+                                     ForceReal(0));
         }
 
     if (compute_virial)
@@ -390,12 +390,12 @@ gpu_compute_pair_aniso_forces_kernel(Scalar4* d_force,
         // promote ForceReal -> Scalar for output storage
         if (active && threadIdx.x % tpp == 0)
             {
-            d_virial[0 * virial_pitch + idx] = static_cast<Scalar>(virialxx);
-            d_virial[1 * virial_pitch + idx] = static_cast<Scalar>(virialxy);
-            d_virial[2 * virial_pitch + idx] = static_cast<Scalar>(virialxz);
-            d_virial[3 * virial_pitch + idx] = static_cast<Scalar>(virialyy);
-            d_virial[4 * virial_pitch + idx] = static_cast<Scalar>(virialyz);
-            d_virial[5 * virial_pitch + idx] = static_cast<Scalar>(virialzz);
+            d_virial[0 * virial_pitch + idx] = virialxx;
+            d_virial[1 * virial_pitch + idx] = virialxy;
+            d_virial[2 * virial_pitch + idx] = virialxz;
+            d_virial[3 * virial_pitch + idx] = virialyy;
+            d_virial[4 * virial_pitch + idx] = virialyz;
+            d_virial[5 * virial_pitch + idx] = virialzz;
             }
         }
     }

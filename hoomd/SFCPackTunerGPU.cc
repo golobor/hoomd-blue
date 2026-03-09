@@ -186,13 +186,13 @@ void SFCPackTunerGPU::applySortOrder()
         ArrayHandle<Scalar3> d_inertia_alt(m_pdata->getAltMomentsOfInertiaArray(),
                                            access_location::device,
                                            access_mode::overwrite);
-        ArrayHandle<Scalar> d_net_virial_alt(m_pdata->getAltNetVirial(),
+        ArrayHandle<ForceReal> d_net_virial_alt(m_pdata->getAltNetVirial(),
                                              access_location::device,
                                              access_mode::overwrite);
-        ArrayHandle<Scalar4> d_net_force_alt(m_pdata->getAltNetForce(),
+        ArrayHandle<ForceReal4> d_net_force_alt(m_pdata->getAltNetForce(),
                                              access_location::device,
                                              access_mode::overwrite);
-        ArrayHandle<Scalar4> d_net_torque_alt(m_pdata->getAltNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque_alt(m_pdata->getAltNetTorqueArray(),
                                               access_location::device,
                                               access_mode::overwrite);
 
@@ -229,13 +229,13 @@ void SFCPackTunerGPU::applySortOrder()
                                        access_location::device,
                                        access_mode::read);
 
-        ArrayHandle<Scalar> d_net_virial(m_pdata->getNetVirial(),
+        ArrayHandle<ForceReal> d_net_virial(m_pdata->getNetVirial(),
                                          access_location::device,
                                          access_mode::read);
-        ArrayHandle<Scalar4> d_net_force(m_pdata->getNetForce(),
+        ArrayHandle<ForceReal4> d_net_force(m_pdata->getNetForce(),
                                          access_location::device,
                                          access_mode::read);
-        ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
 

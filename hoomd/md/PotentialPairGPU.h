@@ -124,10 +124,10 @@ template<class evaluator> void PotentialPairGPU<evaluator>::computeForces(uint64
         // access parameters
         ArrayHandle<Scalar> d_ronsq(this->m_ronsq, access_location::device, access_mode::read);
         ArrayHandle<Scalar> d_rcutsq(this->m_rcutsq, access_location::device, access_mode::read);
-        ArrayHandle<Scalar4> d_force(this->m_force,
+        ArrayHandle<ForceReal4> d_force(this->m_force,
                                      access_location::device,
                                      access_mode::readwrite);
-        ArrayHandle<Scalar> d_virial(this->m_virial,
+        ArrayHandle<ForceReal> d_virial(this->m_virial,
                                      access_location::device,
                                      access_mode::readwrite);
 

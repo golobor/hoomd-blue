@@ -125,7 +125,7 @@ gpu_fire_zero_angmom(Scalar4* d_angmom, unsigned int* d_group_members, unsigned 
 */
 __global__ void gpu_fire_reduce_pe_partial_kernel(unsigned int* d_group_members,
                                                   unsigned int group_size,
-                                                  Scalar4* d_net_force,
+                                                  ForceReal4* d_net_force,
                                                   Scalar* d_partial_sum_pe)
     {
     extern __shared__ Scalar fire_sdata[];
@@ -140,8 +140,7 @@ __global__ void gpu_fire_reduce_pe_partial_kernel(unsigned int* d_group_members,
         unsigned int idx = d_group_members[group_idx];
         // read the particle's force and extract the pe from w component (MEM TRANSFER: 32 bytes)
 
-        Scalar4 force = d_net_force[idx];
-        pe = force.w;
+        pe = Scalar(d_net_force[idx].w);
 
         // Uncoalesced Memory Read replace by Texture Read above.  Scalars4* d_net_force still being
         // passed to support this defunct structure.
@@ -219,7 +218,7 @@ gpu_fire_reduce_partial_sum_kernel(Scalar* d_sum, Scalar* d_partial_sum, unsigne
 */
 hipError_t gpu_fire_compute_sum_pe(unsigned int* d_group_members,
                                    unsigned int group_size,
-                                   Scalar4* d_net_force,
+                                   ForceReal4* d_net_force,
                                    Scalar* d_sum_pe,
                                    Scalar* d_partial_sum_pe,
                                    unsigned int block_size,
@@ -303,7 +302,7 @@ __global__ void gpu_fire_reduce_P_partial_kernel(const Scalar4* d_vel,
 __global__ void gpu_fire_reduce_Pr_partial_kernel(const Scalar4* d_angmom,
                                                   const Scalar4* d_orientation,
                                                   const Scalar3* d_inertia,
-                                                  const Scalar4* d_net_torque,
+                                                  const ForceReal4* d_net_torque,
                                                   unsigned int* d_group_members,
                                                   unsigned int group_size,
                                                   Scalar* d_partial_sum_Pr)
@@ -319,7 +318,7 @@ __global__ void gpu_fire_reduce_Pr_partial_kernel(const Scalar4* d_angmom,
         {
         unsigned int idx = d_group_members[group_idx];
 
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         quat<Scalar> p(d_angmom[idx]);
         quat<Scalar> q(d_orientation[idx]);
         vec3<Scalar> I(d_inertia[idx]);
@@ -497,7 +496,7 @@ __global__ void gpu_fire_reduce_asq_partial_kernel(const Scalar3* d_accel,
         d_partial_sum_asq[blockIdx.x] = fire_partial_sdata[0];
     }
 
-__global__ void gpu_fire_reduce_tsq_partial_kernel(const Scalar4* d_net_torque,
+__global__ void gpu_fire_reduce_tsq_partial_kernel(const ForceReal4* d_net_torque,
                                                    const Scalar4* d_orientation,
                                                    const Scalar3* d_inertia,
                                                    unsigned int* d_group_members,
@@ -515,7 +514,7 @@ __global__ void gpu_fire_reduce_tsq_partial_kernel(const Scalar4* d_net_torque,
         {
         unsigned int idx = d_group_members[group_idx];
 
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         quat<Scalar> q(d_orientation[idx]);
         vec3<Scalar> I(d_inertia[idx]);
 
@@ -657,7 +656,7 @@ hipError_t gpu_fire_compute_sum_all_angular(const unsigned int N,
                                             const Scalar4* d_orientation,
                                             const Scalar3* d_inertia,
                                             const Scalar4* d_angmom,
-                                            const Scalar4* d_net_torque,
+                                            const ForceReal4* d_net_torque,
                                             unsigned int* d_group_members,
                                             unsigned int group_size,
                                             Scalar* d_sum_all,
@@ -812,7 +811,7 @@ hipError_t gpu_fire_update_v(Scalar4* d_vel,
     return hipSuccess;
     }
 
-__global__ void gpu_fire_update_angmom_kernel(const Scalar4* d_net_torque,
+__global__ void gpu_fire_update_angmom_kernel(const ForceReal4* d_net_torque,
                                               const Scalar4* d_orientation,
                                               const Scalar3* d_inertia,
                                               Scalar4* d_angmom,
@@ -828,7 +827,7 @@ __global__ void gpu_fire_update_angmom_kernel(const Scalar4* d_net_torque,
         {
         unsigned int idx = d_group_members[group_idx];
         quat<Scalar> q(d_orientation[idx]);
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         quat<Scalar> p(d_angmom[idx]);
         vec3<Scalar> I(d_inertia[idx]);
 
@@ -855,7 +854,7 @@ __global__ void gpu_fire_update_angmom_kernel(const Scalar4* d_net_torque,
         }
     }
 
-hipError_t gpu_fire_update_angmom(const Scalar4* d_net_torque,
+hipError_t gpu_fire_update_angmom(const ForceReal4* d_net_torque,
                                   const Scalar4* d_orientation,
                                   const Scalar3* d_inertia,
                                   Scalar4* d_angmom,

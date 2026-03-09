@@ -119,8 +119,8 @@ template<class evaluator> void PotentialTersoffGPU<evaluator>::computeForces(uin
                                                          access_location::device,
                                                          access_mode::read);
 
-    ArrayHandle<Scalar4> d_force(this->m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(this->m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(this->m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(this->m_virial, access_location::device, access_mode::overwrite);
 
     PDataFlags flags = this->m_pdata->getFlags();
     bool compute_virial = flags[pdata_flag::pressure_tensor];

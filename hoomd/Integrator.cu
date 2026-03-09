@@ -16,19 +16,19 @@ namespace kernel
     {
 //! helper to add a given force/virial pointer pair
 template<unsigned int compute_virial>
-__device__ void add_force_total(Scalar4& net_force,
-                                Scalar* net_virial,
-                                Scalar4& net_torque,
-                                Scalar4* d_f,
-                                Scalar* d_v,
+__device__ void add_force_total(ForceReal4& net_force,
+                                ForceReal* net_virial,
+                                ForceReal4& net_torque,
+                                ForceReal4* d_f,
+                                ForceReal* d_v,
                                 const size_t virial_pitch,
-                                Scalar4* d_t,
+                                ForceReal4* d_t,
                                 int idx)
     {
     if (d_f != NULL && d_v != NULL && d_t != NULL)
         {
-        Scalar4 f = d_f[idx];
-        Scalar4 t = d_t[idx];
+        ForceReal4 f = d_f[idx];
+        ForceReal4 t = d_t[idx];
 
         net_force.x += f.x;
         net_force.y += f.y;
@@ -65,10 +65,10 @@ __device__ void add_force_total(Scalar4& net_force,
     \tparam compute_virial When set to 0, the virial sum is not computed
 */
 template<unsigned int compute_virial>
-__global__ void gpu_integrator_sum_net_force_kernel(Scalar4* d_net_force,
-                                                    Scalar* d_net_virial,
+__global__ void gpu_integrator_sum_net_force_kernel(ForceReal4* d_net_force,
+                                                    ForceReal* d_net_virial,
                                                     const size_t net_virial_pitch,
-                                                    Scalar4* d_net_torque,
+                                                    ForceReal4* d_net_torque,
                                                     const gpu_force_list force_list,
                                                     unsigned int nwork,
                                                     bool clear)
@@ -79,18 +79,18 @@ __global__ void gpu_integrator_sum_net_force_kernel(Scalar4* d_net_force,
     if (idx < nwork)
         {
         // set the initial net_force and net_virial to sum into
-        Scalar4 net_force;
-        Scalar net_virial[6];
-        Scalar4 net_torque;
+        ForceReal4 net_force;
+        ForceReal net_virial[6];
+        ForceReal4 net_torque;
         if (clear)
             {
-            net_force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+            net_force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
             if (compute_virial)
                 {
                 for (int i = 0; i < 6; i++)
-                    net_virial[i] = Scalar(0.0);
+                    net_virial[i] = ForceReal(0.0);
                 }
-            net_torque = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+            net_torque = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
             }
         else
             {
@@ -165,10 +165,10 @@ __global__ void gpu_integrator_sum_net_force_kernel(Scalar4* d_net_force,
         }
     }
 
-hipError_t gpu_integrator_sum_net_force(Scalar4* d_net_force,
-                                        Scalar* d_net_virial,
+hipError_t gpu_integrator_sum_net_force(ForceReal4* d_net_force,
+                                        ForceReal* d_net_virial,
                                         size_t net_virial_pitch,
-                                        Scalar4* d_net_torque,
+                                        ForceReal4* d_net_torque,
                                         const gpu_force_list& force_list,
                                         unsigned int nparticles,
                                         bool clear,

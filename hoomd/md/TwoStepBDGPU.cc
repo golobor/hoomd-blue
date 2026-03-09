@@ -48,7 +48,7 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
                                             access_mode::read);
     unsigned int group_size = m_group->getNumMembers();
     const unsigned int D = m_sysdef->getNDimensions();
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(),
                                access_location::device,
@@ -67,7 +67,7 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
     struct { Scalar4* data = nullptr; } d_pos_correction;
 #endif
 
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
     ArrayHandle<Scalar> d_gamma(m_gamma, access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_tag(m_pdata->getTags(), access_location::device, access_mode::read);
 
@@ -76,7 +76,7 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
     ArrayHandle<Scalar4> d_orientation(m_pdata->getOrientationArray(),
                                        access_location::device,
                                        access_mode::readwrite);
-    ArrayHandle<Scalar4> d_torque(m_pdata->getNetTorqueArray(),
+    ArrayHandle<ForceReal4> d_torque(m_pdata->getNetTorqueArray(),
                                   access_location::device,
                                   access_mode::readwrite);
     ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),

@@ -96,7 +96,7 @@ template<class Manifold> void TwoStepRATTLEBDGPU<Manifold>::integrateStepOne(uin
                                             access_mode::read);
     unsigned int group_size = this->m_group->getNumMembers();
     const unsigned int D = this->m_sysdef->getNDimensions();
-    const GPUArray<Scalar4>& net_force = this->m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = this->m_pdata->getNetForce();
 
     ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
                                access_location::device,
@@ -108,7 +108,7 @@ template<class Manifold> void TwoStepRATTLEBDGPU<Manifold>::integrateStepOne(uin
                                access_location::device,
                                access_mode::readwrite);
 
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
     ArrayHandle<Scalar> d_gamma(this->m_gamma, access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_tag(this->m_pdata->getTags(),
                                     access_location::device,
@@ -119,7 +119,7 @@ template<class Manifold> void TwoStepRATTLEBDGPU<Manifold>::integrateStepOne(uin
     ArrayHandle<Scalar4> d_orientation(this->m_pdata->getOrientationArray(),
                                        access_location::device,
                                        access_mode::readwrite);
-    ArrayHandle<Scalar4> d_torque(this->m_pdata->getNetTorqueArray(),
+    ArrayHandle<ForceReal4> d_torque(this->m_pdata->getNetTorqueArray(),
                                   access_location::device,
                                   access_mode::readwrite);
     ArrayHandle<Scalar3> d_inertia(this->m_pdata->getMomentsOfInertiaArray(),
@@ -176,14 +176,14 @@ template<class Manifold> void TwoStepRATTLEBDGPU<Manifold>::includeRATTLEForce(u
                                             access_location::device,
                                             access_mode::read);
     unsigned int group_size = this->m_group->getNumMembers();
-    const GPUArray<Scalar4>& net_force = this->m_pdata->getNetForce();
-    const GPUArray<Scalar>& net_virial = this->m_pdata->getNetVirial();
+    const GPUArray<ForceReal4>& net_force = this->m_pdata->getNetForce();
+    const GPUArray<ForceReal>& net_virial = this->m_pdata->getNetVirial();
 
     ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
                                access_location::device,
                                access_mode::read);
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::readwrite);
-    ArrayHandle<Scalar> d_net_virial(net_virial, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal> d_net_virial(net_virial, access_location::device, access_mode::readwrite);
     ArrayHandle<Scalar> d_gamma(this->m_gamma, access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_tag(this->m_pdata->getTags(),
                                     access_location::device,

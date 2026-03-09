@@ -224,7 +224,7 @@ void TwoStepConstantPressureGPU::integrateStepOne(uint64_t timestep)
         ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
         ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -269,7 +269,7 @@ void TwoStepConstantPressureGPU::integrateStepOne(uint64_t timestep)
 */
 void TwoStepConstantPressureGPU::integrateStepTwo(uint64_t timestep)
     {
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
     // Martyna-Tobias-Klein correction
     Scalar mtk = exp(-Scalar(1.0 / 2.0) * m_deltaT
@@ -286,7 +286,7 @@ void TwoStepConstantPressureGPU::integrateStepTwo(uint64_t timestep)
                                      access_location::device,
                                      access_mode::overwrite);
 
-        ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
+        ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
         ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),
                                                 access_location::device,
                                                 access_mode::read);
@@ -324,7 +324,7 @@ void TwoStepConstantPressureGPU::integrateStepTwo(uint64_t timestep)
         ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
         ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),

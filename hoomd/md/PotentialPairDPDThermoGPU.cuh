@@ -37,8 +37,8 @@ const int gpu_dpd_pair_force_max_tpp = 64;
 struct dpd_pair_args_t
     {
     //! Construct a dpd_pair_args_t
-    dpd_pair_args_t(Scalar4* _d_force,
-                    Scalar* _d_virial,
+    dpd_pair_args_t(ForceReal4* _d_force,
+                    ForceReal* _d_virial,
                     const size_t _virial_pitch,
                     const unsigned int _N,
                     const unsigned int _n_max,
@@ -69,8 +69,8 @@ struct dpd_pair_args_t
           compute_virial(_compute_virial), threads_per_particle(_threads_per_particle),
           devprop(_devprop) { };
 
-    Scalar4* d_force;          //!< Force to write out
-    Scalar* d_virial;          //!< Virial to write out
+    ForceReal4* d_force;          //!< Force to write out
+    ForceReal* d_virial;          //!< Virial to write out
     const size_t virial_pitch; //!< Pitch of 2D virial array
     const unsigned int N;      //!< number of particles
     const unsigned int n_max;  //!< Maximum size of particle data arrays
@@ -145,8 +145,8 @@ template<class evaluator,
          unsigned int compute_virial,
          unsigned char use_gmem_nlist,
          int tpp>
-__global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
-                                              Scalar* d_virial,
+__global__ void gpu_compute_dpd_forces_kernel(ForceReal4* d_force,
+                                              ForceReal* d_virial,
                                               const size_t virial_pitch,
                                               const unsigned int N,
                                               const Scalar4* d_pos,
@@ -331,7 +331,7 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
 
     // now that the force calculation is complete, write out the result (MEM TRANSFER: 20 bytes)
     if (active && threadIdx.x % tpp == 0)
-        d_force[idx] = make_scalar4(Scalar(force.x), Scalar(force.y), Scalar(force.z), Scalar(force.w));
+        d_force[idx] = make_forcereal4(force.x, force.y, force.z, force.w);
 
     if (compute_virial)
         {
@@ -341,7 +341,7 @@ __global__ void gpu_compute_dpd_forces_kernel(Scalar4* d_force,
         // if we are the first thread in the cta, write out virial to global mem
         if (active && threadIdx.x % tpp == 0)
             for (unsigned int i = 0; i < 6; i++)
-                d_virial[i * virial_pitch + idx] = Scalar(virial[i]);
+                d_virial[i * virial_pitch + idx] = virial[i];
         }
     }
 

@@ -40,8 +40,8 @@ namespace kernel
 
     See BondTablePotential for information on the memory layout.
 */
-__global__ void gpu_compute_bondtable_forces_kernel(Scalar4* d_force,
-                                                    Scalar* d_virial,
+__global__ void gpu_compute_bondtable_forces_kernel(ForceReal4* d_force,
+                                                    ForceReal* d_virial,
                                                     const size_t virial_pitch,
                                                     const unsigned int N,
                                                     const Scalar4* d_pos,
@@ -78,7 +78,7 @@ __global__ void gpu_compute_bondtable_forces_kernel(Scalar4* d_force,
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
     // initialize the force to 0
-    Scalar4 force = make_scalar4(0.0f, 0.0f, 0.0f, 0.0f);
+    ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
     // initialize the virial tensor to 0
     Scalar virial[6];
     for (unsigned int i = 0; i < 6; i++)
@@ -189,8 +189,8 @@ __global__ void gpu_compute_bondtable_forces_kernel(Scalar4* d_force,
     \note This is just a kernel driver. See gpu_compute_bondtable_forces_kernel for full
    documentation.
 */
-hipError_t gpu_compute_bondtable_forces(Scalar4* d_force,
-                                        Scalar* d_virial,
+hipError_t gpu_compute_bondtable_forces(ForceReal4* d_force,
+                                        ForceReal* d_virial,
                                         size_t virial_pitch,
                                         const unsigned int N,
                                         const Scalar4* d_pos,

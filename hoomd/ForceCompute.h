@@ -124,19 +124,19 @@ class PYBIND11_EXPORT ForceCompute : public Compute
     Scalar getEnergy(unsigned int tag);
 
     //! Get the array of computed forces
-    const GPUArray<Scalar4>& getForceArray() const
+    const GPUArray<ForceReal4>& getForceArray() const
         {
         return m_force;
         }
 
     //! Get the array of computed virials
-    const GPUArray<Scalar>& getVirialArray() const
+    const GPUArray<ForceReal>& getVirialArray() const
         {
         return m_virial;
         }
 
     //! Get the array of computed torques
-    const GPUArray<Scalar4>& getTorqueArray() const
+    const GPUArray<ForceReal4>& getTorqueArray() const
         {
         return m_torque;
         }
@@ -204,8 +204,8 @@ class PYBIND11_EXPORT ForceCompute : public Compute
 
     Scalar m_deltaT; //!< timestep size (required for some types of non-conservative forces)
 
-    GPUArray<Scalar4> m_force; //!< m_force.x,m_force.y,m_force.z are the x,y,z components of the
-                               //!< force, m_force.u is the PE
+    GPUArray<ForceReal4> m_force; //!< m_force.x,m_force.y,m_force.z are the x,y,z components of the
+                                  //!< force, m_force.u is the PE
 
     /*! per-particle virial, a 2D array with width=number
         of particles and height=6. The elements of the (upper triangular)
@@ -213,9 +213,9 @@ class PYBIND11_EXPORT ForceCompute : public Compute
         particle \f$k\f$ are stored in the rows and are indexed in the
         order xx, xy, xz, yy, yz, zz
      */
-    GPUArray<Scalar> m_virial;
-    size_t m_virial_pitch;      //!< The pitch of the 2D virial array
-    GPUArray<Scalar4> m_torque; //!< per-particle torque
+    GPUArray<ForceReal> m_virial;
+    size_t m_virial_pitch;        //!< The pitch of the 2D virial array
+    GPUArray<ForceReal4> m_torque; //!< per-particle torque
 
     Scalar m_external_virial[6]; //!< Stores external contribution to virial
     Scalar m_external_energy;    //!< Stores external contribution to potential energy
@@ -264,7 +264,7 @@ class PYBIND11_EXPORT LocalForceComputeData : public GhostLocalDataAccess<Output
 
     Output getForce(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_force_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_force_handle,
                                                               &ForceCompute::getForceArray,
                                                               flag,
                                                               m_buffers_writeable,
@@ -273,17 +273,17 @@ class PYBIND11_EXPORT LocalForceComputeData : public GhostLocalDataAccess<Output
 
     Output getPotentialEnergy(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_force_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_force_handle,
                                                               &ForceCompute::getForceArray,
                                                               flag,
                                                               m_buffers_writeable,
                                                               0,
-                                                              3 * sizeof(Scalar));
+                                                              3 * sizeof(ForceReal));
         }
 
     Output getTorque(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_torque_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_torque_handle,
                                                               &ForceCompute::getTorqueArray,
                                                               flag,
                                                               m_buffers_writeable,
@@ -295,7 +295,7 @@ class PYBIND11_EXPORT LocalForceComputeData : public GhostLocalDataAccess<Output
         // we order the strides as (1, m_virial_pitch) because we need to expose
         // the array as having shape (N, 6) even though the underlying data has
         // shape (6, m_virial_pitch)
-        return this->template getLocalBuffer<Scalar, Scalar>(
+        return this->template getLocalBuffer<ForceReal, ForceReal>(
             m_virial_handle,
             &ForceCompute::getVirialArray,
             flag,
@@ -303,7 +303,7 @@ class PYBIND11_EXPORT LocalForceComputeData : public GhostLocalDataAccess<Output
             6,
             0,
             std::vector<size_t>(
-                {sizeof(Scalar), static_cast<size_t>(m_virial_pitch * sizeof(Scalar))}));
+                {sizeof(ForceReal), static_cast<size_t>(m_virial_pitch * sizeof(ForceReal))}));
         }
 
     protected:
@@ -316,9 +316,9 @@ class PYBIND11_EXPORT LocalForceComputeData : public GhostLocalDataAccess<Output
         }
 
     private:
-    std::unique_ptr<ArrayHandle<Scalar4>> m_force_handle;
-    std::unique_ptr<ArrayHandle<Scalar4>> m_torque_handle;
-    std::unique_ptr<ArrayHandle<Scalar>> m_virial_handle;
+    std::unique_ptr<ArrayHandle<ForceReal4>> m_force_handle;
+    std::unique_ptr<ArrayHandle<ForceReal4>> m_torque_handle;
+    std::unique_ptr<ArrayHandle<ForceReal>> m_virial_handle;
     std::unique_ptr<ArrayHandle<unsigned int>> m_rtag_handle;
     size_t m_virial_pitch;
     bool m_buffers_writeable;

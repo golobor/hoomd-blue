@@ -420,13 +420,13 @@ void test_communicator_migrate(communicator_creator comm_creator,
         ArrayHandle<unsigned int> h_rtag(pdata->getRTags(),
                                          access_location::host,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_force(pdata->getNetForce(),
+        ArrayHandle<ForceReal4> h_net_force(pdata->getNetForce(),
                                          access_location::host,
                                          access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::readwrite);
-        ArrayHandle<Scalar> h_net_virial(pdata->getNetVirial(),
+        ArrayHandle<ForceReal> h_net_virial(pdata->getNetVirial(),
                                          access_location::host,
                                          access_mode::readwrite);
 
@@ -566,13 +566,13 @@ void test_communicator_migrate(communicator_creator comm_creator,
         ArrayHandle<unsigned int> h_rtag(pdata->getRTags(),
                                          access_location::host,
                                          access_mode::read);
-        ArrayHandle<Scalar4> h_net_force(pdata->getNetForce(),
+        ArrayHandle<ForceReal4> h_net_force(pdata->getNetForce(),
                                          access_location::host,
                                          access_mode::read);
-        ArrayHandle<Scalar4> h_net_torque(pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
-        ArrayHandle<Scalar> h_net_virial(pdata->getNetVirial(),
+        ArrayHandle<ForceReal> h_net_virial(pdata->getNetVirial(),
                                          access_location::host,
                                          access_mode::read);
 

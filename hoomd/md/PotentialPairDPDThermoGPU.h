@@ -125,8 +125,8 @@ void PotentialPairDPDThermoGPU<evaluator>::computeForces(uint64_t timestep)
 
     // access parameters
     ArrayHandle<Scalar> d_rcutsq(this->m_rcutsq, access_location::device, access_mode::read);
-    ArrayHandle<Scalar4> d_force(this->m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(this->m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(this->m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(this->m_virial, access_location::device, access_mode::overwrite);
 
     // access flags
     PDataFlags flags = this->m_pdata->getFlags();

@@ -163,7 +163,7 @@ __global__ void gpu_nvt_rescale_step_two_kernel(Scalar4* d_vel,
                                                 Scalar3* d_accel,
                                                 unsigned int* d_group_members,
                                                 unsigned int work_size,
-                                                Scalar4* d_net_force,
+                                                ForceReal4* d_net_force,
                                                 Scalar deltaT,
                                                 Scalar rescale_factor,
                                                 unsigned int n_dimensions)
@@ -176,7 +176,7 @@ __global__ void gpu_nvt_rescale_step_two_kernel(Scalar4* d_vel,
         unsigned int idx = d_group_members[group_idx];
 
         // read in the net force and calculate the acceleration
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
         if (n_dimensions == 2)
             {
             net_force.z = Scalar(0.0);
@@ -217,7 +217,7 @@ hipError_t gpu_nvt_rescale_step_two(Scalar4* d_vel,
                                     Scalar3* d_accel,
                                     unsigned int* d_group_members,
                                     unsigned int group_size,
-                                    Scalar4* d_net_force,
+                                    ForceReal4* d_net_force,
                                     unsigned int block_size,
                                     Scalar deltaT,
                                     Scalar rescale_factor,

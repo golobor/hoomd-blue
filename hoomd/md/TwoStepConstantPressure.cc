@@ -370,7 +370,7 @@ void TwoStepConstantPressure::integrateStepOne(uint64_t timestep)
         ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
         ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -383,7 +383,7 @@ void TwoStepConstantPressure::integrateStepOne(uint64_t timestep)
 
             quat<Scalar> q(h_orientation.data[j]);
             quat<Scalar> p(h_angmom.data[j]);
-            vec3<Scalar> t(h_net_torque.data[j]);
+            ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(h_inertia.data[j]);
 
             // rotate torque into principal frame
@@ -595,7 +595,7 @@ void TwoStepConstantPressure::integrateStepTwo(uint64_t timestep)
                                   : std::array<Scalar, 2> {1., 1.};
     const std::array<Scalar, 2> rescaleFactors = {rf[0] * mtk, rf[1] * mtk};
 
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
         {
         ArrayHandle<Scalar4> h_vel(m_pdata->getVelocities(),
@@ -604,7 +604,7 @@ void TwoStepConstantPressure::integrateStepTwo(uint64_t timestep)
         ArrayHandle<Scalar3> h_accel(m_pdata->getAccelerations(),
                                      access_location::host,
                                      access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::read);
 
         // perform second half step of NPT integration
         for (unsigned int group_idx = 0; group_idx < group_size; group_idx++)
@@ -656,7 +656,7 @@ void TwoStepConstantPressure::integrateStepTwo(uint64_t timestep)
             ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                           access_location::host,
                                           access_mode::readwrite);
-            ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                               access_location::host,
                                               access_mode::read);
             ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -672,7 +672,7 @@ void TwoStepConstantPressure::integrateStepTwo(uint64_t timestep)
 
                 quat<Scalar> q(h_orientation.data[j]);
                 quat<Scalar> p(h_angmom.data[j]);
-                vec3<Scalar> t(h_net_torque.data[j]);
+                ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
                 vec3<Scalar> I(h_inertia.data[j]);
 
                 // rotate torque into principal frame

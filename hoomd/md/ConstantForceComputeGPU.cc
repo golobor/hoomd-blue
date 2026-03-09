@@ -43,12 +43,12 @@ void ConstantForceComputeGPU::setForces()
     ArrayHandle<Scalar3> d_constant_force(m_constant_force,
                                           access_location::device,
                                           access_mode::read);
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar3> d_constant_torque(m_constant_torque,
                                            access_location::device,
                                            access_mode::read);
-    ArrayHandle<Scalar4> d_torque(m_torque, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_torque(m_torque, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),

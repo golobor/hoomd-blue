@@ -155,7 +155,7 @@ void ForceDistanceConstraintGPU::fillMatrixVector(uint64_t timestep)
         ArrayHandle<unsigned int> d_rtag(m_pdata->getRTags(),
                                          access_location::device,
                                          access_mode::read);
-        ArrayHandle<Scalar4> d_netforce(m_pdata->getNetForce(),
+        ArrayHandle<ForceReal4> d_netforce(m_pdata->getNetForce(),
                                         access_location::device,
                                         access_mode::read);
 
@@ -726,8 +726,8 @@ void ForceDistanceConstraintGPU::computeConstraintForces(uint64_t timestep)
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
 
     // access force and virial arrays
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
 
     // access GPU constraint table on device
     const GPUArray<ConstraintData::members_t>& gpu_constraint_list = this->m_cdata->getGPUTable();

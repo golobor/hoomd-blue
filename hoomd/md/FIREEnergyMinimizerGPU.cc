@@ -103,7 +103,7 @@ void FIREEnergyMinimizerGPU::update(uint64_t timestep)
                                                 access_mode::read);
 
             {
-            ArrayHandle<Scalar4> d_net_force(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> d_net_force(m_pdata->getNetForce(),
                                              access_location::device,
                                              access_mode::read);
             ArrayHandle<Scalar> d_partial_sumE(m_partial_sum1,
@@ -237,7 +237,7 @@ void FIREEnergyMinimizerGPU::update(uint64_t timestep)
                 ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),
                                               access_location::device,
                                               access_mode::read);
-                ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+                ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                                   access_location::device,
                                                   access_mode::read);
                 ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -382,7 +382,7 @@ void FIREEnergyMinimizerGPU::update(uint64_t timestep)
             ArrayHandle<Scalar4> d_orientation(m_pdata->getOrientationArray(),
                                                access_location::device,
                                                access_mode::read);
-            ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                               access_location::device,
                                               access_mode::read);
             ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),

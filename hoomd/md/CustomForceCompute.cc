@@ -40,18 +40,18 @@ void CustomForceCompute::computeForces(uint64_t timestep)
     {
         // zero necessary arrays
         {
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
         m_force.zeroFill();
         }
     if (m_aniso)
         {
-        ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
         m_torque.zeroFill();
         }
 
     if (m_pdata->getFlags()[pdata_flag::pressure_tensor])
         {
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
         m_virial.zeroFill();
         }
     // execute python callback to update the forces, if present

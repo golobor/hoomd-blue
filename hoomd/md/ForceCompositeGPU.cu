@@ -59,8 +59,8 @@ namespace kernel
    kernel is hardcoded to handle only 1,2,4,8 n_bodies_per_block with a power of 2 block size
    (hardcoded to 64 in the kernel launch).
 */
-__global__ void gpu_rigid_force_sliding_kernel(Scalar4* d_force,
-                                               Scalar4* d_torque,
+__global__ void gpu_rigid_force_sliding_kernel(ForceReal4* d_force,
+                                               ForceReal4* d_torque,
                                                const unsigned int* d_molecule_len,
                                                const unsigned int* d_molecule_list,
                                                const unsigned int* d_molecule_idx,
@@ -75,8 +75,8 @@ __global__ void gpu_rigid_force_sliding_kernel(Scalar4* d_force,
                                                const unsigned int* d_body,
                                                const unsigned int* d_tag,
                                                uint2* d_flag,
-                                               Scalar4* d_net_force,
-                                               Scalar4* d_net_torque,
+                                               ForceReal4* d_net_force,
+                                               ForceReal4* d_net_torque,
                                                unsigned int n_mol,
                                                unsigned int N,
                                                unsigned int window_size,
@@ -159,20 +159,21 @@ __global__ void gpu_rigid_force_sliding_kernel(Scalar4* d_force,
                 // if this particle is not the central particle
                 if (body_type[m] != 0xffffffff && pidx != central_idx[m])
                     {
-                    Scalar4 fi = d_net_force[pidx];
+                    ForceReal4 fi = d_net_force[pidx];
 
                     // will likely need to rotate these components too
-                    vec3<Scalar> ti(d_net_torque[pidx]);
+                    ForceReal4 ti_raw = d_net_torque[pidx];
+                    vec3<Scalar> ti(Scalar(ti_raw.x), Scalar(ti_raw.y), Scalar(ti_raw.z));
 
                     // zero net torque on constituent particles
-                    d_net_torque[pidx] = make_scalar4(0.0, 0.0, 0.0, 0.0);
+                    d_net_torque[pidx] = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
 
                     // zero force only if we don't need it later
                     if (zero_force)
                         {
                         // zero net energy on constituent ptls to avoid double counting
                         // also zero net force for consistency
-                        d_net_force[pidx] = make_scalar4(0.0, 0.0, 0.0, 0.0);
+                        d_net_force[pidx] = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
                         }
 
                     if (central_idx[m] < N)
@@ -198,7 +199,7 @@ __global__ void gpu_rigid_force_sliding_kernel(Scalar4* d_force,
                         vec3<Scalar> ri = rotate(quat<Scalar>(body_orientation[m]), particle_pos);
 
                         // torque = r x f
-                        vec3<Scalar> del_torque(cross(ri, vec3<Scalar>(fi)));
+                        vec3<Scalar> del_torque(cross(ri, vec3<Scalar>(Scalar(fi.x), Scalar(fi.y), Scalar(fi.z))));
 
                         // tally the torque in the per thread counter
                         sum_torque.x += ti.x + del_torque.x;
@@ -243,15 +244,16 @@ __global__ void gpu_rigid_force_sliding_kernel(Scalar4* d_force,
     // thread 0 within this body writes out the total force and torque for the body
     if ((threadIdx.x & thread_mask) == 0 && mol_idx[m] < MIN_FLOPPY && central_idx[m] < N)
         {
-        d_force[central_idx[m]] = body_force[threadIdx.x];
-        d_torque[central_idx[m]] = make_scalar4(body_torque[threadIdx.x].x,
-                                                body_torque[threadIdx.x].y,
-                                                body_torque[threadIdx.x].z,
-                                                0.0f);
+        Scalar4 bf = body_force[threadIdx.x];
+        d_force[central_idx[m]] = make_forcereal4(ForceReal(bf.x), ForceReal(bf.y), ForceReal(bf.z), ForceReal(bf.w));
+        d_torque[central_idx[m]] = make_forcereal4(ForceReal(body_torque[threadIdx.x].x),
+                                                   ForceReal(body_torque[threadIdx.x].y),
+                                                   ForceReal(body_torque[threadIdx.x].z),
+                                                   ForceReal(0));
         }
     }
 
-__global__ void gpu_rigid_virial_sliding_kernel(Scalar* d_virial,
+__global__ void gpu_rigid_virial_sliding_kernel(ForceReal* d_virial,
                                                 const unsigned int* d_molecule_len,
                                                 const unsigned int* d_molecule_list,
                                                 const unsigned int* d_molecule_idx,
@@ -262,8 +264,8 @@ __global__ void gpu_rigid_virial_sliding_kernel(Scalar* d_virial,
                                                 Index2D body_indexer,
                                                 Scalar3* d_body_pos,
                                                 Scalar4* d_body_orientation,
-                                                Scalar4* d_net_force,
-                                                Scalar* d_net_virial,
+                                                ForceReal4* d_net_force,
+                                                ForceReal* d_net_virial,
                                                 const unsigned int* d_body,
                                                 const unsigned int* d_tag,
                                                 unsigned int n_mol,
@@ -359,7 +361,7 @@ __global__ void gpu_rigid_virial_sliding_kernel(Scalar* d_virial,
                 if (body_type[m] < MIN_FLOPPY && pidx != central_idx[m])
                     {
                     // calculate body force and torques
-                    Scalar4 fi = d_net_force[pidx];
+                    ForceReal4 fi = d_net_force[pidx];
 
                     // sum up virial
                     Scalar virialxx = d_net_virial[0 * net_virial_pitch + pidx];
@@ -370,14 +372,14 @@ __global__ void gpu_rigid_virial_sliding_kernel(Scalar* d_virial,
                     Scalar virialzz = d_net_virial[5 * net_virial_pitch + pidx];
 
                     // zero force and virial on constituent particles
-                    d_net_force[pidx] = make_scalar4(0.0, 0.0, 0.0, 0.0);
+                    d_net_force[pidx] = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
 
-                    d_net_virial[0 * net_virial_pitch + pidx] = Scalar(0.0);
-                    d_net_virial[1 * net_virial_pitch + pidx] = Scalar(0.0);
-                    d_net_virial[2 * net_virial_pitch + pidx] = Scalar(0.0);
-                    d_net_virial[3 * net_virial_pitch + pidx] = Scalar(0.0);
-                    d_net_virial[4 * net_virial_pitch + pidx] = Scalar(0.0);
-                    d_net_virial[5 * net_virial_pitch + pidx] = Scalar(0.0);
+                    d_net_virial[0 * net_virial_pitch + pidx] = ForceReal(0.0);
+                    d_net_virial[1 * net_virial_pitch + pidx] = ForceReal(0.0);
+                    d_net_virial[2 * net_virial_pitch + pidx] = ForceReal(0.0);
+                    d_net_virial[3 * net_virial_pitch + pidx] = ForceReal(0.0);
+                    d_net_virial[4 * net_virial_pitch + pidx] = ForceReal(0.0);
+                    d_net_virial[5 * net_virial_pitch + pidx] = ForceReal(0.0);
 
                     // if this particle is not the central particle (incomplete molecules can't have
                     // local members)
@@ -445,8 +447,8 @@ __global__ void gpu_rigid_virial_sliding_kernel(Scalar* d_virial,
 
 /*!
  */
-hipError_t gpu_rigid_force(Scalar4* d_force,
-                           Scalar4* d_torque,
+hipError_t gpu_rigid_force(ForceReal4* d_force,
+                           ForceReal4* d_torque,
                            const unsigned int* d_molecule_len,
                            const unsigned int* d_molecule_list,
                            const unsigned int* d_molecule_idx,
@@ -461,8 +463,8 @@ hipError_t gpu_rigid_force(Scalar4* d_force,
                            const unsigned int* d_body,
                            const unsigned int* d_tag,
                            uint2* d_flag,
-                           Scalar4* d_net_force,
-                           Scalar4* d_net_torque,
+                           ForceReal4* d_net_force,
+                           ForceReal4* d_net_torque,
                            unsigned int n_mol,
                            unsigned int N,
                            unsigned int n_bodies_per_block,
@@ -541,7 +543,7 @@ hipError_t gpu_rigid_force(Scalar4* d_force,
     return hipSuccess;
     }
 
-hipError_t gpu_rigid_virial(Scalar* d_virial,
+hipError_t gpu_rigid_virial(ForceReal* d_virial,
                             const unsigned int* d_molecule_len,
                             const unsigned int* d_molecule_list,
                             const unsigned int* d_molecule_idx,
@@ -552,8 +554,8 @@ hipError_t gpu_rigid_virial(Scalar* d_virial,
                             Index2D body_indexer,
                             Scalar3* d_body_pos,
                             Scalar4* d_body_orientation,
-                            Scalar4* d_net_force,
-                            Scalar* d_net_virial,
+                            ForceReal4* d_net_force,
+                            ForceReal* d_net_virial,
                             const unsigned int* d_body,
                             const unsigned int* d_tag,
                             unsigned int n_mol,

@@ -250,7 +250,7 @@ hipError_t gpu_npt_rescale_wrap(const unsigned int N,
 //! Kernel to propagate the positions and velocities, second half of NPT update
 __global__ void gpu_npt_mtk_step_two_kernel(Scalar4* d_vel,
                                             Scalar3* d_accel,
-                                            const Scalar4* d_net_force,
+                                            const ForceReal4* d_net_force,
                                             unsigned int* d_group_members,
                                             const unsigned int nwork,
                                             Scalar mat_exp_v_xx,
@@ -276,7 +276,7 @@ __global__ void gpu_npt_mtk_step_two_kernel(Scalar4* d_vel,
 
         // compute acceleration
         Scalar minv = Scalar(1.0) / vel.w;
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
 
         if (n_dimensions == 2)
             {
@@ -322,7 +322,7 @@ hipError_t gpu_npt_rescale_step_two(Scalar4* d_vel,
                                     Scalar3* d_accel,
                                     unsigned int* d_group_members,
                                     const unsigned int group_size,
-                                    Scalar4* d_net_force,
+                                    ForceReal4* d_net_force,
                                     Scalar* mat_exp_v,
                                     Scalar deltaT,
                                     Scalar thermo_rescale,

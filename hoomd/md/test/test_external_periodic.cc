@@ -79,11 +79,11 @@ void periodic_force_particle_test(periodicforce_creator periodic_creator,
     fc_3->compute(0);
 
         {
-        const GPUArray<Scalar4>& force_array_1 = fc_3->getForceArray();
-        const GPUArray<Scalar>& virial_array_1 = fc_3->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_1 = fc_3->getForceArray();
+        const GPUArray<ForceReal>& virial_array_1 = fc_3->getVirialArray();
         size_t pitch = virial_array_1.getPitch();
-        ArrayHandle<Scalar4> h_force_1(force_array_1, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_1(virial_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_1(force_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_1(virial_array_1, access_location::host, access_mode::read);
         MY_CHECK_CLOSE(h_force_1.data[0].x, -0.180137, tol);
         MY_CHECK_SMALL(h_force_1.data[0].y, tol_small);
         MY_CHECK_SMALL(h_force_1.data[0].z, tol_small);
@@ -137,15 +137,15 @@ void periodic_force_comparison_test(periodicforce_creator periodic_creator1, per
 
     {
     // verify that the forces are identical (within roundoff errors)
-    GPUArray<Scalar4>& force_array_5 =  fc1->getForceArray();
-    GPUArray<Scalar>& virial_array_5 =  fc1->getVirialArray();
+    GPUArray<ForceReal4>& force_array_5 =  fc1->getForceArray();
+    GPUArray<ForceReal>& virial_array_5 =  fc1->getVirialArray();
     size_t pitch = virial_array_5.getPitch();
-    ArrayHandle<Scalar4> h_force_5(force_array_5,access_location::host,access_mode::read);
-    ArrayHandle<Scalar> h_virial_5(virial_array_5,access_location::host,access_mode::read);
-    GPUArray<Scalar4>& force_array_6 =  fc2->getForceArray();
-    GPUArray<Scalar>& virial_array_6 =  fc2->getVirialArray();
-    ArrayHandle<Scalar4> h_force_6(force_array_6,access_location::host,access_mode::read);
-    ArrayHandle<Scalar> h_virial_6(virial_array_6,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal4> h_force_5(force_array_5,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal> h_virial_5(virial_array_5,access_location::host,access_mode::read);
+    GPUArray<ForceReal4>& force_array_6 =  fc2->getForceArray();
+    GPUArray<ForceReal>& virial_array_6 =  fc2->getVirialArray();
+    ArrayHandle<ForceReal4> h_force_6(force_array_6,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal> h_virial_6(virial_array_6,access_location::host,access_mode::read);
 
     // compare average deviation between the two computes
     double deltaf2 = 0.0;

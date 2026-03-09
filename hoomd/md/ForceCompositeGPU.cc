@@ -90,20 +90,20 @@ void ForceCompositeGPU::computeForces(uint64_t timestep)
     ArrayHandle<unsigned int> d_tag(m_pdata->getTags(), access_location::device, access_mode::read);
 
     // access net force and torque acting on constituent particles
-    ArrayHandle<Scalar4> d_net_force(m_pdata->getNetForce(),
+    ArrayHandle<ForceReal4> d_net_force(m_pdata->getNetForce(),
                                      access_location::device,
                                      access_mode::readwrite);
-    ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+    ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-    ArrayHandle<Scalar> d_net_virial(m_pdata->getNetVirial(),
+    ArrayHandle<ForceReal> d_net_virial(m_pdata->getNetVirial(),
                                      access_location::device,
                                      access_mode::readwrite);
 
     // access the force and torque array for the central ptl
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar4> d_torque(m_torque, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_torque(m_torque, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
 
     // access rigid body definition
     ArrayHandle<Scalar3> d_body_pos(m_body_pos, access_location::device, access_mode::read);
@@ -132,8 +132,8 @@ void ForceCompositeGPU::computeForces(uint64_t timestep)
 
         if (nelem != 0)
             {
-            hipMemsetAsync(d_force.data, 0, sizeof(Scalar4) * nelem);
-            hipMemsetAsync(d_torque.data, 0, sizeof(Scalar4) * nelem);
+            hipMemsetAsync(d_force.data, 0, sizeof(ForceReal4) * nelem);
+            hipMemsetAsync(d_torque.data, 0, sizeof(ForceReal4) * nelem);
             }
 
         if (m_exec_conf->isCUDAErrorCheckingEnabled())
@@ -198,7 +198,7 @@ void ForceCompositeGPU::computeForces(uint64_t timestep)
 
         if (nelem != 0)
             {
-            hipMemsetAsync(d_virial.data, 0, sizeof(Scalar) * m_virial.getNumElements());
+            hipMemsetAsync(d_virial.data, 0, sizeof(ForceReal) * m_virial.getNumElements());
             }
 
         if (m_exec_conf->isCUDAErrorCheckingEnabled())

@@ -27,9 +27,9 @@ namespace kernel
 struct external_potential_args_t
     {
     //! Construct a external_potential_args_t
-    external_potential_args_t(Scalar4* _d_force,
-                              Scalar4* _d_torque,
-                              Scalar* _d_virial,
+    external_potential_args_t(ForceReal4* _d_force,
+                              ForceReal4* _d_torque,
+                              ForceReal* _d_virial,
                               const size_t _virial_pitch,
                               const unsigned int _N,
                               const Scalar4* _d_pos,
@@ -42,9 +42,9 @@ struct external_potential_args_t
           box(_box), N(_N), d_pos(_d_pos), d_orientation(_d_orientation), d_charge(_d_charge),
           block_size(_block_size), devprop(_devprop) { };
 
-    Scalar4* d_force;               //!< Force to write out
-    Scalar4* d_torque;              //!< Torque to write out
-    Scalar* d_virial;               //!< Virial to write out
+    ForceReal4* d_force;               //!< Force to write out
+    ForceReal4* d_torque;              //!< Torque to write out
+    ForceReal* d_virial;               //!< Virial to write out
     const size_t virial_pitch;      //!< The pitch of the 2D array of virial matrix elements
     const BoxDim box;               //!< Simulation box in GPU format
     const unsigned int N;           //!< Number of particles
@@ -85,9 +85,9 @@ hipError_t __attribute__((visibility("default"))) gpu_compute_potential_external
 
 */
 template<class evaluator>
-__global__ void gpu_compute_external_forces_kernel(Scalar4* d_force,
-                                                   Scalar4* d_torque,
-                                                   Scalar* d_virial,
+__global__ void gpu_compute_external_forces_kernel(ForceReal4* d_force,
+                                                   ForceReal4* d_torque,
+                                                   ForceReal* d_virial,
                                                    const size_t virial_pitch,
                                                    const unsigned int N,
                                                    const Scalar4* d_pos,
@@ -134,15 +134,15 @@ __global__ void gpu_compute_external_forces_kernel(Scalar4* d_force,
         qi = ForceReal(0.0); // Silence compiler warning
 
     // initialize the force to 0
-    Scalar3 force = make_scalar3(Scalar(0.0), Scalar(0.0), Scalar(0.0));
-    Scalar3 torque = make_scalar3(Scalar(0.0), Scalar(0.0), Scalar(0.0));
-    Scalar virial[6];
+    ForceReal3 force = make_forcereal3(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
+    ForceReal3 torque = make_forcereal3(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
+    ForceReal virial[6];
     for (unsigned int k = 0; k < 6; k++)
-        virial[k] = Scalar(0.0);
-    Scalar energy = Scalar(0.0);
+        virial[k] = ForceReal(0.0);
+    ForceReal energy = ForceReal(0.0);
 
     unsigned int typei = __scalar_as_int(posi.w);
-    Scalar3 Xi = make_scalar3(posi.x, posi.y, posi.z);
+    ForceReal3 Xi = make_forcereal3(ForceReal(posi.x), ForceReal(posi.y), ForceReal(posi.z));
     quat<Scalar> q(d_orientation[idx]);
     evaluator eval(Xi, q, box, params[typei], field);
 
@@ -152,17 +152,12 @@ __global__ void gpu_compute_external_forces_kernel(Scalar4* d_force,
     eval.evalForceTorqueEnergyAndVirial(force, torque, energy, virial);
 
     // now that the force calculation is complete, write out the result)
-    d_force[idx].x = force.x;
-    d_force[idx].y = force.y;
-    d_force[idx].z = force.z;
-    d_force[idx].w = energy;
+    d_force[idx] = make_forcereal4(force.x, force.y, force.z, energy);
 
     for (unsigned int k = 0; k < 6; k++)
         d_virial[k * virial_pitch + idx] = virial[k];
 
-    d_torque[idx].x = torque.x;
-    d_torque[idx].y = torque.y;
-    d_torque[idx].z = torque.z;
+    d_torque[idx] = make_forcereal4(torque.x, torque.y, torque.z, ForceReal(0));
     }
 
 /*!

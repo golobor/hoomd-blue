@@ -56,7 +56,7 @@ cudaError_t nve_bounce_step_one(const bounce_args_t& args, const Geometry& geom)
 //! Kernel driver to apply step two of the velocity Verlet algorithm with bounce-back rules
 cudaError_t nve_bounce_step_two(Scalar4* d_vel,
                                 Scalar3* d_accel,
-                                const Scalar4* d_net_force,
+                                const ForceReal4* d_net_force,
                                 const unsigned int* d_group,
                                 const Scalar dt,
                                 const unsigned int N,

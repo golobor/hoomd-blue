@@ -100,8 +100,8 @@ template<class evaluator> void PotentialSpecialPairGPU<evaluator>::computeForces
                                                          access_mode::read);
 
     // access net force & virial
-    ArrayHandle<Scalar4> d_force(this->m_force, access_location::device, access_mode::readwrite);
-    ArrayHandle<Scalar> d_virial(this->m_virial, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_force(this->m_force, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal> d_virial(this->m_virial, access_location::device, access_mode::readwrite);
 
         {
         const GPUArray<typename PairData::members_t>& gpu_bond_list

@@ -42,8 +42,8 @@ namespace kernel
 */
 
 __global__ void gpu_compute_thermo_partial_sums(Scalar4* d_scratch,
-                                                Scalar4* d_net_force,
-                                                Scalar* d_net_virial,
+                                                ForceReal4* d_net_force,
+                                                ForceReal* d_net_virial,
                                                 const size_t virial_pitch,
                                                 Scalar4* d_velocity,
                                                 unsigned int* d_body,
@@ -71,7 +71,7 @@ __global__ void gpu_compute_thermo_partial_sums(Scalar4* d_scratch,
         if (body >= MIN_FLOPPY || body == tag)
             {
             // update positions to the next timestep and update velocities to the next half step
-            Scalar4 net_force = d_net_force[idx];
+            ForceReal4 net_force = d_net_force[idx];
             Scalar net_isotropic_virial;
             // (1/3)*trace of virial tensor
             net_isotropic_virial = Scalar(1.0 / 3.0)
@@ -133,8 +133,8 @@ __global__ void gpu_compute_thermo_partial_sums(Scalar4* d_scratch,
 */
 
 __global__ void gpu_compute_pressure_tensor_partial_sums(Scalar* d_scratch,
-                                                         Scalar4* d_net_force,
-                                                         Scalar* d_net_virial,
+                                                         ForceReal4* d_net_force,
+                                                         ForceReal* d_net_virial,
                                                          const size_t virial_pitch,
                                                          Scalar4* d_velocity,
                                                          unsigned int* d_body,

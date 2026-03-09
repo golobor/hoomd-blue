@@ -103,8 +103,8 @@ void HelfrichMeshForceComputeGPU::computeForces(uint64_t timestep)
         access_location::device,
         access_mode::read);
 
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
     ArrayHandle<Scalar> d_params(m_params, access_location::device, access_mode::read);
 
     m_tuner_force->begin();

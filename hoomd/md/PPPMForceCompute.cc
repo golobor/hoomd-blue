@@ -43,7 +43,7 @@ PPPMForceCompute::PPPMForceCompute(std::shared_ptr<SystemDefinition> sysdef,
     {
     m_pdata->getBoxChangeSignal().connect<PPPMForceCompute, &PPPMForceCompute::setBoxChange>(this);
     // reset virial
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
     m_virial.zeroFill();
 
     m_mesh_points = make_uint3(0, 0, 0);
@@ -1099,7 +1099,7 @@ void PPPMForceCompute::interpolateForces()
                                                    access_mode::read);
 
     // access force array
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
 
     // reset force for ALL particles
     m_force.zeroFill();
@@ -1247,7 +1247,7 @@ void PPPMForceCompute::interpolateForces()
                 }
             }
 
-        h_force.data[idx] = make_scalar4(force.x, force.y, force.z, 0.0);
+        h_force.data[idx] = make_forcereal4(ForceReal(force.x), ForceReal(force.y), ForceReal(force.z), ForceReal(0.0));
         } // end of loop over particles
     }
 
@@ -1589,8 +1589,8 @@ void PPPMForceCompute::fixExclusions()
     if (group_size == 0)
         return;
 
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::readwrite);
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::readwrite);
 
     // reset virial (but not forces, we reset them above)
     m_virial.zeroFill();

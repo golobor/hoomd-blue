@@ -28,8 +28,8 @@ namespace kernel
 template<int group_size> struct bond_args_t
     {
     //! Construct a bond_args_t
-    bond_args_t(Scalar4* _d_force,
-                Scalar* _d_virial,
+    bond_args_t(ForceReal4* _d_force,
+                ForceReal* _d_virial,
                 const size_t _virial_pitch,
                 const unsigned int _N,
                 const unsigned int _n_max,
@@ -49,8 +49,8 @@ template<int group_size> struct bond_args_t
           d_gpu_n_bonds(_d_gpu_n_bonds), n_bond_types(_n_bond_types), block_size(_block_size),
           devprop(_devprop) { };
 
-    Scalar4* d_force;          //!< Force to write out
-    Scalar* d_virial;          //!< Virial to write out
+    ForceReal4* d_force;          //!< Force to write out
+    ForceReal* d_virial;          //!< Virial to write out
     const size_t virial_pitch; //!< pitch of 2D array of virial matrix elements
     unsigned int N;            //!< number of particles
     unsigned int n_max;        //!< Size of local pdata arrays
@@ -95,8 +95,8 @@ template<int group_size> struct bond_args_t
 
 */
 template<class evaluator, int group_size, bool enable_shared_cache>
-__global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
-                                               Scalar* d_virial,
+__global__ void gpu_compute_bond_forces_kernel(ForceReal4* d_force,
+                                               ForceReal* d_virial,
                                                const size_t virial_pitch,
                                                const unsigned int N,
                                                const Scalar4* d_pos,
@@ -235,10 +235,10 @@ __global__ void gpu_compute_bond_forces_kernel(Scalar4* d_force,
         }
 
     // now that the force calculation is complete, write out the result (MEM TRANSFER: 20 bytes);
-    d_force[idx] = make_scalar4(Scalar(force.x), Scalar(force.y), Scalar(force.z), Scalar(force.w));
+    d_force[idx] = make_forcereal4(force.x, force.y, force.z, force.w);
 
     for (unsigned int i = 0; i < 6; i++)
-        d_virial[i * virial_pitch + idx] = Scalar(virial[i]);
+        d_virial[i * virial_pitch + idx] = ForceReal(virial[i]);
     }
 
 //! Kernel driver that computes lj forces on the GPU for LJForceComputeGPU

@@ -162,7 +162,7 @@ void ForceDistanceConstraint::fillMatrixVector(uint64_t timestep)
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
     ArrayHandle<Scalar4> h_vel(m_pdata->getVelocities(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_netforce(m_pdata->getNetForce(),
+    ArrayHandle<ForceReal4> h_netforce(m_pdata->getNetForce(),
                                     access_location::host,
                                     access_mode::read);
 
@@ -289,10 +289,12 @@ void ForceDistanceConstraint::fillMatrixVector(uint64_t timestep)
 
         // fill vector component
         h_cvec.data[n] = (dot(qn, qn) - d * d) / m_deltaT / m_deltaT;
+        { ForceReal4 fa_raw = h_netforce.data[idx_a]; ForceReal4 fb_raw = h_netforce.data[idx_b];
         h_cvec.data[n] += double(2.0)
                           * dot(qn,
-                                vec3<Scalar>(h_netforce.data[idx_a]) / ma
-                                    - vec3<Scalar>(h_netforce.data[idx_b]) / mb);
+                                vec3<Scalar>(Scalar(fa_raw.x), Scalar(fa_raw.y), Scalar(fa_raw.z)) / ma
+                                    - vec3<Scalar>(Scalar(fb_raw.x), Scalar(fb_raw.y), Scalar(fb_raw.z)) / mb);
+        }
         }
     }
 
@@ -432,8 +434,8 @@ void ForceDistanceConstraint::computeConstraintForces(uint64_t timestep)
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
 
     // access force and virial arrays
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
 
     const BoxDim& box = m_pdata->getBox();
 
@@ -477,9 +479,10 @@ void ForceDistanceConstraint::computeConstraintForces(uint64_t timestep)
         // if idx is local
         if (idx_a < n_ptl)
             {
-            vec3<Scalar> f(h_force.data[idx_a]);
+            { ForceReal4 f_raw = h_force.data[idx_a]; vec3<Scalar> f(Scalar(f_raw.x), Scalar(f_raw.y), Scalar(f_raw.z));
             f -= Scalar(2.0) * (Scalar)h_lagrange.data[n] * rn;
-            h_force.data[idx_a] = make_scalar4(f.x, f.y, f.z, Scalar(0.0));
+            h_force.data[idx_a] = make_forcereal4(ForceReal(f.x), ForceReal(f.y), ForceReal(f.z), ForceReal(0.0));
+            }
 
             h_virial.data[0 * m_virial_pitch + idx_a] += virialxx;
             h_virial.data[1 * m_virial_pitch + idx_a] += virialxy;
@@ -490,9 +493,10 @@ void ForceDistanceConstraint::computeConstraintForces(uint64_t timestep)
             }
         if (idx_b < n_ptl)
             {
-            vec3<Scalar> f(h_force.data[idx_b]);
+            { ForceReal4 f_raw = h_force.data[idx_b]; vec3<Scalar> f(Scalar(f_raw.x), Scalar(f_raw.y), Scalar(f_raw.z));
             f += Scalar(2.0) * (Scalar)h_lagrange.data[n] * rn;
-            h_force.data[idx_b] = make_scalar4(f.x, f.y, f.z, Scalar(0.0));
+            h_force.data[idx_b] = make_forcereal4(ForceReal(f.x), ForceReal(f.y), ForceReal(f.z), ForceReal(0.0));
+            }
 
             h_virial.data[0 * m_virial_pitch + idx_b] += virialxx;
             h_virial.data[1 * m_virial_pitch + idx_b] += virialxy;

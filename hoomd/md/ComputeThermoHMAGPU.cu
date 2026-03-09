@@ -50,8 +50,8 @@ extern __shared__ Scalar3 compute_thermo_hma_final_sdata[];
 
 __global__ void gpu_compute_thermo_hma_partial_sums(Scalar3* d_scratch,
                                                     BoxDim box,
-                                                    Scalar4* d_net_force,
-                                                    Scalar* d_net_virial,
+                                                    ForceReal4* d_net_force,
+                                                    ForceReal* d_net_virial,
                                                     const size_t virial_pitch,
                                                     Scalar4* d_position,
                                                     Scalar3* d_lattice_site,
@@ -78,7 +78,7 @@ __global__ void gpu_compute_thermo_hma_partial_sums(Scalar3* d_scratch,
         unsigned int tag = d_tag[idx];
         if (body >= MIN_FLOPPY || body == tag)
             {
-            Scalar4 net_force = d_net_force[idx];
+            ForceReal4 net_force = d_net_force[idx];
             Scalar net_isotropic_virial;
             // (1/3)*trace of virial tensor
             net_isotropic_virial = Scalar(1.0 / 3.0)

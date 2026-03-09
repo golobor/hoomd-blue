@@ -270,8 +270,8 @@ hipError_t gpu_compute_area_constraint_area(Scalar* d_sum_area,
     \param d_params K, A0 params packed as Scalar variables
     \param ignore_type ignores mesh type if true
 */
-__global__ void gpu_compute_area_constraint_force_kernel(Scalar4* d_force,
-                                                         Scalar* d_virial,
+__global__ void gpu_compute_area_constraint_force_kernel(ForceReal4* d_force,
+                                                         ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
                                                          const unsigned int* gN,
@@ -299,7 +299,7 @@ __global__ void gpu_compute_area_constraint_force_kernel(Scalar4* d_force,
     Scalar4 postype = __ldg(d_pos + idx);
     Scalar3 pos_a = make_scalar3(postype.x, postype.y, postype.z);
 
-    Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
     // initialize the virial to 0
     Scalar virial[6];
@@ -441,8 +441,8 @@ __global__ void gpu_compute_area_constraint_force_kernel(Scalar4* d_force,
     \returns Any error code resulting from the kernel launch
     \note Always returns hipSuccess in release builds to avoid the hipDeviceSynchronize()
 */
-hipError_t gpu_compute_area_constraint_force(Scalar4* d_force,
-                                             Scalar* d_virial,
+hipError_t gpu_compute_area_constraint_force(ForceReal4* d_force,
+                                             ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
                                              const unsigned int* gN,

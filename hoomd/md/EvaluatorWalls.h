@@ -134,7 +134,7 @@ template<class evaluator> class EvaluatorWalls
     typedef wall_type field_type;
 
     //! Constructs the external wall potential evaluator
-    DEVICE EvaluatorWalls(Scalar3 pos,
+    DEVICE EvaluatorWalls(ForceReal3 pos,
                           quat<Scalar> q,
                           const BoxDim& box,
                           const param_type& p,
@@ -160,23 +160,23 @@ template<class evaluator> class EvaluatorWalls
     Walls charge currently assigns a charge of 0 to the walls. It is however unused by implemented
     potentials.
     */
-    DEVICE void setCharge(Scalar charge)
+    DEVICE void setCharge(ForceReal charge)
         {
         qi = charge;
         }
 
-    DEVICE inline void callEvaluator(Scalar3& F, Scalar& energy, const Scalar3 drv)
+    DEVICE inline void callEvaluator(ForceReal3& F, ForceReal& energy, const ForceReal3 drv)
         {
-        Scalar rsq = dot(drv, drv);
+        ForceReal rsq = dot(drv, drv);
 
         // compute the force and potential energy
         ForceReal force_divr = ForceReal(0.0);
         ForceReal pair_eng = ForceReal(0.0);
-        evaluator eval(static_cast<ForceReal>(rsq),
-                       static_cast<ForceReal>(m_params.rcutsq),
+        evaluator eval(rsq,
+                       ForceReal(m_params.rcutsq),
                        m_params.params);
         if (evaluator::needsCharge())
-            eval.setCharge(static_cast<ForceReal>(qi), ForceReal(0.0));
+            eval.setCharge(qi, ForceReal(0.0));
 
         bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, true);
 
@@ -193,34 +193,33 @@ template<class evaluator> class EvaluatorWalls
                 pair_eng = ForceReal(0.0);
                 }
             // add the force and potential energy to the particle i
-            F += drv * static_cast<Scalar>(force_divr);
-            energy += static_cast<Scalar>(pair_eng); // removing half since the other "particle" won't be represented *
-                                // Scalar(0.5);
+            F += drv * force_divr;
+            energy += pair_eng;
             }
         }
 
-    DEVICE inline void extrapEvaluator(Scalar3& F,
-                                       Scalar& energy,
-                                       const Scalar3 drv,
-                                       const Scalar rextrapsq,
-                                       const Scalar r)
+    DEVICE inline void extrapEvaluator(ForceReal3& F,
+                                       ForceReal& energy,
+                                       const ForceReal3 drv,
+                                       const ForceReal rextrapsq,
+                                       const ForceReal r)
         {
         // compute the force and potential energy
         ForceReal force_divr = ForceReal(0.0);
         ForceReal pair_eng = ForceReal(0.0);
 
-        evaluator eval(static_cast<ForceReal>(rextrapsq),
-                       static_cast<ForceReal>(m_params.rcutsq),
+        evaluator eval(rextrapsq,
+                       ForceReal(m_params.rcutsq),
                        m_params.params);
         if (evaluator::needsCharge())
-            eval.setCharge(static_cast<ForceReal>(qi), ForceReal(0.0));
+            eval.setCharge(qi, ForceReal(0.0));
 
         bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, true);
 
         if (evaluated)
             {
-            pair_eng = pair_eng + force_divr * static_cast<ForceReal>(m_params.rextrap * r);
-            force_divr *= static_cast<ForceReal>(m_params.rextrap / r);
+            pair_eng = pair_eng + force_divr * ForceReal(m_params.rextrap) * r;
+            force_divr *= ForceReal(m_params.rextrap) / r;
 // correctly result in a 0 force in this case
 #ifdef __HIPCC__
             if (!isfinite(force_divr))
@@ -231,39 +230,41 @@ template<class evaluator> class EvaluatorWalls
                 force_divr = ForceReal(0.0);
                 pair_eng = ForceReal(0.0);
                 }
-            F += drv * static_cast<Scalar>(force_divr);
-            energy += static_cast<Scalar>(pair_eng);
+            F += drv * force_divr;
+            energy += pair_eng;
             }
         }
 
     //! Generates force and energy from standard evaluators using wall geometry functions
     DEVICE void
-    evalForceTorqueEnergyAndVirial(Scalar3& F, Scalar3& T, Scalar& energy, Scalar* virial)
+    evalForceTorqueEnergyAndVirial(ForceReal3& F, ForceReal3& T, ForceReal& energy, ForceReal* virial)
         {
-        F.x = Scalar(0.0);
-        F.y = Scalar(0.0);
-        F.z = Scalar(0.0);
+        F.x = ForceReal(0.0);
+        F.y = ForceReal(0.0);
+        F.z = ForceReal(0.0);
 
-        T.x = Scalar(0.0);
-        T.y = Scalar(0.0);
-        T.z = Scalar(0.0);
+        T.x = ForceReal(0.0);
+        T.y = ForceReal(0.0);
+        T.z = ForceReal(0.0);
 
-        energy = Scalar(0.0);
+        energy = ForceReal(0.0);
         // initialize virial
         for (unsigned int i = 0; i < 6; i++)
-            virial[i] = Scalar(0.0);
+            virial[i] = ForceReal(0.0);
 
-        // convert type as little as possible
-        vec3<Scalar> position = vec3<Scalar>(m_pos);
-        Scalar3 drv;
+        // Widen ForceReal position to Scalar for wall geometry functions
+        vec3<Scalar> position = vec3<Scalar>(Scalar(m_pos.x), Scalar(m_pos.y), Scalar(m_pos.z));
+        Scalar3 drv_s;
+        ForceReal3 drv;
         bool in_active_space = false;
         if (m_params.rextrap > 0.0) // extrapolated mode
             {
-            Scalar rextrapsq = m_params.rextrap * m_params.rextrap;
-            Scalar rsq;
+            ForceReal rextrapsq = ForceReal(m_params.rextrap * m_params.rextrap);
+            ForceReal rsq;
             for (unsigned int k = 0; k < m_field.numSpheres; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Spheres[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Spheres[k], position, in_active_space);
+                drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                 rsq = dot(drv, drv);
                 if (in_active_space && rsq >= rextrapsq)
                     {
@@ -272,27 +273,28 @@ template<class evaluator> class EvaluatorWalls
                 // Need to use extrapolated potential
                 else
                     {
-                    Scalar r = fast::sqrt(rsq);
+                    ForceReal r = fast::sqrt(rsq);
                     // Normalize distance vectors
-                    if (rsq == 0.0)
+                    if (rsq == ForceReal(0.0))
                         {
                         in_active_space = true; // just in case
-                        drv = onWallForceDirection(position, m_field.Spheres[k]);
+                        drv_s = onWallForceDirection(position, m_field.Spheres[k]);
+                        drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                         }
                     else
                         {
-                        drv *= 1 / r;
+                        drv *= ForceReal(1.0) / r;
                         }
                     // Recompute r and distance vector in terms of r_extrap
-                    r = in_active_space ? m_params.rextrap - r : m_params.rextrap + r;
+                    r = in_active_space ? ForceReal(m_params.rextrap) - r : ForceReal(m_params.rextrap) + r;
                     drv *= in_active_space ? r : -r;
                     extrapEvaluator(F, energy, drv, rextrapsq, r);
                     }
                 }
-            vec3<Scalar> intermediate_distance_vector;
             for (unsigned int k = 0; k < m_field.numCylinders; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Cylinders[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Cylinders[k], position, in_active_space);
+                drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                 rsq = dot(drv, drv);
                 if (in_active_space && rsq >= rextrapsq)
                     {
@@ -300,24 +302,26 @@ template<class evaluator> class EvaluatorWalls
                     }
                 else
                     {
-                    Scalar r = fast::sqrt(rsq);
-                    if (rsq == 0.0)
+                    ForceReal r = fast::sqrt(rsq);
+                    if (rsq == ForceReal(0.0))
                         {
                         in_active_space = true; // just in case
-                        drv = onWallForceDirection(position, m_field.Cylinders[k]);
+                        drv_s = onWallForceDirection(position, m_field.Cylinders[k]);
+                        drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                         }
                     else
                         {
-                        drv *= 1 / r;
+                        drv *= ForceReal(1.0) / r;
                         }
-                    r = (in_active_space) ? m_params.rextrap - r : m_params.rextrap + r;
+                    r = (in_active_space) ? ForceReal(m_params.rextrap) - r : ForceReal(m_params.rextrap) + r;
                     drv *= (in_active_space) ? r : -r;
                     extrapEvaluator(F, energy, drv, rextrapsq, r);
                     }
                 }
             for (unsigned int k = 0; k < m_field.numPlanes; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Planes[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Planes[k], position, in_active_space);
+                drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                 rsq = dot(drv, drv);
                 if (in_active_space && rsq >= rextrapsq)
                     {
@@ -325,17 +329,18 @@ template<class evaluator> class EvaluatorWalls
                     }
                 else
                     {
-                    Scalar r = fast::sqrt(rsq);
-                    if (rsq == 0.0)
+                    ForceReal r = fast::sqrt(rsq);
+                    if (rsq == ForceReal(0.0))
                         {
                         in_active_space = true; // just in case
-                        drv = onWallForceDirection(m_field.Planes[k]);
+                        drv_s = onWallForceDirection(m_field.Planes[k]);
+                        drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                         }
                     else
                         {
-                        drv *= 1 / r;
+                        drv *= ForceReal(1.0) / r;
                         }
-                    r = (in_active_space) ? m_params.rextrap - r : m_params.rextrap + r;
+                    r = (in_active_space) ? ForceReal(m_params.rextrap) - r : ForceReal(m_params.rextrap) + r;
                     drv *= (in_active_space) ? r : -r;
                     extrapEvaluator(F, energy, drv, rextrapsq, r);
                     }
@@ -345,25 +350,28 @@ template<class evaluator> class EvaluatorWalls
             {
             for (unsigned int k = 0; k < m_field.numSpheres; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Spheres[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Spheres[k], position, in_active_space);
                 if (in_active_space)
                     {
+                    drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                     callEvaluator(F, energy, drv);
                     }
                 }
             for (unsigned int k = 0; k < m_field.numCylinders; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Cylinders[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Cylinders[k], position, in_active_space);
                 if (in_active_space)
                     {
+                    drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                     callEvaluator(F, energy, drv);
                     }
                 }
             for (unsigned int k = 0; k < m_field.numPlanes; k++)
                 {
-                drv = distVectorWallToPoint(m_field.Planes[k], position, in_active_space);
+                drv_s = distVectorWallToPoint(m_field.Planes[k], position, in_active_space);
                 if (in_active_space)
                     {
+                    drv = make_forcereal3(ForceReal(drv_s.x), ForceReal(drv_s.y), ForceReal(drv_s.z));
                     callEvaluator(F, energy, drv);
                     }
                 }
@@ -389,10 +397,10 @@ template<class evaluator> class EvaluatorWalls
 #endif
 
     protected:
-    Scalar3 m_pos;             //!< particle position
+    ForceReal3 m_pos;          //!< particle position
     const field_type& m_field; //!< contains all information about the walls.
     param_type m_params;
-    Scalar qi;
+    ForceReal qi;
     };
 
     } // end namespace md

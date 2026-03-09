@@ -31,8 +31,8 @@ namespace kernel
     \param d_params K params packed as Scalar variables
     \param n_bond_type number of mesh bond types
 */
-__global__ void gpu_compute_bending_rigidity_force_kernel(Scalar4* d_force,
-                                                          Scalar* d_virial,
+__global__ void gpu_compute_bending_rigidity_force_kernel(ForceReal4* d_force,
+                                                          ForceReal* d_virial,
                                                           const size_t virial_pitch,
                                                           const unsigned int N,
                                                           const Scalar4* d_pos,
@@ -56,7 +56,7 @@ __global__ void gpu_compute_bending_rigidity_force_kernel(Scalar4* d_force,
     Scalar4 postype = __ldg(d_pos + idx);
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
-    Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
     Scalar virial[6];
     for (int i = 0; i < 6; i++)
@@ -214,8 +214,8 @@ __global__ void gpu_compute_bending_rigidity_force_kernel(Scalar4* d_force,
     \returns Any error code resulting from the kernel launch
     \note Always returns hipSuccess in release builds to avoid the hipDeviceSynchronize()
 */
-hipError_t gpu_compute_bending_rigidity_force(Scalar4* d_force,
-                                              Scalar* d_virial,
+hipError_t gpu_compute_bending_rigidity_force(ForceReal4* d_force,
+                                              ForceReal* d_virial,
                                               const size_t virial_pitch,
                                               const unsigned int N,
                                               const Scalar4* d_pos,

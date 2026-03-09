@@ -245,7 +245,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepOne(uint6
         ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
         ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -258,7 +258,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepOne(uint6
 
             quat<Scalar> q(h_orientation.data[j]);
             quat<Scalar> p(h_angmom.data[j]);
-            vec3<Scalar> t(h_net_torque.data[j]);
+            ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(h_inertia.data[j]);
 
             // rotate torque into principal frame
@@ -364,7 +364,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepTwo(uint6
     {
     unsigned int group_size = m_group->getNumMembers();
 
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(),
                                access_location::host,
@@ -376,7 +376,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepTwo(uint6
                                  access_location::host,
                                  access_mode::readwrite);
 
-    ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::read);
 
     // v(t+deltaT) = v(t+deltaT/2) + 1/2 * a(t+deltaT)*deltaT
     // iterative: v(t+deltaT) = v(t+deltaT/2) - J^(-1)*residual
@@ -478,7 +478,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepTwo(uint6
         ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
         ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -491,7 +491,7 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::integrateStepTwo(uint6
 
             quat<Scalar> q(h_orientation.data[j]);
             quat<Scalar> p(h_angmom.data[j]);
-            vec3<Scalar> t(h_net_torque.data[j]);
+            ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(h_inertia.data[j]);
 
             // rotate torque into principal frame
@@ -523,16 +523,16 @@ template<class Manifold> void TwoStepRATTLENVE<Manifold>::includeRATTLEForce(uin
     {
     unsigned int group_size = m_group->getNumMembers();
 
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
-    const GPUArray<Scalar>& net_virial = m_pdata->getNetVirial();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal>& net_virial = m_pdata->getNetVirial();
     ArrayHandle<Scalar4> h_vel(m_pdata->getVelocities(), access_location::host, access_mode::read);
     ArrayHandle<Scalar3> h_accel(m_pdata->getAccelerations(),
                                  access_location::host,
                                  access_mode::readwrite);
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
 
-    ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::readwrite);
-    ArrayHandle<Scalar> h_net_virial(net_virial, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal> h_net_virial(net_virial, access_location::host, access_mode::readwrite);
 
     size_t net_virial_pitch = net_virial.getPitch();
 

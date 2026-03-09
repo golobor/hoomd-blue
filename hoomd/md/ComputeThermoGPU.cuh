@@ -21,8 +21,8 @@ namespace kernel
 //! Holder for arguments to gpu_compute_thermo
 struct compute_thermo_args
     {
-    Scalar4* d_net_force;              //!< Net force / pe array to sum
-    Scalar* d_net_virial;              //!< Net virial array to sum
+    ForceReal4* d_net_force;              //!< Net force / pe array to sum
+    ForceReal* d_net_virial;              //!< Net virial array to sum
     Scalar4* d_orientation;            //!< Particle data orientations
     Scalar4* d_angmom;                 //!< Particle data conjugate quaternions
     Scalar3* d_inertia;                //!< Particle data moments of inertia

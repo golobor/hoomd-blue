@@ -89,7 +89,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepOne(uint64_t timestep)
         ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
         ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -102,7 +102,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepOne(uint64_t timestep)
 
             quat<Scalar> q(h_orientation.data[j]);
             quat<Scalar> p(h_angmom.data[j]);
-            vec3<Scalar> t(h_net_torque.data[j]);
+            ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(h_inertia.data[j]);
 
             // rotate torque into principal frame
@@ -217,7 +217,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepTwo(uint64_t timestep)
     auto rescaling_factors = m_thermostat ? m_thermostat->getRescalingFactorsTwo(timestep, m_deltaT)
                                           : std::array<Scalar, 2> {1., 1.};
 
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
     ArrayHandle<Scalar4> h_vel(m_pdata->getVelocities(),
                                access_location::host,
@@ -226,7 +226,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepTwo(uint64_t timestep)
                                  access_location::host,
                                  access_mode::readwrite);
 
-    ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::read);
 
     // perform second half step of Nose-Hoover integration
 
@@ -274,7 +274,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepTwo(uint64_t timestep)
         ArrayHandle<Scalar4> h_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::host,
                                           access_mode::read);
         ArrayHandle<Scalar3> h_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -287,7 +287,7 @@ void hoomd::md::TwoStepConstantVolume::integrateStepTwo(uint64_t timestep)
 
             quat<Scalar> q(h_orientation.data[j]);
             quat<Scalar> p(h_angmom.data[j]);
-            vec3<Scalar> t(h_net_torque.data[j]);
+            ForceReal4 t_raw = h_net_torque.data[j]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(h_inertia.data[j]);
 
             // rotate torque into principal frame

@@ -36,8 +36,8 @@ namespace kernel
     \param pitch Pitch of 2D angles list
     \param n_angles_list List of numbers of angles stored on the GPU
 */
-__global__ void gpu_compute_harmonic_angle_forces_kernel(Scalar4* d_force,
-                                                         Scalar* d_virial,
+__global__ void gpu_compute_harmonic_angle_forces_kernel(ForceReal4* d_force,
+                                                         ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
                                                          const Scalar4* d_pos,
@@ -197,9 +197,9 @@ __global__ void gpu_compute_harmonic_angle_forces_kernel(Scalar4* d_force,
         }
 
     // now that the force calculation is complete, write out the result (MEM TRANSFER: 20 bytes)
-    d_force[idx] = make_scalar4(Scalar(force_idx.x), Scalar(force_idx.y), Scalar(force_idx.z), Scalar(force_idx.w));
+    d_force[idx] = force_idx;
     for (int i = 0; i < 6; i++)
-        d_virial[i * virial_pitch + idx] = Scalar(virial[i]);
+        d_virial[i * virial_pitch + idx] = ForceReal(virial[i]);
     }
 
 /*! \param d_force Device memory to write computed forces
@@ -222,8 +222,8 @@ __global__ void gpu_compute_harmonic_angle_forces_kernel(Scalar4* d_force,
     \a d_params should include one Scalar2 element per angle type. The x component contains K the
    spring constant and the y component contains t_0 the equilibrium angle.
 */
-hipError_t gpu_compute_harmonic_angle_forces(Scalar4* d_force,
-                                             Scalar* d_virial,
+hipError_t gpu_compute_harmonic_angle_forces(ForceReal4* d_force,
+                                             ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
                                              const Scalar4* d_pos,

@@ -16,8 +16,8 @@ namespace md
 namespace kernel
     {
 //! Kernel driver that computes periodic improper forces for PeriodicImproperForceComputeGPU
-hipError_t gpu_compute_periodic_improper_forces(Scalar4* d_force,
-                                                Scalar* d_virial,
+hipError_t gpu_compute_periodic_improper_forces(ForceReal4* d_force,
+                                                ForceReal* d_virial,
                                                 const size_t virial_pitch,
                                                 const unsigned int N,
                                                 const Scalar4* d_pos,

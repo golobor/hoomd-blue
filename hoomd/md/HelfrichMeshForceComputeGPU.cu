@@ -241,8 +241,8 @@ hipError_t gpu_compute_helfrich_sigma(Scalar* d_sigma,
     \param d_params K params packed as Scalar variables
     \param n_bond_type number of mesh bond types
 */
-__global__ void gpu_compute_helfrich_force_kernel(Scalar4* d_force,
-                                                  Scalar* d_virial,
+__global__ void gpu_compute_helfrich_force_kernel(ForceReal4* d_force,
+                                                  ForceReal* d_virial,
                                                   const size_t virial_pitch,
                                                   const unsigned int N,
                                                   const Scalar4* d_pos,
@@ -275,7 +275,7 @@ __global__ void gpu_compute_helfrich_force_kernel(Scalar4* d_force,
     Scalar inv_sigma_a = 1.0 / sigma_a;
     Scalar sigma_dash_a2 = 0.5 * dot(sigma_dash_a, sigma_dash_a) * inv_sigma_a * inv_sigma_a;
 
-    Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
     // initialize the virial to 0
     Scalar virial[6];
@@ -522,8 +522,8 @@ __global__ void gpu_compute_helfrich_force_kernel(Scalar4* d_force,
     \returns Any error code resulting from the kernel launch
     \note Always returns hipSuccess in release builds to avoid the hipDeviceSynchronize()
 */
-hipError_t gpu_compute_helfrich_force(Scalar4* d_force,
-                                      Scalar* d_virial,
+hipError_t gpu_compute_helfrich_force(ForceReal4* d_force,
+                                      ForceReal* d_virial,
                                       const size_t virial_pitch,
                                       const unsigned int N,
                                       const Scalar4* d_pos,

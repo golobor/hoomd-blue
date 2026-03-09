@@ -105,11 +105,11 @@ void ComputeThermoHMA::computeProperties()
     assert(m_pdata);
 
     // access the net force, pe, and virial
-    const GPUArray<Scalar>& net_virial = m_pdata->getNetVirial();
-    ArrayHandle<Scalar4> h_net_force(m_pdata->getNetForce(),
+    const GPUArray<ForceReal>& net_virial = m_pdata->getNetVirial();
+    ArrayHandle<ForceReal4> h_net_force(m_pdata->getNetForce(),
                                      access_location::host,
                                      access_mode::read);
-    ArrayHandle<Scalar> h_net_virial(net_virial, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal> h_net_virial(net_virial, access_location::host, access_mode::read);
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
     ArrayHandle<Scalar3> h_lattice_site(m_lattice_site, access_location::host, access_mode::read);

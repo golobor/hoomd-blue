@@ -82,7 +82,7 @@ class EvaluatorExternalMagneticField
         \param box box dimensions
         \param params per-type parameters of external potential
     */
-    DEVICE EvaluatorExternalMagneticField(Scalar3 X,
+    DEVICE EvaluatorExternalMagneticField(ForceReal3 X,
                                           quat<Scalar> q,
                                           const BoxDim& box,
                                           const param_type& params,
@@ -100,7 +100,7 @@ class EvaluatorExternalMagneticField
     //! Accept the optional charge value
     /*! \param qi Charge of particle i
      */
-    DEVICE void setCharge(Scalar qi) { }
+    DEVICE void setCharge(ForceReal qi) { }
 
     //! Declares additional virial contributions are needed for the external field
     /*! No contribution
@@ -117,24 +117,24 @@ class EvaluatorExternalMagneticField
         \param virial array of six scalars for the upper triangular virial tensor
     */
     DEVICE void
-    evalForceTorqueEnergyAndVirial(Scalar3& F, Scalar3& T, Scalar& energy, Scalar* virial)
+    evalForceTorqueEnergyAndVirial(ForceReal3& F, ForceReal3& T, ForceReal& energy, ForceReal* virial)
         {
         vec3<Scalar> dir = rotate(m_q, m_mu);
 
         vec3<Scalar> T_vec = cross(dir, m_B);
 
-        T.x = T_vec.x;
-        T.y = T_vec.y;
-        T.z = T_vec.z;
+        T.x = ForceReal(T_vec.x);
+        T.y = ForceReal(T_vec.y);
+        T.z = ForceReal(T_vec.z);
 
-        energy = -dot(dir, m_B);
+        energy = ForceReal(-dot(dir, m_B));
 
-        F.x = Scalar(0.0);
-        F.y = Scalar(0.0);
-        F.z = Scalar(0.0);
+        F.x = ForceReal(0.0);
+        F.y = ForceReal(0.0);
+        F.z = ForceReal(0.0);
 
         for (unsigned int i = 0; i < 6; i++)
-            virial[i] = Scalar(0.0);
+            virial[i] = ForceReal(0.0);
         }
 
 #ifndef __HIPCC__

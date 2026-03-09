@@ -56,8 +56,8 @@ void TableAngleForceComputeGPU::computeForces(uint64_t timestep)
     // access the table data
     ArrayHandle<Scalar2> d_tables(m_tables, access_location::device, access_mode::read);
 
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
 
         {
         // Access the angle data for reading

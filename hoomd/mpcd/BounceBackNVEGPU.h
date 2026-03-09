@@ -118,7 +118,7 @@ template<class Geometry> void BounceBackNVEGPU<Geometry>::integrateStepTwo(uint6
     ArrayHandle<Scalar3> d_accel(this->m_pdata->getAccelerations(),
                                  access_location::device,
                                  access_mode::readwrite);
-    ArrayHandle<Scalar4> d_net_force(this->m_pdata->getNetForce(),
+    ArrayHandle<ForceReal4> d_net_force(this->m_pdata->getNetForce(),
                                      access_location::device,
                                      access_mode::read);
 

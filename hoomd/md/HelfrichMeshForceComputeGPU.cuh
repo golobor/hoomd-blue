@@ -34,8 +34,8 @@ hipError_t gpu_compute_helfrich_sigma(Scalar* d_sigma,
                                       int block_size);
 
 //! Kernel driver that computes the forces for HelfrichMeshForceComputeGPU
-hipError_t gpu_compute_helfrich_force(Scalar4* d_force,
-                                      Scalar* d_virial,
+hipError_t gpu_compute_helfrich_force(ForceReal4* d_force,
+                                      ForceReal* d_virial,
                                       const size_t virial_pitch,
                                       const unsigned int N,
                                       const Scalar4* d_pos,

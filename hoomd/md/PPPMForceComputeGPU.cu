@@ -490,7 +490,7 @@ void gpu_update_meshes(const unsigned int n_wave_vectors,
 
 __global__ void gpu_compute_forces_kernel(const unsigned int work_size,
                                           const Scalar4* d_postype,
-                                          Scalar4* d_force,
+                                          ForceReal4* d_force,
                                           const uint3 grid_dim,
                                           const uint3 n_ghost_cells,
                                           const Scalar* d_charge,
@@ -626,13 +626,13 @@ __global__ void gpu_compute_forces_kernel(const unsigned int work_size,
             }
         } // end neighbor cells loop
 
-    d_force[idx] = make_scalar4(force.x, force.y, force.z, 0.0);
+    d_force[idx] = make_forcereal4(ForceReal(force.x), ForceReal(force.y), ForceReal(force.z), ForceReal(0.0));
     }
 
 void gpu_compute_forces(const unsigned int N,
                         const unsigned int group_size,
                         const Scalar4* d_postype,
-                        Scalar4* d_force,
+                        ForceReal4* d_force,
                         const hipfftComplex* d_inv_fourier_mesh_x,
                         const hipfftComplex* d_inv_fourier_mesh_y,
                         const hipfftComplex* d_inv_fourier_mesh_z,
@@ -654,7 +654,7 @@ void gpu_compute_forces(const unsigned int N,
 
     unsigned int run_block_size = min(max_block_size, block_size);
 
-    hipMemsetAsync(d_force, 0, sizeof(Scalar4) * N);
+    hipMemsetAsync(d_force, 0, sizeof(ForceReal4) * N);
 
     unsigned int nwork = group_size;
     unsigned int n_blocks = nwork / run_block_size + 1;
@@ -1258,8 +1258,8 @@ void gpu_compute_influence_function(const uint3 mesh_dim,
     }
 
 //! The developer has chosen not to document this function
-__global__ void gpu_fix_exclusions_kernel(Scalar4* d_force,
-                                          Scalar* d_virial,
+__global__ void gpu_fix_exclusions_kernel(ForceReal4* d_force,
+                                          ForceReal* d_virial,
                                           const size_t virial_pitch,
                                           const Scalar4* d_pos,
                                           const Scalar* d_charge,
@@ -1284,7 +1284,7 @@ __global__ void gpu_fix_exclusions_kernel(Scalar4* d_force,
 
         Scalar qi = __ldg(d_charge + idx);
         // initialize the force to 0
-        Scalar4 force = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+        ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
         Scalar virial[6];
         for (unsigned int i = 0; i < 6; i++)
             virial[i] = Scalar(0.0);
@@ -1360,8 +1360,8 @@ __global__ void gpu_fix_exclusions_kernel(Scalar4* d_force,
     }
 
 //! The developer has chosen not to document this function
-hipError_t gpu_fix_exclusions(Scalar4* d_force,
-                              Scalar* d_virial,
+hipError_t gpu_fix_exclusions(ForceReal4* d_force,
+                              ForceReal* d_virial,
                               const size_t virial_pitch,
                               const unsigned int Nmax,
                               const Scalar4* d_pos,

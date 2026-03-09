@@ -196,7 +196,7 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepOne(ui
         ArrayHandle<Scalar4> d_angmom(this->m_pdata->getAngularMomentumArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(this->m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(this->m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
         ArrayHandle<Scalar3> d_inertia(this->m_pdata->getMomentsOfInertiaArray(),
@@ -227,7 +227,7 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepOne(ui
 */
 template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepTwo(uint64_t timestep)
     {
-    const GPUArray<Scalar4>& net_force = this->m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = this->m_pdata->getNetForce();
 
     ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
                                access_location::device,
@@ -239,7 +239,7 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepTwo(ui
                                  access_location::device,
                                  access_mode::readwrite);
 
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_index_array(this->m_group->getIndexArray(),
                                             access_location::device,
                                             access_mode::read);
@@ -277,7 +277,7 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepTwo(ui
         ArrayHandle<Scalar4> d_angmom(this->m_pdata->getAngularMomentumArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(this->m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(this->m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
         ArrayHandle<Scalar3> d_inertia(this->m_pdata->getMomentsOfInertiaArray(),
@@ -306,8 +306,8 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::integrateStepTwo(ui
 template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::includeRATTLEForce(uint64_t timestep)
     {
     // access all the needed data
-    const GPUArray<Scalar4>& net_force = this->m_pdata->getNetForce();
-    const GPUArray<Scalar>& net_virial = this->m_pdata->getNetVirial();
+    const GPUArray<ForceReal4>& net_force = this->m_pdata->getNetForce();
+    const GPUArray<ForceReal>& net_virial = this->m_pdata->getNetVirial();
     ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
                                access_location::device,
                                access_mode::read);
@@ -318,8 +318,8 @@ template<class Manifold> void TwoStepRATTLENVEGPU<Manifold>::includeRATTLEForce(
                                  access_location::device,
                                  access_mode::readwrite);
 
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::readwrite);
-    ArrayHandle<Scalar> d_net_virial(net_virial, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal> d_net_virial(net_virial, access_location::device, access_mode::readwrite);
 
     ArrayHandle<unsigned int> d_index_array(this->m_group->getIndexArray(),
                                             access_location::device,

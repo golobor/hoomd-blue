@@ -151,7 +151,7 @@ template<class Geometry> void BounceBackNVE<Geometry>::integrateStepTwo(uint64_t
     ArrayHandle<Scalar3> h_accel(m_pdata->getAccelerations(),
                                  access_location::host,
                                  access_mode::readwrite);
-    ArrayHandle<Scalar4> h_net_force(m_pdata->getNetForce(),
+    ArrayHandle<ForceReal4> h_net_force(m_pdata->getNetForce(),
                                      access_location::host,
                                      access_mode::read);
 
@@ -165,8 +165,8 @@ template<class Geometry> void BounceBackNVE<Geometry>::integrateStepTwo(uint64_t
         const unsigned int pid = h_group.data[idx];
 
         // load net force and velocity, compute a = F / m
-        const Scalar4 net_force = h_net_force.data[pid];
-        Scalar3 accel = make_scalar3(net_force.x, net_force.y, net_force.z);
+        const ForceReal4 net_force = h_net_force.data[pid];
+        Scalar3 accel = make_scalar3(Scalar(net_force.x), Scalar(net_force.y), Scalar(net_force.z));
         Scalar4 vel = h_vel.data[pid];
         accel.x /= vel.w;
         accel.y /= vel.w;

@@ -78,10 +78,10 @@ void ComputeThermo::computeProperties()
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
 
     // access the net force, pe, and virial
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
-    const GPUArray<Scalar>& net_virial = m_pdata->getNetVirial();
-    ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::read);
-    ArrayHandle<Scalar> h_net_virial(net_virial, access_location::host, access_mode::read);
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal>& net_virial = m_pdata->getNetVirial();
+    ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal> h_net_virial(net_virial, access_location::host, access_mode::read);
 
     // total kinetic energy
     double ke_trans_total = 0.0;

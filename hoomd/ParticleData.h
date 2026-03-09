@@ -769,7 +769,7 @@ class PYBIND11_EXPORT ParticleData
         }
 
     //! Get the net force array (alternate array)
-    const GPUArray<Scalar4>& getAltNetForce() const
+    const GPUArray<ForceReal4>& getAltNetForce() const
         {
         return m_net_force_alt;
         }
@@ -781,7 +781,7 @@ class PYBIND11_EXPORT ParticleData
         }
 
     //! Get the net virial array (alternate array)
-    const GPUArray<Scalar>& getAltNetVirial() const
+    const GPUArray<ForceReal>& getAltNetVirial() const
         {
         return m_net_virial_alt;
         }
@@ -793,7 +793,7 @@ class PYBIND11_EXPORT ParticleData
         }
 
     //! Get the net torque array (alternate array)
-    const GPUArray<Scalar4>& getAltNetTorqueArray() const
+    const GPUArray<ForceReal4>& getAltNetTorqueArray() const
         {
         return m_net_torque_alt;
         }
@@ -911,19 +911,19 @@ class PYBIND11_EXPORT ParticleData
     void setTypeName(unsigned int type, const std::string& name);
 
     //! Get the net force array
-    const GPUArray<Scalar4>& getNetForce() const
+    const GPUArray<ForceReal4>& getNetForce() const
         {
         return m_net_force;
         }
 
     //! Get the net virial array
-    const GPUArray<Scalar>& getNetVirial() const
+    const GPUArray<ForceReal>& getNetVirial() const
         {
         return m_net_virial;
         }
 
     //! Get the net torque array
-    const GPUArray<Scalar4>& getNetTorqueArray() const
+    const GPUArray<ForceReal4>& getNetTorqueArray() const
         {
         return m_net_torque;
         }
@@ -1325,14 +1325,14 @@ class PYBIND11_EXPORT ParticleData
     GPUArray<Scalar4> m_orientation_alt; //!< orientations (swap-in)
     GPUArray<Scalar4> m_angmom_alt;      //!< angular momenta (swap-in)
     GPUArray<Scalar3> m_inertia_alt;   //!< Principal moments of inertia for each particle (swap-in)
-    GPUArray<Scalar4> m_net_force_alt; //!< Net force (swap-in)
-    GPUArray<Scalar> m_net_virial_alt; //!< Net virial (swap-in)
-    GPUArray<Scalar4> m_net_torque_alt; //!< Net torque (swap-in)
+    GPUArray<ForceReal4> m_net_force_alt; //!< Net force (swap-in)
+    GPUArray<ForceReal> m_net_virial_alt; //!< Net virial (swap-in)
+    GPUArray<ForceReal4> m_net_torque_alt; //!< Net torque (swap-in)
 
-    GPUArray<Scalar4> m_net_force;  //!< Net force calculated for each particle
-    GPUArray<Scalar> m_net_virial;  //!< Net virial calculated for each particle (2D GPU array of
-                                    //!< dimensions 6*number of particles)
-    GPUArray<Scalar4> m_net_torque; //!< Net torque calculated for each particle
+    GPUArray<ForceReal4> m_net_force;  //!< Net force calculated for each particle
+    GPUArray<ForceReal> m_net_virial;  //!< Net virial calculated for each particle (2D GPU array of
+                                      //!< dimensions 6*number of particles)
+    GPUArray<ForceReal4> m_net_torque; //!< Net torque calculated for each particle
 
     Scalar m_external_virial[6]; //!< External potential contribution to the virial
     Scalar m_external_energy;    //!< External potential energy
@@ -1520,7 +1520,7 @@ class PYBIND11_EXPORT LocalParticleData : public GhostLocalDataAccess<Output, Pa
 
     Output getNetForce(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_net_force_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_net_force_handle,
                                                               &ParticleData::getNetForce,
                                                               flag,
                                                               true,
@@ -1529,7 +1529,7 @@ class PYBIND11_EXPORT LocalParticleData : public GhostLocalDataAccess<Output, Pa
 
     Output getNetTorque(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_net_torque_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_net_torque_handle,
                                                               &ParticleData::getNetTorqueArray,
                                                               flag,
                                                               true,
@@ -1541,24 +1541,24 @@ class PYBIND11_EXPORT LocalParticleData : public GhostLocalDataAccess<Output, Pa
         // Need pitch not particle numbers since GPUArrays can be padded for
         // faster data access.
         size_t size = this->m_data.getNetVirial().getPitch();
-        return this->template getLocalBuffer<Scalar, Scalar>(
+        return this->template getLocalBuffer<ForceReal, ForceReal>(
             m_net_virial_handle,
             &ParticleData::getNetVirial,
             flag,
             true,
             6,
             0,
-            std::vector<size_t>({sizeof(Scalar), size * sizeof(Scalar)}));
+            std::vector<size_t>({sizeof(ForceReal), size * sizeof(ForceReal)}));
         }
 
     Output getNetEnergy(GhostDataFlag flag)
         {
-        return this->template getLocalBuffer<Scalar4, Scalar>(m_net_force_handle,
+        return this->template getLocalBuffer<ForceReal4, ForceReal>(m_net_force_handle,
                                                               &ParticleData::getNetForce,
                                                               flag,
                                                               true,
                                                               0,
-                                                              3 * sizeof(Scalar));
+                                                              3 * sizeof(ForceReal));
         }
 
     protected:
@@ -1598,9 +1598,9 @@ class PYBIND11_EXPORT LocalParticleData : public GhostLocalDataAccess<Output, Pa
     std::unique_ptr<ArrayHandle<unsigned int>> m_tag_handle;
     std::unique_ptr<ArrayHandle<unsigned int>> m_rtag_handle;
     std::unique_ptr<ArrayHandle<unsigned int>> m_rigid_body_ids_handle;
-    std::unique_ptr<ArrayHandle<Scalar4>> m_net_force_handle;
-    std::unique_ptr<ArrayHandle<Scalar>> m_net_virial_handle;
-    std::unique_ptr<ArrayHandle<Scalar4>> m_net_torque_handle;
+    std::unique_ptr<ArrayHandle<ForceReal4>> m_net_force_handle;
+    std::unique_ptr<ArrayHandle<ForceReal>> m_net_virial_handle;
+    std::unique_ptr<ArrayHandle<ForceReal4>> m_net_torque_handle;
     };
 
 namespace detail

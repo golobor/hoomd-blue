@@ -54,7 +54,7 @@ __global__ void gpu_langevin_step_two_kernel(const Scalar4* d_pos,
                                              const unsigned int* d_tag,
                                              unsigned int* d_group_members,
                                              unsigned int group_size,
-                                             Scalar4* d_net_force,
+                                             ForceReal4* d_net_force,
                                              Scalar* d_gamma,
                                              unsigned int n_types,
                                              uint64_t timestep,
@@ -131,7 +131,7 @@ __global__ void gpu_langevin_step_two_kernel(const Scalar4* d_pos,
             bd_force.z = randomz * coeff - gamma * vel.z;
 
         // read in the net force and calculate the acceleration MEM TRANSFER: 16 bytes
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
         Scalar3 accel = make_scalar3(net_force.x, net_force.y, net_force.z);
         // MEM TRANSFER: 4 bytes   FLOPS: 3
         Scalar mass = vel.w;
@@ -251,7 +251,7 @@ __global__ void gpu_langevin_angular_step_two_kernel(const Scalar4* d_pos,
                                                      Scalar4* d_orientation,
                                                      Scalar4* d_angmom,
                                                      const Scalar3* d_inertia,
-                                                     Scalar4* d_net_torque,
+                                                     ForceReal4* d_net_torque,
                                                      const unsigned int* d_group_members,
                                                      const Scalar3* d_gamma_r,
                                                      const unsigned int* d_tag,
@@ -305,7 +305,7 @@ __global__ void gpu_langevin_angular_step_two_kernel(const Scalar4* d_pos,
             {
             quat<Scalar> q(d_orientation[idx]);
             quat<Scalar> p(d_angmom[idx]);
-            vec3<Scalar> t(d_net_torque[idx]);
+            ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
             vec3<Scalar> I(d_inertia[idx]);
 
             vec3<Scalar> s;
@@ -349,9 +349,9 @@ __global__ void gpu_langevin_angular_step_two_kernel(const Scalar4* d_pos,
 
             // change to lab frame and update the net torque
             bf_torque = rotate(q, bf_torque);
-            d_net_torque[idx].x += bf_torque.x;
-            d_net_torque[idx].y += bf_torque.y;
-            d_net_torque[idx].z += bf_torque.z;
+            d_net_torque[idx].x += ForceReal(bf_torque.x);
+            d_net_torque[idx].y += ForceReal(bf_torque.y);
+            d_net_torque[idx].z += ForceReal(bf_torque.z);
 
             // with the wishful mind that compiler may use conditional move to avoid branching
             if (D < 3)
@@ -364,7 +364,7 @@ __global__ void gpu_langevin_angular_step_two_kernel(const Scalar4* d_pos,
         // read the particle's orientation, conjugate quaternion, moment of inertia and net torque
         quat<Scalar> q(d_orientation[idx]);
         quat<Scalar> p(d_angmom[idx]);
-        vec3<Scalar> t(d_net_torque[idx]);
+        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
         vec3<Scalar> I(d_inertia[idx]);
 
         // rotate torque into principal frame
@@ -413,7 +413,7 @@ hipError_t gpu_langevin_angular_step_two(const Scalar4* d_pos,
                                          Scalar4* d_orientation,
                                          Scalar4* d_angmom,
                                          const Scalar3* d_inertia,
-                                         Scalar4* d_net_torque,
+                                         ForceReal4* d_net_torque,
                                          const unsigned int* d_group_members,
                                          const Scalar3* d_gamma_r,
                                          const unsigned int* d_tag,
@@ -486,7 +486,7 @@ hipError_t gpu_langevin_step_two(const Scalar4* d_pos,
                                  const unsigned int* d_tag,
                                  unsigned int* d_group_members,
                                  unsigned int group_size,
-                                 Scalar4* d_net_force,
+                                 ForceReal4* d_net_force,
                                  const langevin_step_two_args& langevin_args,
                                  Scalar deltaT,
                                  unsigned int D)

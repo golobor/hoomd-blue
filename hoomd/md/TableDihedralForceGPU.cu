@@ -44,8 +44,8 @@ namespace kernel
 
     See TableDihedralForceCompute for information on the memory layout.
 */
-__global__ void gpu_compute_table_dihedral_forces_kernel(Scalar4* d_force,
-                                                         Scalar* d_virial,
+__global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
+                                                         ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
                                                          const Scalar4* device_pos,
@@ -74,7 +74,7 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(Scalar4* d_force,
         pos_d; // allocate space for the a,b,c, and d atom in the a-b-c-d set
 
     // initialize the force to 0
-    Scalar4 force_idx = make_scalar4(0.0f, 0.0f, 0.0f, 0.0f);
+    ForceReal4 force_idx = make_forcereal4(0.0f, 0.0f, 0.0f, 0.0f);
 
     // initialize the virial tensor to 0
     Scalar virial_idx[6];
@@ -315,8 +315,8 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(Scalar4* d_force,
     \note This is just a kernel driver. See gpu_compute_table_dihedral_forces_kernel for full
    documentation.
 */
-hipError_t gpu_compute_table_dihedral_forces(Scalar4* d_force,
-                                             Scalar* d_virial,
+hipError_t gpu_compute_table_dihedral_forces(ForceReal4* d_force,
+                                             ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
                                              const Scalar4* device_pos,

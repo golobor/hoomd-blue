@@ -43,8 +43,8 @@ namespace kernel
 
     See TableAngleForceCompute for information on the memory layout.
 */
-__global__ void gpu_compute_table_angle_forces_kernel(Scalar4* d_force,
-                                                      Scalar* d_virial,
+__global__ void gpu_compute_table_angle_forces_kernel(ForceReal4* d_force,
+                                                      ForceReal* d_virial,
                                                       const size_t virial_pitch,
                                                       const unsigned int N,
                                                       const Scalar4* d_pos,
@@ -72,7 +72,7 @@ __global__ void gpu_compute_table_angle_forces_kernel(Scalar4* d_force,
     Scalar3 a_pos, b_pos, c_pos; // allocate space for the a,b, and c atom in the a-b-c triplet
 
     // initialize the force to 0
-    Scalar4 force_idx = make_scalar4(0.0, 0.0, 0.0, 0.0);
+    ForceReal4 force_idx = make_forcereal4(0.0, 0.0, 0.0, 0.0);
 
     Scalar fab[3], fcb[3];
 
@@ -242,8 +242,8 @@ __global__ void gpu_compute_table_angle_forces_kernel(Scalar4* d_force,
     \note This is just a kernel driver. See gpu_compute_table_angle_forces_kernel for full
    documentation.
 */
-hipError_t gpu_compute_table_angle_forces(Scalar4* d_force,
-                                          Scalar* d_virial,
+hipError_t gpu_compute_table_angle_forces(ForceReal4* d_force,
+                                          ForceReal* d_virial,
                                           const size_t virial_pitch,
                                           const unsigned int N,
                                           const Scalar4* d_pos,

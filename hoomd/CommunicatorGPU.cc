@@ -3547,7 +3547,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
 
             {
             // access particle data
-            ArrayHandle<Scalar4> d_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> d_netforce(m_pdata->getNetForce(),
                                             access_location::device,
                                             access_mode::read);
 
@@ -3574,7 +3574,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
         if (flags[comm_flag::net_torque])
             {
             // access particle data
-            ArrayHandle<Scalar4> d_nettorque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> d_nettorque(m_pdata->getNetTorqueArray(),
                                              access_location::device,
                                              access_mode::read);
 
@@ -3601,7 +3601,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
         if (flags[comm_flag::net_virial])
             {
             // access particle data
-            ArrayHandle<Scalar> d_netvirial(m_pdata->getNetVirial(),
+            ArrayHandle<ForceReal> d_netvirial(m_pdata->getNetVirial(),
                                             access_location::device,
                                             access_mode::read);
 
@@ -3805,7 +3805,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
                                                           access_mode::read);
 
             // access particle data
-            ArrayHandle<Scalar4> d_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> d_netforce(m_pdata->getNetForce(),
                                             access_location::device,
                                             access_mode::readwrite);
 
@@ -3826,7 +3826,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
                                                            access_mode::read);
 
             // access particle data
-            ArrayHandle<Scalar4> d_nettorque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> d_nettorque(m_pdata->getNetTorqueArray(),
                                              access_location::device,
                                              access_mode::readwrite);
 
@@ -3847,7 +3847,7 @@ void CommunicatorGPU::updateNetForce(uint64_t timestep)
                                                           access_mode::read);
 
             // access particle data
-            ArrayHandle<Scalar> d_netvirial(m_pdata->getNetVirial(),
+            ArrayHandle<ForceReal> d_netvirial(m_pdata->getNetVirial(),
                                             access_location::device,
                                             access_mode::readwrite);
 

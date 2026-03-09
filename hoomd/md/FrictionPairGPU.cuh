@@ -38,9 +38,9 @@ namespace kernel
 struct a_pair_args_t
     {
     //! Construct a pair_args_t
-    a_pair_args_t(Scalar4* _d_force,
-                  Scalar4* _d_torque,
-                  Scalar* _d_virial,
+    a_pair_args_t(ForceReal4* _d_force,
+                  ForceReal4* _d_torque,
+                  ForceReal* _d_virial,
                   size_t _virial_pitch,
                   const unsigned int _N,
                   const unsigned int _n_max,
@@ -76,9 +76,9 @@ struct a_pair_args_t
           block_size(_block_size), compute_virial(_compute_virial),
           threads_per_particle(_threads_per_particle), devprop(_devprop) { };
 
-    Scalar4* d_force;                //!< Force to write out
-    Scalar4* d_torque;               //!< Torque to write out
-    Scalar* d_virial;                //!< Virial to write out
+    ForceReal4* d_force;                //!< Force to write out
+    ForceReal4* d_torque;               //!< Torque to write out
+    ForceReal* d_virial;                //!< Virial to write out
     const size_t virial_pitch;       //!< The pitch of the 2D array of virial matrix elements
     const unsigned int N;            //!< number of particles
     const unsigned int n_max;        //!< maximum size of particle data arrays
@@ -159,9 +159,9 @@ struct a_pair_args_t
 */
 template<class evaluator, unsigned int compute_virial, int tpp>
 __global__ void
-gpu_compute_pair_friction_forces_kernel(Scalar4* d_force,
-                                        Scalar4* d_torque,
-                                        Scalar* d_virial,
+gpu_compute_pair_friction_forces_kernel(ForceReal4* d_force,
+                                        ForceReal4* d_torque,
+                                        ForceReal* d_virial,
                                         const size_t virial_pitch,
                                         const unsigned int N,
                                         const Scalar4* d_pos,
@@ -236,14 +236,14 @@ gpu_compute_pair_friction_forces_kernel(Scalar4* d_force,
         }
 
     // initialize the force to 0
-    Scalar4 force = make_scalar4(Scalar(0), Scalar(0), Scalar(0), Scalar(0));
-    Scalar4 torque = make_scalar4(Scalar(0), Scalar(0), Scalar(0), Scalar(0));
-    Scalar virialxx = Scalar(0);
-    Scalar virialxy = Scalar(0);
-    Scalar virialxz = Scalar(0);
-    Scalar virialyy = Scalar(0);
-    Scalar virialyz = Scalar(0);
-    Scalar virialzz = Scalar(0);
+    ForceReal4 force = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
+    ForceReal4 torque = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
+    ForceReal virialxx = ForceReal(0);
+    ForceReal virialxy = ForceReal(0);
+    ForceReal virialxz = ForceReal(0);
+    ForceReal virialyy = ForceReal(0);
+    ForceReal virialyz = ForceReal(0);
+    ForceReal virialzz = ForceReal(0);
 
     if (active)
         {
@@ -414,11 +414,11 @@ gpu_compute_pair_friction_forces_kernel(Scalar4* d_force,
             }
 
         // potential energy per particle must be halved
-        force.w *= Scalar(0.5);
+        force.w *= ForceReal(0.5);
         }
 
     // reduce force over threads in cta
-    hoomd::detail::WarpReduce<Scalar, tpp> reducer;
+    hoomd::detail::WarpReduce<ForceReal, tpp> reducer;
     force.x = reducer.Sum(force.x);
     force.y = reducer.Sum(force.y);
     force.z = reducer.Sum(force.z);
@@ -437,12 +437,12 @@ gpu_compute_pair_friction_forces_kernel(Scalar4* d_force,
 
     if (compute_virial)
         {
-        virialxx = reducer.Sum(virialxx);
-        virialxy = reducer.Sum(virialxy);
-        virialxz = reducer.Sum(virialxz);
-        virialyy = reducer.Sum(virialyy);
-        virialyz = reducer.Sum(virialyz);
-        virialzz = reducer.Sum(virialzz);
+        virialxx = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialxx);
+        virialxy = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialxy);
+        virialxz = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialxz);
+        virialyy = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialyy);
+        virialyz = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialyz);
+        virialzz = hoomd::detail::WarpReduce<ForceReal, tpp>().Sum(virialzz);
 
         // if we are the first thread in the cta, write out virial to global mem
         if (active && threadIdx.x % tpp == 0)

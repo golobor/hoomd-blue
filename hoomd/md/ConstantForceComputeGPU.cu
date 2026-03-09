@@ -30,8 +30,8 @@ namespace kernel
 */
 __global__ void gpu_compute_constant_force_set_forces_kernel(const unsigned int group_size,
                                                              unsigned int* d_index_array,
-                                                             Scalar4* d_force,
-                                                             Scalar4* d_torque,
+                                                             ForceReal4* d_force,
+                                                             ForceReal4* d_torque,
                                                              const Scalar4* d_pos,
                                                              const Scalar3* d_f_const,
                                                              const Scalar3* d_t_const,
@@ -48,17 +48,17 @@ __global__ void gpu_compute_constant_force_set_forces_kernel(const unsigned int 
     Scalar3 fconst = d_f_const[type];
 
     vec3<Scalar> fi(fconst.x, fconst.y, fconst.z);
-    d_force[idx] = vec_to_scalar4(fi, 0);
+    d_force[idx] = make_forcereal4(ForceReal(fi.x), ForceReal(fi.y), ForceReal(fi.z), ForceReal(0));
 
     Scalar3 tconst = d_t_const[type];
     vec3<Scalar> ti(tconst.x, tconst.y, tconst.z);
-    d_torque[idx] = vec_to_scalar4(ti, 0);
+    d_torque[idx] = make_forcereal4(ForceReal(ti.x), ForceReal(ti.y), ForceReal(ti.z), ForceReal(0));
     }
 
 hipError_t gpu_compute_constant_force_set_forces(const unsigned int group_size,
                                                  unsigned int* d_index_array,
-                                                 Scalar4* d_force,
-                                                 Scalar4* d_torque,
+                                                 ForceReal4* d_force,
+                                                 ForceReal4* d_torque,
                                                  const Scalar4* d_pos,
                                                  const Scalar3* d_f_const,
                                                  const Scalar3* d_t_const,

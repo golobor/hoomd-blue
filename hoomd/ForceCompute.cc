@@ -33,17 +33,17 @@ ForceCompute::ForceCompute(std::shared_ptr<SystemDefinition> sysdef)
 
     // allocate data on the host
     unsigned int max_num_particles = m_pdata->getMaxN();
-    GPUArray<Scalar4> force(max_num_particles, m_exec_conf);
-    GPUArray<Scalar> virial(max_num_particles, 6, m_exec_conf);
-    GPUArray<Scalar4> torque(max_num_particles, m_exec_conf);
+    GPUArray<ForceReal4> force(max_num_particles, m_exec_conf);
+    GPUArray<ForceReal> virial(max_num_particles, 6, m_exec_conf);
+    GPUArray<ForceReal4> torque(max_num_particles, m_exec_conf);
     m_force.swap(force);
     m_virial.swap(virial);
     m_torque.swap(torque);
 
         {
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
         m_force.zeroFill();
         m_torque.zeroFill();
         m_virial.zeroFill();
@@ -85,9 +85,9 @@ void ForceCompute::reallocate()
     m_torque.resize(m_pdata->getMaxN());
 
         {
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
         m_force.zeroFill();
         m_torque.zeroFill();
         m_virial.zeroFill();
@@ -111,7 +111,7 @@ ForceCompute::~ForceCompute()
  */
 Scalar ForceCompute::calcEnergySum()
     {
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
     double pe_total = m_external_energy;
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
         {
@@ -138,7 +138,7 @@ Scalar ForceCompute::calcEnergySum()
 Scalar ForceCompute::calcEnergyGroup(std::shared_ptr<ParticleGroup> group)
     {
     unsigned int group_size = group->getNumMembers();
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
 
     double pe_total = 0.0;
 
@@ -168,7 +168,7 @@ Scalar ForceCompute::calcEnergyGroup(std::shared_ptr<ParticleGroup> group)
 vec3<double> ForceCompute::calcForceGroup(std::shared_ptr<ParticleGroup> group)
     {
     unsigned int group_size = group->getNumMembers();
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
 
     vec3<double> f_total = vec3<double>();
 
@@ -176,7 +176,8 @@ vec3<double> ForceCompute::calcForceGroup(std::shared_ptr<ParticleGroup> group)
         {
         unsigned int j = group->getMemberIndex(group_idx);
 
-        f_total += (vec3<double>)h_force.data[j];
+        ForceReal4 f_raw = h_force.data[j];
+        f_total += vec3<double>(double(f_raw.x), double(f_raw.y), double(f_raw.z));
         }
 #ifdef ENABLE_MPI
     if (m_sysdef->isDomainDecomposed())
@@ -199,7 +200,7 @@ vec3<double> ForceCompute::calcForceGroup(std::shared_ptr<ParticleGroup> group)
 std::vector<Scalar> ForceCompute::calcVirialGroup(std::shared_ptr<ParticleGroup> group)
     {
     const unsigned int group_size = group->getNumMembers();
-    const ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::read);
+    const ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::read);
 
     std::vector<Scalar> total_virial(6, 0.);
 
@@ -250,7 +251,7 @@ pybind11::object ForceCompute::getEnergiesPython()
     local_energy.reserve(m_pdata->getN());
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
         {
         local_energy.push_back(h_force.data[h_rtag.data[m_local_tag[i]]].w);
@@ -301,7 +302,7 @@ pybind11::object ForceCompute::getForcesPython()
     std::vector<vec3<double>> local_force(m_pdata->getN());
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
         {
         local_force[i].x = h_force.data[h_rtag.data[m_local_tag[i]]].x;
@@ -357,7 +358,7 @@ pybind11::object ForceCompute::getTorquesPython()
     std::vector<vec3<double>> local_torque(m_pdata->getN());
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::read);
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
         {
         local_torque[i].x = h_torque.data[h_rtag.data[m_local_tag[i]]].x;
@@ -418,7 +419,7 @@ pybind11::object ForceCompute::getVirialsPython()
     std::vector<hoomd::detail::vec6<double>> local_virial(m_pdata->getN());
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::read);
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
         {
         local_virial[i].xx = h_virial.data[m_virial_pitch * 0 + h_rtag.data[m_local_tag[i]]];
@@ -482,8 +483,9 @@ Scalar4 ForceCompute::getTorque(unsigned int tag)
     Scalar4 result = make_scalar4(0.0, 0.0, 0.0, 0.0);
     if (found)
         {
-        ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::read);
-        result = h_torque.data[i];
+        ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::read);
+        ForceReal4 t_raw = h_torque.data[i];
+        result = make_scalar4(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z), Scalar(t_raw.w));
         }
 #ifdef ENABLE_MPI
     if (m_pdata->getDomainDecomposition())
@@ -509,7 +511,7 @@ Scalar3 ForceCompute::getForce(unsigned int tag)
     Scalar3 result = make_scalar3(0.0, 0.0, 0.0);
     if (found)
         {
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
         result = make_scalar3(h_force.data[i].x, h_force.data[i].y, h_force.data[i].z);
         }
 #ifdef ENABLE_MPI
@@ -537,7 +539,7 @@ Scalar ForceCompute::getVirial(unsigned int tag, unsigned int component)
     Scalar result = Scalar(0.0);
     if (found)
         {
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::read);
         result = h_virial.data[m_virial_pitch * component + i];
         }
 #ifdef ENABLE_MPI
@@ -560,7 +562,7 @@ Scalar ForceCompute::getEnergy(unsigned int tag)
     Scalar result = Scalar(0.0);
     if (found)
         {
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::read);
         result = h_force.data[i].w;
         }
 #ifdef ENABLE_MPI

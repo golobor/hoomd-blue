@@ -77,11 +77,11 @@ void angle_force_basic_tests(angleforce_creator tf_creator,
     fc_3->compute(0);
 
         {
-        const GPUArray<Scalar4>& force_array_1 = fc_3->getForceArray();
-        const GPUArray<Scalar>& virial_array_1 = fc_3->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_1 = fc_3->getForceArray();
+        const GPUArray<ForceReal>& virial_array_1 = fc_3->getVirialArray();
         size_t pitch = 0;
-        ArrayHandle<Scalar4> h_force_1(force_array_1, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_1(virial_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_1(force_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_1(virial_array_1, access_location::host, access_mode::read);
 
         // check that the force is correct, it should be 0 since we haven't created any angles yet
         MY_CHECK_SMALL(h_force_1.data[0].x, tol);
@@ -104,11 +104,11 @@ void angle_force_basic_tests(angleforce_creator tf_creator,
     Scalar rough_tol = 0.1;
         {
         // this time there should be a force
-        const GPUArray<Scalar4>& force_array_2 = fc_3->getForceArray();
-        const GPUArray<Scalar>& virial_array_2 = fc_3->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_2 = fc_3->getForceArray();
+        const GPUArray<ForceReal>& virial_array_2 = fc_3->getVirialArray();
         size_t pitch = virial_array_2.getPitch();
-        ArrayHandle<Scalar4> h_force_2(force_array_2, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_2(virial_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_2(force_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_2(virial_array_2, access_location::host, access_mode::read);
 
         MY_CHECK_CLOSE(h_force_2.data[0].x, -0.061684, rough_tol);
         MY_CHECK_CLOSE(h_force_2.data[0].y, -0.313469, rough_tol);
@@ -142,11 +142,11 @@ void angle_force_basic_tests(angleforce_creator tf_creator,
     fc_3->compute(1);
 
         {
-        const GPUArray<Scalar4>& force_array_3 = fc_3->getForceArray();
-        const GPUArray<Scalar>& virial_array_3 = fc_3->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_3 = fc_3->getForceArray();
+        const GPUArray<ForceReal>& virial_array_3 = fc_3->getVirialArray();
         size_t pitch = virial_array_3.getPitch();
-        ArrayHandle<Scalar4> h_force_3(force_array_3, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_3(virial_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_3(force_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_3(virial_array_3, access_location::host, access_mode::read);
 
         MY_CHECK_CLOSE(h_force_3.data[1].x, -0.061684, rough_tol);
         MY_CHECK_CLOSE(h_force_3.data[1].y, -0.3134695, rough_tol);
@@ -185,11 +185,11 @@ void angle_force_basic_tests(angleforce_creator tf_creator,
 
     fc_3->compute(2);
         {
-        const GPUArray<Scalar4>& force_array_3 = fc_3->getForceArray();
-        const GPUArray<Scalar>& virial_array_3 = fc_3->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_3 = fc_3->getForceArray();
+        const GPUArray<ForceReal>& virial_array_3 = fc_3->getVirialArray();
         size_t pitch = virial_array_3.getPitch();
-        ArrayHandle<Scalar4> h_force_3(force_array_3, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_3(virial_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_3(force_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_3(virial_array_3, access_location::host, access_mode::read);
 
         MY_CHECK_CLOSE(h_force_3.data[1].x, -0.061684, rough_tol);
         MY_CHECK_CLOSE(h_force_3.data[1].y, -0.3134695, rough_tol);
@@ -233,15 +233,15 @@ void angle_force_comparison_tests(angleforce_creator tf_creator1,
 
     // verify that the forces are identical (within roundoff errors)
     {
-    GPUArray<Scalar4>& force_array_7 =  fc1->getForceArray();
-    GPUArray<Scalar>& virial_array_7 =  fc1->getVirialArray();
+    GPUArray<ForceReal4>& force_array_7 =  fc1->getForceArray();
+    GPUArray<ForceReal>& virial_array_7 =  fc1->getVirialArray();
     size_t pitch = virial_array_7.getPitch();
-    ArrayHandle<Scalar4> h_force_7(force_array_7,access_location::host,access_mode::read);
-    ArrayHandle<Scalar> h_virial_7(virial_array_7,access_location::host,access_mode::read);
-    GPUArray<Scalar4>& force_array_8 =  fc2->getForceArray();
-    GPUArray<Scalar>& virial_array_8 =  fc2->getVirialArray();
-    ArrayHandle<Scalar4> h_force_8(force_array_8,access_location::host,access_mode::read);
-    ArrayHandle<Scalar> h_virial_8(virial_array_8,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal4> h_force_7(force_array_7,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal> h_virial_7(virial_array_7,access_location::host,access_mode::read);
+    GPUArray<ForceReal4>& force_array_8 =  fc2->getForceArray();
+    GPUArray<ForceReal>& virial_array_8 =  fc2->getVirialArray();
+    ArrayHandle<ForceReal4> h_force_8(force_array_8,access_location::host,access_mode::read);
+    ArrayHandle<ForceReal> h_virial_8(virial_array_8,access_location::host,access_mode::read);
 
     // compare average deviation between the two computes
     double deltaf2 = 0.0;

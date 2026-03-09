@@ -490,7 +490,7 @@ void PPPMForceComputeGPU::interpolateForces()
                                                     access_mode::read);
     ArrayHandle<Scalar> d_charge(m_pdata->getCharges(), access_location::device, access_mode::read);
 
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
 
     // access the group
     ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),
@@ -707,8 +707,8 @@ void PPPMForceComputeGPU::fixExclusions()
     ArrayHandle<unsigned int> d_n_ex(m_nlist->getNExArray(),
                                      access_location::device,
                                      access_mode::read);
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::readwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::readwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::readwrite);
     ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),
                                             access_location::device,
                                             access_mode::read);

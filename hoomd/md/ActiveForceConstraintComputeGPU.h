@@ -127,12 +127,12 @@ template<class Manifold> void ActiveForceConstraintComputeGPU<Manifold>::setForc
     ArrayHandle<Scalar4> d_f_actVec(this->m_f_activeVec,
                                     access_location::device,
                                     access_mode::read);
-    ArrayHandle<Scalar4> d_force(this->m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(this->m_force, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar4> d_t_actVec(this->m_t_activeVec,
                                     access_location::device,
                                     access_mode::read);
-    ArrayHandle<Scalar4> d_torque(this->m_torque, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_torque(this->m_torque, access_location::device, access_mode::overwrite);
 
     ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
                                access_location::device,

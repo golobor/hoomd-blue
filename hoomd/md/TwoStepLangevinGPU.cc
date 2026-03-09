@@ -117,7 +117,7 @@ void TwoStepLangevinGPU::integrateStepOne(uint64_t timestep)
         ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),
                                       access_location::device,
                                       access_mode::readwrite);
-        ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+        ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                           access_location::device,
                                           access_mode::read);
         ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),
@@ -149,12 +149,12 @@ void TwoStepLangevinGPU::integrateStepOne(uint64_t timestep)
 */
 void TwoStepLangevinGPU::integrateStepTwo(uint64_t timestep)
     {
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
 
     // get the dimensionality of the system
     const unsigned int D = m_sysdef->getNDimensions();
 
-    ArrayHandle<Scalar4> d_net_force(net_force, access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
     ArrayHandle<Scalar> d_gamma(m_gamma, access_location::device, access_mode::read);
     ArrayHandle<Scalar3> d_gamma_r(m_gamma_r, access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_index_array(m_group->getIndexArray(),
@@ -220,7 +220,7 @@ void TwoStepLangevinGPU::integrateStepTwo(uint64_t timestep)
             ArrayHandle<Scalar4> d_angmom(m_pdata->getAngularMomentumArray(),
                                           access_location::device,
                                           access_mode::readwrite);
-            ArrayHandle<Scalar4> d_net_torque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> d_net_torque(m_pdata->getNetTorqueArray(),
                                               access_location::device,
                                               access_mode::read);
             ArrayHandle<Scalar3> d_inertia(m_pdata->getMomentsOfInertiaArray(),

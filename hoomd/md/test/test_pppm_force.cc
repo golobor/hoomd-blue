@@ -96,8 +96,8 @@ void pppm_force_particle_test(pppmforce_creator pppm_creator,
     // compute the forces
     fc_2->compute(0);
 
-    ArrayHandle<Scalar4> h_force(fc_2->getForceArray(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar> h_virial(fc_2->getVirialArray(), access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(fc_2->getForceArray(), access_location::host, access_mode::read);
+    ArrayHandle<ForceReal> h_virial(fc_2->getVirialArray(), access_location::host, access_mode::read);
     size_t pitch = fc_2->getVirialArray().getPitch();
 
     MY_CHECK_CLOSE(h_force.data[0].x, 0.151335f, tol_small);
@@ -182,8 +182,8 @@ void pppm_force_particle_test_triclinic(pppmforce_creator pppm_creator,
     // compute the forces
     fc_2->compute(0);
 
-    ArrayHandle<Scalar4> h_force(fc_2->getForceArray(), access_location::host, access_mode::read);
-    ArrayHandle<Scalar> h_virial(fc_2->getVirialArray(), access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_force(fc_2->getForceArray(), access_location::host, access_mode::read);
+    ArrayHandle<ForceReal> h_virial(fc_2->getVirialArray(), access_location::host, access_mode::read);
     size_t pitch = fc_2->getVirialArray().getPitch();
 
     Scalar rough_tol = 0.02;

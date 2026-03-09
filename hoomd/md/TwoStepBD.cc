@@ -52,7 +52,7 @@ void TwoStepBD::integrateStepOne(uint64_t timestep)
     const Scalar currentTemp = m_T->operator()(timestep);
     const unsigned int D = m_sysdef->getNDimensions();
 
-    const GPUArray<Scalar4>& net_force = m_pdata->getNetForce();
+    const GPUArray<ForceReal4>& net_force = m_pdata->getNetForce();
     ArrayHandle<Scalar4> h_vel(m_pdata->getVelocities(),
                                access_location::host,
                                access_mode::readwrite);
@@ -62,14 +62,14 @@ void TwoStepBD::integrateStepOne(uint64_t timestep)
     ArrayHandle<int3> h_image(m_pdata->getImages(), access_location::host, access_mode::readwrite);
     ArrayHandle<unsigned int> h_tag(m_pdata->getTags(), access_location::host, access_mode::read);
 
-    ArrayHandle<Scalar4> h_net_force(net_force, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_net_force(net_force, access_location::host, access_mode::read);
     ArrayHandle<Scalar> h_gamma(m_gamma, access_location::host, access_mode::read);
 
     ArrayHandle<Scalar3> h_gamma_r(m_gamma_r, access_location::host, access_mode::read);
     ArrayHandle<Scalar4> h_orientation(m_pdata->getOrientationArray(),
                                        access_location::host,
                                        access_mode::readwrite);
-    ArrayHandle<Scalar4> h_torque(m_pdata->getNetTorqueArray(),
+    ArrayHandle<ForceReal4> h_torque(m_pdata->getNetTorqueArray(),
                                   access_location::host,
                                   access_mode::readwrite);
 
@@ -162,7 +162,8 @@ void TwoStepBD::integrateStepOne(uint64_t timestep)
                 {
                 vec3<Scalar> p_vec;
                 quat<Scalar> q(h_orientation.data[j]);
-                vec3<Scalar> t(h_torque.data[j]);
+                ForceReal4 t_raw = h_torque.data[j];
+                vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
                 vec3<Scalar> I(h_inertia.data[j]);
 
                 bool x_zero, y_zero, z_zero;

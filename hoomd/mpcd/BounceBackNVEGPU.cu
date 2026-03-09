@@ -33,7 +33,7 @@ namespace kernel
  */
 __global__ void nve_bounce_step_two(Scalar4* d_vel,
                                     Scalar3* d_accel,
-                                    const Scalar4* d_net_force,
+                                    const ForceReal4* d_net_force,
                                     const unsigned int* d_group,
                                     const Scalar dt,
                                     const unsigned int N)
@@ -44,8 +44,8 @@ __global__ void nve_bounce_step_two(Scalar4* d_vel,
         return;
     const unsigned int pid = d_group[idx];
 
-    const Scalar4 net_force = d_net_force[pid];
-    Scalar3 accel = make_scalar3(net_force.x, net_force.y, net_force.z);
+    const ForceReal4 net_force = d_net_force[pid];
+    Scalar3 accel = make_scalar3(Scalar(net_force.x), Scalar(net_force.y), Scalar(net_force.z));
     Scalar4 vel = d_vel[pid];
     accel.x /= vel.w;
     accel.y /= vel.w;
@@ -74,7 +74,7 @@ __global__ void nve_bounce_step_two(Scalar4* d_vel,
  */
 cudaError_t nve_bounce_step_two(Scalar4* d_vel,
                                 Scalar3* d_accel,
-                                const Scalar4* d_net_force,
+                                const ForceReal4* d_net_force,
                                 const unsigned int* d_group,
                                 const Scalar dt,
                                 const unsigned int N,

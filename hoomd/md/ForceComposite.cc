@@ -714,20 +714,20 @@ void ForceComposite::computeForces(uint64_t timestep)
                                        access_mode::read);
 
     // access net force and torque acting on constituent particles
-    ArrayHandle<Scalar4> h_net_force(m_pdata->getNetForce(),
+    ArrayHandle<ForceReal4> h_net_force(m_pdata->getNetForce(),
                                      access_location::host,
                                      access_mode::readwrite);
-    ArrayHandle<Scalar4> h_net_torque(m_pdata->getNetTorqueArray(),
+    ArrayHandle<ForceReal4> h_net_torque(m_pdata->getNetTorqueArray(),
                                       access_location::host,
                                       access_mode::readwrite);
-    ArrayHandle<Scalar> h_net_virial(m_pdata->getNetVirial(),
+    ArrayHandle<ForceReal> h_net_virial(m_pdata->getNetVirial(),
                                      access_location::host,
                                      access_mode::readwrite);
 
     // access the force and torque array for the central particle
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
 
     // access rigid body definition
     ArrayHandle<Scalar3> h_body_pos(m_body_pos, access_location::host, access_mode::read);
@@ -786,14 +786,16 @@ void ForceComposite::computeForces(uint64_t timestep)
                 continue;
 
             // force and torque on particle
-            Scalar4 net_force = h_net_force.data[idxj];
-            Scalar4 net_torque = h_net_torque.data[idxj];
+            ForceReal4 net_force_raw = h_net_force.data[idxj];
+            ForceReal4 net_torque_raw = h_net_torque.data[idxj];
+            Scalar4 net_force = make_scalar4(Scalar(net_force_raw.x), Scalar(net_force_raw.y), Scalar(net_force_raw.z), Scalar(net_force_raw.w));
+            Scalar4 net_torque = make_scalar4(Scalar(net_torque_raw.x), Scalar(net_torque_raw.y), Scalar(net_torque_raw.z), Scalar(net_torque_raw.w));
             vec3<Scalar> f(net_force);
 
             // zero net energy on constituent particles to avoid double counting
             // also zero net force and torque for consistency
-            h_net_force.data[idxj] = make_scalar4(0.0, 0.0, 0.0, 0.0);
-            h_net_torque.data[idxj] = make_scalar4(0.0, 0.0, 0.0, 0.0);
+            h_net_force.data[idxj] = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
+            h_net_torque.data[idxj] = make_forcereal4(ForceReal(0), ForceReal(0), ForceReal(0), ForceReal(0));
 
             // only add forces for local central particles
             if (central_idx < m_pdata->getN())

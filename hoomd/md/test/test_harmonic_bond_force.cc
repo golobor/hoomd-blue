@@ -63,13 +63,13 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
 
     // compute the force and check the results
     fc_2->compute(0);
-    const GPUArray<Scalar4>& force_array_1 = fc_2->getForceArray();
-    const GPUArray<Scalar>& virial_array_1 = fc_2->getVirialArray();
+    const GPUArray<ForceReal4>& force_array_1 = fc_2->getForceArray();
+    const GPUArray<ForceReal>& virial_array_1 = fc_2->getVirialArray();
 
         {
         size_t pitch = virial_array_1.getPitch();
-        ArrayHandle<Scalar4> h_force_1(force_array_1, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_1(virial_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_1(force_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_1(virial_array_1, access_location::host, access_mode::read);
         // check that the force is correct, it should be 0 since we haven't created any bonds yet
         MY_CHECK_SMALL(h_force_1.data[0].x, tol_small);
         MY_CHECK_SMALL(h_force_1.data[0].y, tol_small);
@@ -89,11 +89,11 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
 
         {
         // this time there should be a force
-        const GPUArray<Scalar4>& force_array_2 = fc_2->getForceArray();
-        const GPUArray<Scalar>& virial_array_2 = fc_2->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_2 = fc_2->getForceArray();
+        const GPUArray<ForceReal>& virial_array_2 = fc_2->getVirialArray();
         size_t pitch = virial_array_2.getPitch();
-        ArrayHandle<Scalar4> h_force_2(force_array_2, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_2(virial_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_2(force_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_2(virial_array_2, access_location::host, access_mode::read);
         MY_CHECK_CLOSE(h_force_2.data[0].x, 0.225, tol);
         MY_CHECK_SMALL(h_force_2.data[0].y, tol_small);
         MY_CHECK_SMALL(h_force_2.data[0].z, tol_small);
@@ -143,10 +143,10 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
 
         {
         // this time there should be a force
-        const GPUArray<Scalar4>& force_array_3 = fc_2->getForceArray();
-        const GPUArray<Scalar>& virial_array_3 = fc_2->getVirialArray();
-        ArrayHandle<Scalar4> h_force_3(force_array_3, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_3(virial_array_3, access_location::host, access_mode::read);
+        const GPUArray<ForceReal4>& force_array_3 = fc_2->getForceArray();
+        const GPUArray<ForceReal>& virial_array_3 = fc_2->getVirialArray();
+        ArrayHandle<ForceReal4> h_force_3(force_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_3(virial_array_3, access_location::host, access_mode::read);
         MY_CHECK_CLOSE(h_force_3.data[0].x, -0.225, tol);
         MY_CHECK_CLOSE(h_force_3.data[1].x, 0.225, tol);
         }
@@ -159,10 +159,10 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
 
         {
         // the force should be zero
-        const GPUArray<Scalar4>& force_array_4 = fc_2->getForceArray();
-        const GPUArray<Scalar>& virial_array_4 = fc_2->getVirialArray();
-        ArrayHandle<Scalar4> h_force_4(force_array_4, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_4(virial_array_4, access_location::host, access_mode::read);
+        const GPUArray<ForceReal4>& force_array_4 = fc_2->getForceArray();
+        const GPUArray<ForceReal>& virial_array_4 = fc_2->getVirialArray();
+        ArrayHandle<ForceReal4> h_force_4(force_array_4, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_4(virial_array_4, access_location::host, access_mode::read);
         MY_CHECK_SMALL(h_force_4.data[0].x, tol_small);
         MY_CHECK_SMALL(h_force_4.data[1].x, tol_small);
         }
@@ -198,11 +198,11 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
 
         {
         // check that the forces are correctly computed
-        const GPUArray<Scalar4>& force_array_5 = fc_6->getForceArray();
-        const GPUArray<Scalar>& virial_array_5 = fc_6->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_5 = fc_6->getForceArray();
+        const GPUArray<ForceReal>& virial_array_5 = fc_6->getVirialArray();
         size_t pitch = virial_array_5.getPitch();
-        ArrayHandle<Scalar4> h_force_5(force_array_5, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_5(virial_array_5, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_5(force_array_5, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_5(virial_array_5, access_location::host, access_mode::read);
         MY_CHECK_CLOSE(h_force_5.data[0].x, -0.075, tol);
         MY_CHECK_SMALL(h_force_5.data[0].y, tol_small);
         MY_CHECK_SMALL(h_force_5.data[0].z, tol_small);
@@ -318,11 +318,11 @@ void bond_force_basic_tests(bondforce_creator bf_creator,
     fc_4->compute(0);
 
         {
-        const GPUArray<Scalar4>& force_array_6 = fc_4->getForceArray();
-        const GPUArray<Scalar>& virial_array_6 = fc_4->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_6 = fc_4->getForceArray();
+        const GPUArray<ForceReal>& virial_array_6 = fc_4->getVirialArray();
         size_t pitch = virial_array_6.getPitch();
-        ArrayHandle<Scalar4> h_force_6(force_array_6, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_6(virial_array_6, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_6(force_array_6, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_6(virial_array_6, access_location::host, access_mode::read);
         // the right two particles shoul only have a force pulling them right
         MY_CHECK_CLOSE(h_force_6.data[1].x, 1.125, tol);
         MY_CHECK_SMALL(h_force_6.data[1].y, tol_small);
@@ -402,15 +402,15 @@ void bond_force_comparison_tests(bondforce_creator bf_creator1,
 
         // verify that the forces are identical (within roundoff errors)
         {
-        const GPUArray<Scalar4>& force_array_7 = fc1->getForceArray();
-        const GPUArray<Scalar>& virial_array_7 = fc1->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_7 = fc1->getForceArray();
+        const GPUArray<ForceReal>& virial_array_7 = fc1->getVirialArray();
         size_t pitch = virial_array_7.getPitch();
-        ArrayHandle<Scalar4> h_force_7(force_array_7, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_7(virial_array_7, access_location::host, access_mode::read);
-        const GPUArray<Scalar4>& force_array_8 = fc2->getForceArray();
-        const GPUArray<Scalar>& virial_array_8 = fc2->getVirialArray();
-        ArrayHandle<Scalar4> h_force_8(force_array_8, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_8(virial_array_8, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_7(force_array_7, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_7(virial_array_7, access_location::host, access_mode::read);
+        const GPUArray<ForceReal4>& force_array_8 = fc2->getForceArray();
+        const GPUArray<ForceReal>& virial_array_8 = fc2->getVirialArray();
+        ArrayHandle<ForceReal4> h_force_8(force_array_8, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_8(virial_array_8, access_location::host, access_mode::read);
 
         // compare average deviation between the two computes
         double deltaf2 = 0.0;

@@ -22,8 +22,8 @@ namespace kernel
     {
 
 //! Kernel driver that computes the forces for BendingRigidityMeshForceComputeGPU
-hipError_t gpu_compute_bending_rigidity_force(Scalar4* d_force,
-                                              Scalar* d_virial,
+hipError_t gpu_compute_bending_rigidity_force(ForceReal4* d_force,
+                                              ForceReal* d_virial,
                                               const size_t virial_pitch,
                                               const unsigned int N,
                                               const Scalar4* d_pos,

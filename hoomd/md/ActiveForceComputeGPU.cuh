@@ -21,8 +21,8 @@ namespace kernel
     {
 hipError_t gpu_compute_active_force_set_forces(const unsigned int group_size,
                                                unsigned int* d_index_array,
-                                               Scalar4* d_force,
-                                               Scalar4* d_torque,
+                                               ForceReal4* d_force,
+                                               ForceReal4* d_torque,
                                                const Scalar4* d_pos,
                                                const Scalar4* d_orientation,
                                                const Scalar4* d_f_act,

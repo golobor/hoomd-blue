@@ -3072,7 +3072,7 @@ void Communicator::updateNetForce(uint64_t timestep)
         // Copy data into send buffers
         if (flags[comm_flag::net_force])
             {
-            ArrayHandle<Scalar4> h_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> h_netforce(m_pdata->getNetForce(),
                                             access_location::host,
                                             access_mode::read);
             ArrayHandle<Scalar4> h_netforce_copybuf(m_netforce_copybuf,
@@ -3111,7 +3111,7 @@ void Communicator::updateNetForce(uint64_t timestep)
             ArrayHandle<unsigned int> h_forward_ghosts_reverse(m_forward_ghosts_reverse[dir],
                                                                access_location::host,
                                                                access_mode::overwrite);
-            ArrayHandle<Scalar4> h_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> h_netforce(m_pdata->getNetForce(),
                                             access_location::host,
                                             access_mode::read);
             ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(),
@@ -3142,7 +3142,7 @@ void Communicator::updateNetForce(uint64_t timestep)
 
         if (flags[comm_flag::net_torque])
             {
-            ArrayHandle<Scalar4> h_nettorque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> h_nettorque(m_pdata->getNetTorqueArray(),
                                              access_location::host,
                                              access_mode::read);
             ArrayHandle<Scalar4> h_nettorque_copybuf(m_nettorque_copybuf,
@@ -3168,7 +3168,7 @@ void Communicator::updateNetForce(uint64_t timestep)
             }
         if (flags[comm_flag::net_virial])
             {
-            ArrayHandle<Scalar> h_netvirial(m_pdata->getNetVirial(),
+            ArrayHandle<ForceReal> h_netvirial(m_pdata->getNetVirial(),
                                             access_location::host,
                                             access_mode::read);
             ArrayHandle<Scalar> h_netvirial_copybuf(m_netvirial_copybuf,
@@ -3220,7 +3220,7 @@ void Communicator::updateNetForce(uint64_t timestep)
             m_reqs.clear();
             m_stats.clear();
 
-            ArrayHandle<Scalar4> h_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> h_netforce(m_pdata->getNetForce(),
                                             access_location::host,
                                             access_mode::readwrite);
             ArrayHandle<Scalar4> h_netforce_copybuf(m_netforce_copybuf,
@@ -3290,7 +3290,7 @@ void Communicator::updateNetForce(uint64_t timestep)
                 }
 
             // Add forces
-            ArrayHandle<Scalar4> h_netforce(m_pdata->getNetForce(),
+            ArrayHandle<ForceReal4> h_netforce(m_pdata->getNetForce(),
                                             access_location::host,
                                             access_mode::readwrite);
             ArrayHandle<Scalar4> h_netforce_reverse_recvbuf(m_netforce_reverse_recvbuf,
@@ -3329,7 +3329,7 @@ void Communicator::updateNetForce(uint64_t timestep)
             m_reqs.resize(2);
             m_stats.resize(2);
 
-            ArrayHandle<Scalar4> h_nettorque(m_pdata->getNetTorqueArray(),
+            ArrayHandle<ForceReal4> h_nettorque(m_pdata->getNetTorqueArray(),
                                              access_location::host,
                                              access_mode::readwrite);
             ArrayHandle<Scalar4> h_nettorque_copybuf(m_nettorque_copybuf,
@@ -3391,7 +3391,7 @@ void Communicator::updateNetForce(uint64_t timestep)
             ArrayHandle<Scalar> h_netvirial_recvbuf(m_netvirial_recvbuf,
                                                     access_location::host,
                                                     access_mode::read);
-            ArrayHandle<Scalar> h_netvirial(m_pdata->getNetVirial(),
+            ArrayHandle<ForceReal> h_netvirial(m_pdata->getNetVirial(),
                                             access_location::host,
                                             access_mode::read);
 

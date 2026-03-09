@@ -27,7 +27,7 @@ __global__ void gpu_fill_matrix_vector_kernel(unsigned int n_constraint,
                                               unsigned int* d_constraint_violated,
                                               const Scalar4* d_pos,
                                               const Scalar4* d_vel,
-                                              const Scalar4* d_netforce,
+                                              const ForceReal4* d_netforce,
                                               const group_storage<2>* d_gpu_clist,
                                               const Index2D gpu_clist_indexer,
                                               const unsigned int* d_gpu_n_constraints,
@@ -163,11 +163,12 @@ __global__ void gpu_fill_matrix_vector_kernel(unsigned int n_constraint,
         if (cpos == 0 || idx_na >= nptl_local || idx_nb >= nptl_local)
             {
             // fill vector component
+            ForceReal4 fa_raw = d_netforce[idx_na]; ForceReal4 fb_raw = d_netforce[idx_nb];
             d_vec[n] = (dot(qn, qn) - d * d) / deltaT / deltaT
                        + double(2.0)
                              * dot(qn,
-                                   vec3<Scalar>(d_netforce[idx_na]) / ma
-                                       - vec3<Scalar>(d_netforce[idx_nb]) / mb);
+                                   vec3<Scalar>(Scalar(fa_raw.x), Scalar(fa_raw.y), Scalar(fa_raw.z)) / ma
+                                       - vec3<Scalar>(Scalar(fb_raw.x), Scalar(fb_raw.y), Scalar(fb_raw.z)) / mb);
             }
         }
     }
@@ -183,7 +184,7 @@ hipError_t gpu_fill_matrix_vector(unsigned int n_constraint,
                                   unsigned int* d_constraint_violated,
                                   const Scalar4* d_pos,
                                   const Scalar4* d_vel,
-                                  const Scalar4* d_netforce,
+                                  const ForceReal4* d_netforce,
                                   const group_storage<2>* d_gpu_clist,
                                   const Index2D& gpu_clist_indexer,
                                   const unsigned int* d_gpu_n_constraints,
@@ -238,8 +239,8 @@ __global__ void gpu_fill_constraint_forces_kernel(unsigned int nptl_local,
                                                   const unsigned int* d_gpu_n_constraints,
                                                   const unsigned int* d_gpu_cpos,
                                                   double* d_lagrange,
-                                                  Scalar4* d_force,
-                                                  Scalar* d_virial,
+                                                  ForceReal4* d_force,
+                                                  ForceReal* d_virial,
                                                   size_t virial_pitch,
                                                   const BoxDim box)
     {
@@ -317,7 +318,7 @@ __global__ void gpu_fill_constraint_forces_kernel(unsigned int nptl_local,
             }
         }
 
-    d_force[idx] = make_scalar4(f.x, f.y, f.z, Scalar(0.0));
+    d_force[idx] = make_forcereal4(ForceReal(f.x), ForceReal(f.y), ForceReal(f.z), ForceReal(0.0));
 
     d_virial[0 * virial_pitch + idx] = virialxx;
     d_virial[1 * virial_pitch + idx] = virialxy;
@@ -382,8 +383,8 @@ hipError_t gpu_compute_constraint_forces(const Scalar4* d_pos,
                                          const Index2D& gpu_clist_indexer,
                                          const unsigned int* d_gpu_n_constraints,
                                          const unsigned int* d_gpu_cpos,
-                                         Scalar4* d_force,
-                                         Scalar* d_virial,
+                                         ForceReal4* d_force,
+                                         ForceReal* d_virial,
                                          size_t virial_pitch,
                                          const BoxDim box,
                                          unsigned int nptl_local,

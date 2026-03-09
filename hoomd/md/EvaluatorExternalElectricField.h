@@ -75,12 +75,12 @@ class EvaluatorExternalElectricField
         \param box box dimensions
         \param params per-type parameters of external potential
     */
-    DEVICE EvaluatorExternalElectricField(Scalar3 X,
+    DEVICE EvaluatorExternalElectricField(ForceReal3 X,
                                           quat<Scalar> q,
                                           const BoxDim& box,
                                           const param_type& params,
                                           const field_type& field)
-        : m_pos(X), m_box(box), m_E(params.E)
+        : m_pos(X), m_box(box), m_E(make_forcereal3(ForceReal(params.E.x), ForceReal(params.E.y), ForceReal(params.E.z)))
         {
         }
 
@@ -93,7 +93,7 @@ class EvaluatorExternalElectricField
     //! Accept the optional charge value
     /*! \param qi Charge of particle i
      */
-    DEVICE void setCharge(Scalar qi)
+    DEVICE void setCharge(ForceReal qi)
         {
         m_qi = qi;
         }
@@ -113,7 +113,7 @@ class EvaluatorExternalElectricField
         \param virial array of six scalars for the upper triangular virial tensor
     */
     DEVICE void
-    evalForceTorqueEnergyAndVirial(Scalar3& F, Scalar3& T, Scalar& energy, Scalar* virial)
+    evalForceTorqueEnergyAndVirial(ForceReal3& F, ForceReal3& T, ForceReal& energy, ForceReal* virial)
         {
         F = m_qi * m_E;
         energy = -m_qi * dot(m_E, m_pos);
@@ -125,9 +125,9 @@ class EvaluatorExternalElectricField
         virial[4] = F.y * m_pos.z;
         virial[5] = F.z * m_pos.z;
 
-        T.x = Scalar(0.0);
-        T.y = Scalar(0.0);
-        T.z = Scalar(0.0);
+        T.x = ForceReal(0.0);
+        T.y = ForceReal(0.0);
+        T.z = ForceReal(0.0);
         }
 
 #ifndef __HIPCC__
@@ -141,10 +141,10 @@ class EvaluatorExternalElectricField
 #endif
 
     protected:
-    Scalar3 m_pos; //!< particle position
-    BoxDim m_box;  //!< box dimensions
-    Scalar m_qi;   //!< particle charge
-    Scalar3 m_E;   //!< the field vector
+    ForceReal3 m_pos; //!< particle position
+    BoxDim m_box;     //!< box dimensions
+    ForceReal m_qi;   //!< particle charge
+    ForceReal3 m_E;   //!< the field vector
     };
 
     } // end namespace md

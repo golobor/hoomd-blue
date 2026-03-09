@@ -78,11 +78,11 @@ void improper_force_basic_tests(improperforce_creator tf_creator,
     fc_4->compute(0);
 
         {
-        const GPUArray<Scalar4>& force_array_1 = fc_4->getForceArray();
-        const GPUArray<Scalar>& virial_array_1 = fc_4->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_1 = fc_4->getForceArray();
+        const GPUArray<ForceReal>& virial_array_1 = fc_4->getVirialArray();
         size_t pitch = virial_array_1.getPitch();
-        ArrayHandle<Scalar4> h_force_1(force_array_1, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_1(virial_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_1(force_array_1, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_1(virial_array_1, access_location::host, access_mode::read);
 
         // check that the force is correct, it should be 0 since we haven't created any impropers
         // yet
@@ -113,11 +113,11 @@ void improper_force_basic_tests(improperforce_creator tf_creator,
 
         {
         // this time there should be a force
-        const GPUArray<Scalar4>& force_array_2 = fc_4->getForceArray();
-        const GPUArray<Scalar>& virial_array_2 = fc_4->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_2 = fc_4->getForceArray();
+        const GPUArray<ForceReal>& virial_array_2 = fc_4->getVirialArray();
         size_t pitch = virial_array_2.getPitch();
-        ArrayHandle<Scalar4> h_force_2(force_array_2, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_2(virial_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_2(force_array_2, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_2(virial_array_2, access_location::host, access_mode::read);
         MY_CHECK_CLOSE(h_force_2.data[0].x, 0.5 * 0.0246093274, tol);
         MY_CHECK_CLOSE(h_force_2.data[0].y, -0.5 * 0.178418, tol);
         MY_CHECK_CLOSE(h_force_2.data[0].z, -0.5 * 0.221484, tol);
@@ -181,11 +181,11 @@ void improper_force_basic_tests(improperforce_creator tf_creator,
     fc_4->compute(1);
 
         {
-        const GPUArray<Scalar4>& force_array_3 = fc_4->getForceArray();
-        const GPUArray<Scalar>& virial_array_3 = fc_4->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_3 = fc_4->getForceArray();
+        const GPUArray<ForceReal>& virial_array_3 = fc_4->getVirialArray();
         size_t pitch = virial_array_3.getPitch();
-        ArrayHandle<Scalar4> h_force_3(force_array_3, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_3(virial_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_3(force_array_3, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_3(virial_array_3, access_location::host, access_mode::read);
 
         MY_CHECK_CLOSE(h_force_3.data[1].x, 0.5 * 0.0246093274, tol);
         MY_CHECK_CLOSE(h_force_3.data[1].y, -0.5 * 0.178418, tol);
@@ -255,11 +255,11 @@ void improper_force_basic_tests(improperforce_creator tf_creator,
 
         {
         // check that the forces are correctly computed
-        const GPUArray<Scalar4>& force_array_4 = fc_8->getForceArray();
-        const GPUArray<Scalar>& virial_array_4 = fc_8->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_4 = fc_8->getForceArray();
+        const GPUArray<ForceReal>& virial_array_4 = fc_8->getVirialArray();
         size_t pitch = virial_array_4.getPitch();
-        ArrayHandle<Scalar4> h_force_4(force_array_4, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_4(virial_array_4, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_4(force_array_4, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_4(virial_array_4, access_location::host, access_mode::read);
         /*
          FORCE 1: fx = -0.000000  fy = 0.000000  fz = 0.275672
          FORCE 2: fx = -0.150230  fy = 0.070010  fz = 0.148276
@@ -402,11 +402,11 @@ void improper_force_basic_tests(improperforce_creator tf_creator,
     fc_5->compute(0);
 
         {
-        const GPUArray<Scalar4>& force_array_5 = fc_5->getForceArray();
-        const GPUArray<Scalar>& virial_array_5 = fc_5->getVirialArray();
+        const GPUArray<ForceReal4>& force_array_5 = fc_5->getForceArray();
+        const GPUArray<ForceReal>& virial_array_5 = fc_5->getVirialArray();
         size_t pitch = virial_array_5.getPitch();
-        ArrayHandle<Scalar4> h_force_5(force_array_5, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_5(virial_array_5, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_force_5(force_array_5, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_5(virial_array_5, access_location::host, access_mode::read);
 
         MY_CHECK_CLOSE(h_force_5.data[0].x, 0.5 * 0.304428, tol);
         MY_CHECK_CLOSE(h_force_5.data[0].y, 0.5 * 0.0141169504, loose_tol);
@@ -495,14 +495,14 @@ void improper_force_comparison_tests(improperforce_creator tf_creator1,
 
         {
         // verify that the forces are identical (within roundoff errors)
-        const GPUArray<Scalar4>& force_array_6 = fc1->getForceArray();
-        const GPUArray<Scalar>& virial_array_6 = fc1->getVirialArray();
-        ArrayHandle<Scalar4> h_force_6(force_array_6, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_6(virial_array_6, access_location::host, access_mode::read);
-        const GPUArray<Scalar4>& force_array_7 = fc2->getForceArray();
-        const GPUArray<Scalar>& virial_array_7 = fc2->getVirialArray();
-        ArrayHandle<Scalar4> h_force_7(force_array_7, access_location::host, access_mode::read);
-        ArrayHandle<Scalar> h_virial_7(virial_array_7, access_location::host, access_mode::read);
+        const GPUArray<ForceReal4>& force_array_6 = fc1->getForceArray();
+        const GPUArray<ForceReal>& virial_array_6 = fc1->getVirialArray();
+        ArrayHandle<ForceReal4> h_force_6(force_array_6, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_6(virial_array_6, access_location::host, access_mode::read);
+        const GPUArray<ForceReal4>& force_array_7 = fc2->getForceArray();
+        const GPUArray<ForceReal>& virial_array_7 = fc2->getVirialArray();
+        ArrayHandle<ForceReal4> h_force_7(force_array_7, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal> h_virial_7(virial_array_7, access_location::host, access_mode::read);
 
         // compare average deviation between the two computes
         double deltaf2 = 0.0;

@@ -68,8 +68,8 @@ void CosineSqAngleForceComputeGPU::computeForces(uint64_t timestep)
 
     BoxDim box = m_pdata->getGlobalBox();
 
-    ArrayHandle<Scalar4> d_force(m_force, access_location::device, access_mode::overwrite);
-    ArrayHandle<Scalar> d_virial(m_virial, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);
+    ArrayHandle<ForceReal> d_virial(m_virial, access_location::device, access_mode::overwrite);
     ArrayHandle<Scalar2> d_params(m_params, access_location::device, access_mode::read);
 
     ArrayHandle<AngleData::members_t> d_gpu_anglelist(m_angle_data->getGPUTable(),

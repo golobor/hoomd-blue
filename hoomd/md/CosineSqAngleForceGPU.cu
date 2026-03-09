@@ -33,8 +33,8 @@ namespace kernel
     \param pitch Pitch of 2D angles list
     \param n_angles_list List of numbers of angles stored on the GPU
 */
-__global__ void gpu_compute_cosinesq_angle_forces_kernel(Scalar4* d_force,
-                                                         Scalar* d_virial,
+__global__ void gpu_compute_cosinesq_angle_forces_kernel(ForceReal4* d_force,
+                                                         ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
                                                          const Scalar4* d_pos,
@@ -60,7 +60,7 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(Scalar4* d_force,
     Scalar3 a_pos, b_pos, c_pos; // allocate space for the a,b, and c atom in the a-b-c triplet
 
     // initialize the force to 0
-    Scalar4 force_idx = make_scalar4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force_idx = make_forcereal4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
 
     Scalar fab[3], fcb[3];
 
@@ -215,8 +215,8 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(Scalar4* d_force,
     \a d_params should include one Scalar2 element per angle type. The x component contains K the
    spring constant and the y component contains t_0 the equilibrium angle.
 */
-hipError_t gpu_compute_cosinesq_angle_forces(Scalar4* d_force,
-                                             Scalar* d_virial,
+hipError_t gpu_compute_cosinesq_angle_forces(ForceReal4* d_force,
+                                             ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
                                              const Scalar4* d_pos,

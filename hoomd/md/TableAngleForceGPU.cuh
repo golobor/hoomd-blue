@@ -21,8 +21,8 @@ namespace md
 namespace kernel
     {
 //! Kernel driver that computes table forces on the GPU for TableAngleForceGPU
-hipError_t gpu_compute_table_angle_forces(Scalar4* d_force,
-                                          Scalar* d_virial,
+hipError_t gpu_compute_table_angle_forces(ForceReal4* d_force,
+                                          ForceReal* d_virial,
                                           const size_t virial_pitch,
                                           const unsigned int N,
                                           const Scalar4* d_pos,

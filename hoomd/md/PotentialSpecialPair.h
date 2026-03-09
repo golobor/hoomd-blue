@@ -187,8 +187,8 @@ template<class evaluator> void PotentialSpecialPair<evaluator>::computeForces(ui
     ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
     ArrayHandle<Scalar> h_charge(m_pdata->getCharges(), access_location::host, access_mode::read);
 
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::readwrite);
-    ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::readwrite);
+    ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::readwrite);
 
     // access the parameters
     ArrayHandle<param_type> h_params(m_params, access_location::host, access_mode::read);

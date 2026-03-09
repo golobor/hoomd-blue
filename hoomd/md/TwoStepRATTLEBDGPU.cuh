@@ -64,10 +64,10 @@ hipError_t gpu_rattle_brownian_step_one(Scalar4* d_pos,
                                         const unsigned int* d_tag,
                                         const unsigned int* d_group_members,
                                         const unsigned int group_size,
-                                        const Scalar4* d_net_force,
+                                        const ForceReal4* d_net_force,
                                         const Scalar3* d_gamma_r,
                                         Scalar4* d_orientation,
-                                        Scalar4* d_torque,
+                                        ForceReal4* d_torque,
                                         const Scalar3* d_inertia,
                                         Scalar4* d_angmom,
                                         const rattle_bd_step_one_args& rattle_bd_args,
@@ -80,8 +80,8 @@ hipError_t gpu_rattle_brownian_step_one(Scalar4* d_pos,
 
 template<class Manifold>
 hipError_t gpu_include_rattle_force_bd(const Scalar4* d_pos,
-                                       Scalar4* d_net_force,
-                                       Scalar* d_net_virial,
+                                       ForceReal4* d_net_force,
+                                       ForceReal* d_net_virial,
                                        const unsigned int* d_tag,
                                        const unsigned int* d_group_members,
                                        const unsigned int group_size,
@@ -101,10 +101,10 @@ __global__ void gpu_rattle_brownian_step_one_kernel(Scalar4* d_pos,
                                                     const unsigned int* d_tag,
                                                     const unsigned int* d_group_members,
                                                     const unsigned int nwork,
-                                                    const Scalar4* d_net_force,
+                                                    const ForceReal4* d_net_force,
                                                     const Scalar3* d_gamma_r,
                                                     Scalar4* d_orientation,
-                                                    Scalar4* d_torque,
+                                                    ForceReal4* d_torque,
                                                     const Scalar3* d_inertia,
                                                     Scalar4* d_angmom,
                                                     const Scalar* d_gamma,
@@ -155,7 +155,7 @@ __global__ void gpu_rattle_brownian_step_one_kernel(Scalar4* d_pos,
 
         Scalar4 postype = d_pos[idx];
         Scalar4 vel = d_vel[idx];
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
         int3 image = d_image[idx];
 
         // calculate the magnitude of the random force
@@ -263,7 +263,7 @@ __global__ void gpu_rattle_brownian_step_one_kernel(Scalar4* d_pos,
                 {
                 vec3<Scalar> p_vec;
                 quat<Scalar> q(d_orientation[idx]);
-                vec3<Scalar> t(d_torque[idx]);
+                ForceReal4 t_raw = d_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
                 vec3<Scalar> I(d_inertia[idx]);
 
                 // check if the shape is degenerate
@@ -357,10 +357,10 @@ hipError_t gpu_rattle_brownian_step_one(Scalar4* d_pos,
                                         const unsigned int* d_tag,
                                         const unsigned int* d_group_members,
                                         const unsigned int group_size,
-                                        const Scalar4* d_net_force,
+                                        const ForceReal4* d_net_force,
                                         const Scalar3* d_gamma_r,
                                         Scalar4* d_orientation,
-                                        Scalar4* d_torque,
+                                        ForceReal4* d_torque,
                                         const Scalar3* d_inertia,
                                         Scalar4* d_angmom,
                                         const rattle_bd_step_one_args& rattle_bd_args,
@@ -424,8 +424,8 @@ hipError_t gpu_rattle_brownian_step_one(Scalar4* d_pos,
 
 template<class Manifold>
 __global__ void gpu_include_rattle_force_bd_kernel(const Scalar4* d_pos,
-                                                   Scalar4* d_net_force,
-                                                   Scalar* d_net_virial,
+                                                   ForceReal4* d_net_force,
+                                                   ForceReal* d_net_virial,
                                                    const unsigned int* d_tag,
                                                    const unsigned int* d_group_members,
                                                    const unsigned int nwork,
@@ -466,7 +466,7 @@ __global__ void gpu_include_rattle_force_bd_kernel(const Scalar4* d_pos,
         unsigned int tag = d_tag[idx];
 
         Scalar4 postype = d_pos[idx];
-        Scalar4 net_force = d_net_force[idx];
+        ForceReal4 net_force = d_net_force[idx];
         Scalar3 brownian_force = make_scalar3(0, 0, 0);
 
         Scalar virial0 = d_net_virial[0 * net_virial_pitch + idx];
@@ -596,8 +596,8 @@ __global__ void gpu_include_rattle_force_bd_kernel(const Scalar4* d_pos,
 
 template<class Manifold>
 hipError_t gpu_include_rattle_force_bd(const Scalar4* d_pos,
-                                       Scalar4* d_net_force,
-                                       Scalar* d_net_virial,
+                                       ForceReal4* d_net_force,
+                                       ForceReal* d_net_virial,
                                        const unsigned int* d_tag,
                                        const unsigned int* d_group_members,
                                        const unsigned int group_size,

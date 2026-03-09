@@ -308,8 +308,8 @@ template<class evaluator> void PotentialTersoff<evaluator>::computeForces(uint64
                                    access_mode::read);
 
         // force and virial arrays
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
 
         PDataFlags flags = this->m_pdata->getFlags();
         bool compute_virial = flags[pdata_flag::pressure_tensor];
@@ -571,8 +571,8 @@ template<class evaluator> void PotentialTersoff<evaluator>::computeForces(uint64
                                    access_mode::read);
 
         // force and virial arrays
-        ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-        ArrayHandle<Scalar> h_virial(m_virial, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+        ArrayHandle<ForceReal> h_virial(m_virial, access_location::host, access_mode::overwrite);
 
         PDataFlags flags = this->m_pdata->getFlags();
         bool compute_virial = flags[pdata_flag::pressure_tensor];

@@ -172,8 +172,8 @@ void ActiveForceCompute::setForces()
     //  array handles
     ArrayHandle<Scalar4> h_f_actVec(m_f_activeVec, access_location::host, access_mode::read);
     ArrayHandle<Scalar4> h_t_actVec(m_t_activeVec, access_location::host, access_mode::read);
-    ArrayHandle<Scalar4> h_force(m_force, access_location::host, access_mode::overwrite);
-    ArrayHandle<Scalar4> h_torque(m_torque, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_force(m_force, access_location::host, access_mode::overwrite);
+    ArrayHandle<ForceReal4> h_torque(m_torque, access_location::host, access_mode::overwrite);
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
     ArrayHandle<Scalar4> h_orientation(m_pdata->getOrientationArray(),
                                        access_location::host,
@@ -199,13 +199,13 @@ void ActiveForceCompute::setForces()
                        h_f_actVec.data[type].w * h_f_actVec.data[type].z);
         quat<Scalar> quati(h_orientation.data[idx]);
         vec3<Scalar> fi = rotate(quati, f);
-        h_force.data[idx] = vec_to_scalar4(fi, 0);
+        h_force.data[idx] = make_forcereal4(ForceReal(fi.x), ForceReal(fi.y), ForceReal(fi.z), ForceReal(0));
 
         vec3<Scalar> t(h_t_actVec.data[type].w * h_t_actVec.data[type].x,
                        h_t_actVec.data[type].w * h_t_actVec.data[type].y,
                        h_t_actVec.data[type].w * h_t_actVec.data[type].z);
         vec3<Scalar> ti = rotate(quati, t);
-        h_torque.data[idx] = vec_to_scalar4(ti, 0);
+        h_torque.data[idx] = make_forcereal4(ForceReal(ti.x), ForceReal(ti.y), ForceReal(ti.z), ForceReal(0));
         }
     }
 

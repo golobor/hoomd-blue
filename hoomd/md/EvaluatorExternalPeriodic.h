@@ -89,7 +89,7 @@ class EvaluatorExternalPeriodic
         \param box box dimensions
         \param params per-type parameters of external potential
     */
-    DEVICE EvaluatorExternalPeriodic(Scalar3 X,
+    DEVICE EvaluatorExternalPeriodic(ForceReal3 X,
                                      quat<Scalar> q,
                                      const BoxDim& box,
                                      const param_type& params,
@@ -107,7 +107,7 @@ class EvaluatorExternalPeriodic
     //! Accept the optional charge value.
     /*! \param qi Charge of particle i
      */
-    DEVICE void setCharge(Scalar qi) { }
+    DEVICE void setCharge(ForceReal qi) { }
 
     //! Declares additional virial contributions are needed for the external field
     /*! No contributions
@@ -124,59 +124,61 @@ class EvaluatorExternalPeriodic
         \param virial array of six scalars for the upper triangular virial tensor
     */
     DEVICE void
-    evalForceTorqueEnergyAndVirial(Scalar3& F, Scalar3& T, Scalar& energy, Scalar* virial)
+    evalForceTorqueEnergyAndVirial(ForceReal3& F, ForceReal3& T, ForceReal& energy, ForceReal* virial)
         {
-        Scalar3 a2 = make_scalar3(0, 0, 0);
-        Scalar3 a3 = make_scalar3(0, 0, 0);
+        F.x = ForceReal(0.0);
+        F.y = ForceReal(0.0);
+        F.z = ForceReal(0.0);
 
-        F.x = Scalar(0.0);
-        F.y = Scalar(0.0);
-        F.z = Scalar(0.0);
+        T.x = ForceReal(0.0);
+        T.y = ForceReal(0.0);
+        T.z = ForceReal(0.0);
 
-        T.x = Scalar(0.0);
-        T.y = Scalar(0.0);
-        T.z = Scalar(0.0);
-
-        energy = Scalar(0.0);
+        energy = ForceReal(0.0);
 
         // For this potential, since it uses scaled positions, the virial is always zero.
         for (unsigned int i = 0; i < 6; i++)
-            virial[i] = Scalar(0.0);
+            virial[i] = ForceReal(0.0);
 
-        Scalar V_box = m_box.getVolume();
+        ForceReal V_box = ForceReal(m_box.getVolume());
         // compute the vector pointing from P to V
+        Scalar3 a2_s = make_scalar3(0, 0, 0);
+        Scalar3 a3_s = make_scalar3(0, 0, 0);
         if (m_index == 0)
             {
-            a2 = m_box.getLatticeVector(1);
-            a3 = m_box.getLatticeVector(2);
+            a2_s = m_box.getLatticeVector(1);
+            a3_s = m_box.getLatticeVector(2);
             }
         else if (m_index == 1)
             {
-            a2 = m_box.getLatticeVector(2);
-            a3 = m_box.getLatticeVector(0);
+            a2_s = m_box.getLatticeVector(2);
+            a3_s = m_box.getLatticeVector(0);
             }
         else if (m_index == 2)
             {
-            a2 = m_box.getLatticeVector(0);
-            a3 = m_box.getLatticeVector(1);
+            a2_s = m_box.getLatticeVector(0);
+            a3_s = m_box.getLatticeVector(1);
             }
 
-        Scalar3 b = Scalar(2.0 * M_PI)
-                    * make_scalar3(a2.y * a3.z - a2.z * a3.y,
+        ForceReal3 a2 = make_forcereal3(ForceReal(a2_s.x), ForceReal(a2_s.y), ForceReal(a2_s.z));
+        ForceReal3 a3 = make_forcereal3(ForceReal(a3_s.x), ForceReal(a3_s.y), ForceReal(a3_s.z));
+
+        ForceReal3 b = ForceReal(2.0 * M_PI)
+                    * make_forcereal3(a2.y * a3.z - a2.z * a3.y,
                                    a2.z * a3.x - a2.x * a3.z,
                                    a2.x * a3.y - a2.y * a3.x)
                     / V_box;
-        Scalar clipParameter, arg, clipcos, tanH, sechSq;
+        ForceReal clipParameter, arg, clipcos, tanH, sechSq;
 
-        Scalar3 q = b * m_periodicity;
-        clipParameter = Scalar(1.0) / Scalar(2.0 * M_PI) / (m_periodicity * m_interfaceWidth);
+        ForceReal3 q = b * ForceReal(m_periodicity);
+        clipParameter = ForceReal(1.0) / ForceReal(2.0 * M_PI) / (ForceReal(m_periodicity) * ForceReal(m_interfaceWidth));
         arg = dot(m_pos, q);
         clipcos = clipParameter * fast::cos(arg);
         tanH = slow::tanh(clipcos);
-        sechSq = (Scalar(1.0) - tanH * tanH);
+        sechSq = (ForceReal(1.0) - tanH * tanH);
 
-        F = m_orderParameter * sechSq * clipParameter * fast::sin(arg) * q;
-        energy = m_orderParameter * tanH;
+        F = ForceReal(m_orderParameter) * sechSq * clipParameter * fast::sin(arg) * q;
+        energy = ForceReal(m_orderParameter) * tanH;
         }
 
 #ifndef __HIPCC__
@@ -190,8 +192,8 @@ class EvaluatorExternalPeriodic
 #endif
 
     protected:
-    Scalar3 m_pos; //!< particle position
-    BoxDim m_box;  //!< box dimensions
+    ForceReal3 m_pos; //!< particle position
+    BoxDim m_box;     //!< box dimensions
     unsigned int
         m_index; //!< cartesian index of direction along which the lamellae should be oriented
     Scalar m_orderParameter;    //!< ordering parameter
