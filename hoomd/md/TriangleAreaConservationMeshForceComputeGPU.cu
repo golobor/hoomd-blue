@@ -36,7 +36,7 @@ gpu_compute_TriangleAreaConservation_force_kernel(ForceReal4* d_force,
                                                   ForceReal* d_virial,
                                                   const size_t virial_pitch,
                                                   const unsigned int N,
-                                                  const Scalar4* d_pos,
+                                                  const ForceReal4* d_pos,
                                                   BoxDim box,
                                                   const group_storage<3>* tlist,
                                                   const unsigned int* tpos_list,
@@ -55,7 +55,7 @@ gpu_compute_TriangleAreaConservation_force_kernel(ForceReal4* d_force,
     int n_triangles = n_triangles_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     Scalar3 pos_a = make_scalar3(postype.x, postype.y, postype.z);
 
     ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
@@ -78,11 +78,11 @@ gpu_compute_TriangleAreaConservation_force_kernel(ForceReal4* d_force,
         int cur_triangle_type = cur_triangle.idx[2];
 
         // get the b-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 bb_postype = d_pos[cur_mem2_idx];
+        ForceReal4 bb_postype = d_pos[cur_mem2_idx];
         Scalar3 pos_b = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
 
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 cc_postype = d_pos[cur_mem3_idx];
+        ForceReal4 cc_postype = d_pos[cur_mem3_idx];
         Scalar3 pos_c = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
 
         Scalar3 dab, dac;
@@ -196,7 +196,7 @@ hipError_t gpu_compute_TriangleAreaConservation_force(ForceReal4* d_force,
                                                       ForceReal* d_virial,
                                                       const size_t virial_pitch,
                                                       const unsigned int N,
-                                                      const Scalar4* d_pos,
+                                                      const ForceReal4* d_pos,
                                                       const BoxDim& box,
                                                       const group_storage<3>* tlist,
                                                       const unsigned int* tpos_list,

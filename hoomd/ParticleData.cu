@@ -7,6 +7,48 @@
     \brief ImplementsGPU kernel code and data structure functions used by ParticleData
 */
 
+#ifdef HOOMD_MIXED_PRECISION
+namespace hoomd
+    {
+namespace kernel
+    {
+//! Kernel to convert Scalar4 positions to ForceReal4 (double4 → float4)
+//! .w stores particle type as int bits; must be re-packed, not cast
+__global__ void gpu_sync_pos_forcereal_kernel(ForceReal4* d_pos_forcereal,
+                                              const Scalar4* d_pos,
+                                              unsigned int N)
+    {
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= N)
+        return;
+    Scalar4 p = d_pos[idx];
+    // Extract type integer from double .w and re-pack into float .w
+    int type_int = __scalar_as_int(p.w);
+    d_pos_forcereal[idx]
+        = make_forcereal4(ForceReal(p.x), ForceReal(p.y), ForceReal(p.z), __int_as_forcereal(type_int));
+    }
+
+void gpu_sync_pos_forcereal(ForceReal4* d_pos_forcereal,
+                            const Scalar4* d_pos,
+                            unsigned int N)
+    {
+    if (N == 0)
+        return;
+    unsigned int block_size = 256;
+    unsigned int n_blocks = (N + block_size - 1) / block_size;
+    hipLaunchKernelGGL(gpu_sync_pos_forcereal_kernel,
+                       dim3(n_blocks),
+                       dim3(block_size),
+                       0,
+                       0,
+                       d_pos_forcereal,
+                       d_pos,
+                       N);
+    }
+    } // end namespace kernel
+    } // end namespace hoomd
+#endif
+
 #ifdef ENABLE_MPI
 
 #pragma GCC diagnostic push

@@ -117,6 +117,13 @@ void gpu_pdata_add_particles(const unsigned int old_nparticles,
                              unsigned int* d_rtag,
                              const detail::pdata_element* d_in,
                              unsigned int* d_comm_flags);
+
+#ifdef HOOMD_MIXED_PRECISION
+//! Sync float4 position mirror from double4 positions on the GPU
+void gpu_sync_pos_forcereal(ForceReal4* d_pos_forcereal,
+                            const Scalar4* d_pos,
+                            unsigned int N);
+#endif
     } // end namespace kernel
 
     } // end namespace hoomd

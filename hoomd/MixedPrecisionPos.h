@@ -33,22 +33,17 @@ namespace hoomd
 #ifdef __HIPCC__
 
 //! Load position as ForceReal4 for use in force evaluation kernels.
-/*! In mixed precision, this narrows double -> float. In uniform precision, this is a no-op cast.
+/*! In mixed precision with float4 mirror, this reads directly from the float4 array.
+    In uniform precision, this is a no-op cast.
     The .w component (particle type as int-in-float) is preserved.
-    \param d_pos Device pointer to positions (Scalar4)
+    \param d_pos_forcereal Device pointer to float4 position mirror (ForceReal4)
     \param idx Particle index
     \returns ForceReal4 position (lower precision for force evaluation)
 */
-__device__ inline ForceReal4 loadPosForceReal(const Scalar4* __restrict__ d_pos,
+__device__ inline ForceReal4 loadPosForceReal(const ForceReal4* __restrict__ d_pos_forcereal,
                                               unsigned int idx)
     {
-    Scalar4 pos = d_pos[idx];
-    ForceReal4 result;
-    result.x = static_cast<ForceReal>(pos.x);
-    result.y = static_cast<ForceReal>(pos.y);
-    result.z = static_cast<ForceReal>(pos.z);
-    result.w = static_cast<ForceReal>(pos.w); // type tag
-    return result;
+    return d_pos_forcereal[idx];
     }
 
 #ifdef HOOMD_MIXED_PRECISION
@@ -73,30 +68,40 @@ __device__ inline Scalar4 loadPosFull(const Scalar4* __restrict__ d_pos,
     return pos;
     }
 
-//! Store full-precision position, splitting into main + correction.
-/*! Stores the position and computes the correction = full_pos - ForceReal(full_pos).
-    This ensures that when force kernels read the position as ForceReal, the integrator
-    can reconstruct the full double-precision value.
+//! Store full-precision position, splitting into main + correction + float4 mirror.
+/*! Stores the position, computes the correction = full_pos - ForceReal(full_pos),
+    and also writes the narrowed float4 to the position mirror array.
     \param d_pos Device pointer to positions (Scalar4)
     \param d_pos_correction Device pointer to position corrections (Scalar4)
+    \param d_pos_forcereal Device pointer to float4 position mirror (ForceReal4)
     \param idx Particle index
     \param pos Full double-precision position to store (Scalar4, .w = type tag)
 */
 __device__ inline void storePosFull(Scalar4* __restrict__ d_pos,
                                     Scalar4* __restrict__ d_pos_correction,
+                                    ForceReal4* __restrict__ d_pos_forcereal,
                                     unsigned int idx,
                                     const Scalar4& pos)
     {
     // Store the main position
     d_pos[idx] = pos;
 
-    // Compute correction: what gets lost when narrowing to ForceReal
+    // Compute and store correction: what gets lost when narrowing to ForceReal
     Scalar4 corr;
     corr.x = pos.x - static_cast<Scalar>(static_cast<ForceReal>(pos.x));
     corr.y = pos.y - static_cast<Scalar>(static_cast<ForceReal>(pos.y));
     corr.z = pos.z - static_cast<Scalar>(static_cast<ForceReal>(pos.z));
     corr.w = Scalar(0.0);
     d_pos_correction[idx] = corr;
+
+    // Write float4 mirror for force kernels
+    // .w stores particle type as int bits; re-pack via __int_as_forcereal
+    ForceReal4 pos_fr;
+    pos_fr.x = static_cast<ForceReal>(pos.x);
+    pos_fr.y = static_cast<ForceReal>(pos.y);
+    pos_fr.z = static_cast<ForceReal>(pos.z);
+    pos_fr.w = __int_as_forcereal(__scalar_as_int(pos.w));
+    d_pos_forcereal[idx] = pos_fr;
     }
 
 #else // !HOOMD_MIXED_PRECISION
@@ -109,9 +114,12 @@ __device__ inline Scalar4 loadPosFull(const Scalar4* __restrict__ d_pos,
     return d_pos[idx];
     }
 
-//! Store full-precision position (no correction needed in uniform precision).
+//! Store full-precision position (no correction in uniform precision, no separate mirror).
+/*! In uniform precision ForceReal4 == Scalar4, so d_pos IS the forcereal array.
+*/
 __device__ inline void storePosFull(Scalar4* __restrict__ d_pos,
                                     Scalar4* __restrict__ /* d_pos_correction */,
+                                    Scalar4* __restrict__ /* d_pos_forcereal */,
                                     unsigned int idx,
                                     const Scalar4& pos)
     {

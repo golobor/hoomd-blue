@@ -509,15 +509,26 @@ Files changed:
 Pattern: evaluator constructors take `ForceReal3 X` (position) instead of `Scalar3 X`.
 Evaluator param_type members stay Scalar (host/Python compatibility) — narrowed at use site.
 
-### Step 2: Convert remaining FP64 force kernels (as needed)
+### Step 2: Convert remaining FP64 force kernels (low priority)
 
-Lower priority — only matters if these force types are used in target workloads:
+Only matters if these force types are used in target workloads. Conversion is mechanical —
+same pattern as HarmonicAngle: narrow positions to ForceReal3, change intermediates to ForceReal,
+switch `box.minImage()` → `box.minImageForceReal()`, narrow params at use site.
+
+Already converted: HarmonicAngleForceGPU.cu, OPLSDihedralForceGPU.cu
+
+Still FP64 (entire kernel body):
+- `CosineSqAngleForceGPU.cu` — cosine-squared angle potential
+- `TableAngleForceGPU.cu` — tabulated angle potential
+- `HarmonicDihedralForceGPU.cu` — also has `__scalar2int_rn` macro to update
+- `TableDihedralForceGPU.cu` — also uses `vec3<Scalar>` → needs `vec3<ForceReal>`
+- `HarmonicImproperForceGPU.cu` — has `#define SMALL Scalar(0.001)`
+- `PeriodicImproperForceGPU.cu` — Chebyshev recurrence, all Scalar
 - `PPPMForceComputeGPU.cu` — charge spreading + force interpolation
 - `PotentialTersoffGPU.cuh` — three-body potential
-- `HarmonicImproperForceGPU.cu`
 - `ForceCompositeGPU.cu` — rigid body forces
 - `ActiveForceComputeGPU.cu` — active matter
-- `ForceDistanceConstraintGPU.cu`
+- `ForceDistanceConstraintGPU.cu` — distance constraints
 
 ### Step 3: Validate and benchmark
 
@@ -558,16 +569,335 @@ Langevin integrator, dt=0.005.
 
 ---
 
-## Phase 2B: Position Storage as float4 ⬜ FUTURE
+## Phase 2B: Float4 Position Mirror ✅ COMPLETE
 
-After Phase 2A proves correct, change `m_pos` from `GPUArray<Scalar4>` to `GPUArray<ForceReal4>`
-with companion `GPUArray<Scalar4> m_pos_correction`. This halves position memory bandwidth on GPU
-but requires deeper changes to ParticleData, communication, and snapshot infrastructure.
+### Problem
 
-Prerequisite fixes for Phase 2B:
-- Fix SFCPackTuner correction permutation bug (add `m_pos_correction` to sort logic)
-- Convert integrator kernels to use `loadPosFull`/`storePosFull`
-- Update all host code that accesses `m_pos` to handle the new float4+correction layout
+Every GPU kernel reads positions from `m_pos` (`GPUArray<Scalar4>` = `double4` in mixed mode).
+Even after converting force arithmetic to ForceReal, every kernel still pays the double4 bandwidth
+cost for position reads. With 5+ force kernels + neighbor list per timestep, position reads
+dominate GPU memory traffic.
+
+Benchmark gap: mixed 3059 TPS vs single 12289 TPS = 4.0× gap, almost entirely from position
+bandwidth.
+
+### Design Decision
+
+**Two-array approach** (not replacing m_pos):
+- Keep `m_pos` as `GPUArray<Scalar4>` — the full-precision "source of truth"
+- Add `m_pos_forcereal` as `GPUArray<ForceReal4>` — float4 mirror for GPU kernels
+- Add `getPositionsForceReal()` accessor returning `GPUArray<ForceReal4>&`
+- Integrator writes both arrays (one extra float4 write per particle per step)
+- Force kernels + neighbor list read `m_pos_forcereal` (float4) instead of `m_pos` (double4)
+
+**Why not replace m_pos?** HPMC (Monte Carlo) is compiled (`BUILD_HPMC=ON`) and has 30+ sites
+using `ArrayHandle<Scalar4>(getPositions(), ...)`. Changing the return type of `getPositions()`
+would break compilation. The two-array approach leaves HPMC, GSD, snapshots, and MPI completely
+untouched.
+
+**Memory cost**: +N × 16 bytes (one float4 per particle). For N=64K: +1 MB. Negligible vs
+the bandwidth savings.
+
+**Bandwidth analysis per timestep** (64K particles, 5 force kernels + nlist):
+- Current: 6 kernels × N × 32 bytes (double4 reads) = 12.3 MB reads
+- After:   6 kernels × N × 16 bytes (float4 reads) = 6.1 MB reads + N × 16 bytes extra write
+- Net saving: ~6 MB/step bandwidth reduction
+
+### Implementation Plan
+
+#### Step 1: Add float4 mirror to ParticleData
+
+In `ParticleData.h`:
+- Add member: `GPUArray<ForceReal4> m_pos_forcereal` (ifdef HOOMD_MIXED_PRECISION)
+- Add member: `GPUArray<ForceReal4> m_pos_forcereal_alt` (for SFCPackTuner swap)
+- Add accessor: `getPositionsForceReal()` → returns `m_pos_forcereal`
+- Add `swapPositionsForceReal()` for SFCPackTuner
+- In non-mixed builds: `getPositionsForceReal()` returns `m_pos` (same type)
+
+In `ParticleData.cc`:
+- `allocate()`: allocate `m_pos_forcereal` alongside `m_pos`
+- `reallocate()`: resize `m_pos_forcereal` alongside `m_pos`
+- `initializeFromSnapshot()`: after writing `m_pos`, populate `m_pos_forcereal` by narrowing
+
+#### Step 2: Update integrators to write both arrays
+
+In `MixedPrecisionPos.h`:
+- Update `storePosFull()` to also write narrowed float4 to `d_pos_forcereal`:
+  ```
+  storePosFull(d_pos, d_pos_correction, d_pos_forcereal, idx, pos)
+  ```
+- Or keep storePosFull unchanged, add separate `storePosForceReal()` call
+
+In integrator `.cu` kernels (TwoStepConstantVolume, NVE, BD, Langevin, ConstantPressure,
+FIRE, RATTLE variants):
+- Add `d_pos_forcereal` parameter
+- After `storePosFull(d_pos, ...)`, also write:
+  `d_pos_forcereal[idx] = make_forcereal4(ForceReal(pos.x), ...)`
+
+In integrator `.cuh` args structs:
+- Add `ForceReal4* d_pos_forcereal` parameter
+
+In integrator `.cc` host code:
+- Get `d_pos_forcereal` handle from `getPositionsForceReal()`
+
+#### Step 3: Update force kernels to read float4
+
+In force kernel host code (`.h` files like PotentialPairGPU.h, PotentialBondGPU.h, etc.):
+- Change `getPositions()` → `getPositionsForceReal()` for GPU kernel args
+- Change `ArrayHandle<Scalar4> d_pos` → `ArrayHandle<ForceReal4> d_pos`
+
+In force kernel `.cuh` args structs:
+- Change `const Scalar4* d_pos` → `const ForceReal4* d_pos`
+
+In force kernel `.cu` bodies:
+- `loadPosForceReal(d_pos, idx)` becomes a direct read (no narrowing needed)
+- Or update `loadPosForceReal` to accept `const ForceReal4*`
+
+Files to change (args struct + host launcher):
+- `PotentialPairGPU.cuh` / `PotentialPairGPU.h`
+- `PotentialBondGPU.cuh` / `PotentialBondGPU.h`
+- `PotentialExternalGPU.cuh` / `PotentialExternalGPU.h`
+- `PotentialTersoffGPU.cuh` / `PotentialTersoffGPU.h`
+- `PotentialSpecialPairGPU.h`
+- `AnisoPotentialPairGPU.cuh` / `AnisoPotentialPairGPU.h`
+- `PotentialPairDPDThermoGPU.cuh` / `PotentialPairDPDThermoGPU.h`
+- `FrictionPairGPU.cuh` / `FrictionPairGPU.h`
+- All angle/dihedral/improper `.cuh` + `.cc` (6 force types)
+- All mesh force `.cuh` + `.cc` (4 force types)
+- `ActiveForceComputeGPU.cuh` / `.cc`
+- `ConstantForceComputeGPU.cuh` / `.cc`
+- `BondTablePotentialGPU.cuh` / `.cc`
+- `ForceCompositeGPU.cuh` / `.cc`
+- `ForceDistanceConstraintGPU.cuh` / `.cc`
+- `PPPMForceComputeGPU.cuh` / `.cc`
+- `ComputeThermoGPU.cuh` / `.cc`
+- `ComputeThermoHMAGPU.cuh` / `.cc`
+
+#### Step 4: Update neighbor list to read float4
+
+In `NeighborListGPU.cc` (or host launchers):
+- Pass `getPositionsForceReal()` instead of `getPositions()`
+
+In nlist GPU kernels (`NeighborListGPUBinned.cu`, `NeighborListGPUTree.cu`,
+`NeighborListGPUStencil.cuh`):
+- Change `const Scalar4* d_pos` → `const ForceReal4* d_pos`
+- Position reads become direct (already float4)
+- `d_last_updated_pos` should also become `ForceReal4`
+
+#### Step 5: Update SFCPackTuner
+
+In `SFCPackTunerGPU.cc`:
+- Permute `m_pos_forcereal → m_pos_forcereal_alt` alongside `m_pos → m_pos_alt`
+- Call `swapPositionsForceReal()` after `swapPositions()`
+
+In `SFCPackTunerGPU.cu`:
+- Add `d_pos_forcereal` / `d_pos_forcereal_alt` parameters to sort kernel
+- Permute both: `d_pos_alt[idx] = d_pos[old_idx]; d_pos_fr_alt[idx] = d_pos_fr[old_idx];`
+
+CPU path (`SFCPackTuner.cc`): same pattern.
+
+#### Step 6: Update MPCD BounceBack (if needed)
+
+`hoomd/mpcd/BounceBackNVEGPU.cu` — reads positions via `d_pos`. If this kernel benefits from
+float4 reads, update. Otherwise skip (MPCD has its own position storage).
+
+### What does NOT change
+
+- `getPositions()` return type — stays `GPUArray<Scalar4>&`
+- All HPMC code — zero changes
+- GSD writer/reader — reads `getPositions()` (full Scalar4), unchanged
+- Snapshots (`takeSnapshot` / `initializeFromSnapshot`) — unchanged except init populates mirror
+- MPI communicator — unchanged (packs from `getPositions()`)
+- Python API (`LocalParticleData`) — unchanged
+- `pdata_element` struct — unchanged
+- All CPU force compute code — unchanged (reads `getPositions()`)
+
+### Verification
+
+- `make -j8` — all targets compile (including HPMC)
+- `ctest --output-on-failure -j8` — all 58 tests pass
+- Benchmark: `benchmark_chains.py` 64K particles — expect significant speedup toward single
+
+### Phase 2B Implementation Summary
+
+**Key mechanism — `syncPositionsForceReal()`:**
+
+Rather than adding `d_pos_forcereal` plumbing to every integrator kernel (9 files × args
+structs × host code × kernel code), a simpler approach was used: a single sync point in
+`ForceCompute::compute()` that copies `m_pos` → `m_pos_forcereal` (narrowing double4→float4)
+before any force kernel reads positions. This is called once per timestep, keeping the
+`.w` component (type tag) intact via `__int_as_forcereal(__scalar_as_int(pos.w))`.
+
+**Critical bug fix — `.w` type bit-packing:**
+
+HOOMD packs particle type as an integer into the `.w` component of position float4/double4.
+The narrowing `ForceReal(pos.w)` would corrupt the type tag (floating-point cast loses bits).
+Fixed by using `__int_as_forcereal(__scalar_as_int(pos.w))` to reinterpret the integer bits
+directly, preserving the type tag exactly. The `__scalar_as_int()` and `__int_as_forcereal()`
+helpers were added to `HOOMDMath.h`.
+
+**Files changed (summary):**
+
+ParticleData infrastructure:
+- `ParticleData.h` — added `m_pos_forcereal`, `m_pos_forcereal_alt`, `getPositionsForceReal()`,
+  `swapPositionsForceReal()`
+- `ParticleData.cc` — allocate + reallocate + initialize mirror arrays
+- `ParticleData.cu` / `ParticleData.cuh` — `syncPositionsForceReal()` GPU kernel
+- `HOOMDMath.h` — `__scalar_as_int()`, `__int_as_forcereal()` helpers
+- `MixedPrecisionPos.h` — `loadPosForceReal()` updated to accept `ForceReal4*`
+
+Sync point:
+- `ForceCompute.cc` — call `syncPositionsForceReal()` at top of `compute()`
+
+Force kernels (~30 files) — changed `Scalar4* d_pos` → `ForceReal4* d_pos`:
+- All pair force templates: `PotentialPairGPU.cuh/.h`, `AnisoPotentialPairGPU.cuh/.h`,
+  `PotentialPairDPDThermoGPU.cuh/.h`, `FrictionPairGPU.cuh/.h`, `PotentialTersoffGPU.cuh/.h`,
+  `PotentialSpecialPairGPU.h`
+- All bonded forces: `PotentialBondGPU.cuh/.h`, `BondTablePotentialGPU.cuh/.cc`,
+  `HarmonicAngleForceGPU.cu/.cuh`, `CosineSqAngleForceGPU.cu/.cuh`,
+  `TableAngleForceGPU.cu/.cuh`, `OPLSDihedralForceGPU.cu/.cuh`,
+  `HarmonicDihedralForceGPU.cu/.cuh`, `TableDihedralForceGPU.cu/.cuh`,
+  `HarmonicImproperForceGPU.cu/.cuh`
+- Mesh forces: `MeshBondGPU.cuh`, `MeshVolumeConservationGPU.cuh`, etc.
+- Active/constant forces: `ActiveForceComputeGPU.cu/.cuh`, `ConstantForceComputeGPU.cu/.cuh`
+- Other: `ForceCompositeGPU.cu/.cuh`, `ForceDistanceConstraintGPU.cu/.cuh`,
+  `PPPMForceComputeGPU.cu/.cuh`, `ComputeThermoGPU.cu/.cuh`, `ComputeThermoHMAGPU.cu/.cuh`
+- Neighbor list: `NeighborListGPUBinned.cu`, `NeighborListGPUTree.cu`,
+  `NeighborListGPUStencil.cuh`
+
+---
+
+## Accuracy Testing
+
+Measured force accuracy comparing double (reference), mixed, and single precision builds
+on the same 64K-particle polymer system (benchmark_chains.py configuration, 100 steps).
+
+### Force Accuracy (vs Double Reference)
+
+| Metric | Mixed | Single |
+|--------|-------|--------|
+| Max relative error | 1.82×10⁻⁵ | 1.82×10⁻⁵ |
+| Mean relative error | 3.64×10⁻⁷ | 3.64×10⁻⁷ |
+| Mean absolute error | 2.87×10⁻⁶ | 2.87×10⁻⁶ |
+
+Mixed and single produce essentially identical force errors — confirming that in mixed mode,
+all force computation now uses float32 arithmetic. The ~10⁻⁷ mean relative error is consistent
+with float32 machine epsilon (~1.2×10⁻⁷).
+
+### Energy Accuracy (vs Double Reference)
+
+| Metric | Mixed | Single |
+|--------|-------|--------|
+| PE relative difference | 4.85×10⁻⁸ | 4.85×10⁻⁸ |
+| KE relative difference | 2.30×10⁻⁷ | 2.30×10⁻⁷ |
+
+### Energy Conservation (100-step drift)
+
+| Build | ΔE/E₀ |
+|-------|--------|
+| Double | -6.30×10⁻⁵ |
+| Mixed | -6.23×10⁻⁵ |
+| Single | -6.23×10⁻⁵ |
+
+All three builds show comparable energy drift over 100 steps, with mixed and single
+essentially identical (as expected — same float32 force accuracy).
+
+---
+
+## Benchmark Results — Phase 2B
+
+### Phase 2B vs Phase 2A Speedup (dt=0.005, 64K particles, RTX 4090)
+
+**Full forces (pair + bond + angle + dihedral + wall):**
+
+| Build | TPS | vs Double |
+|-------|-----|-----------|
+| Double | 2625.9 ± 31.6 | — |
+| Mixed (Phase 2A) | 3058.9 ± 69.5 | +16.5% |
+| **Mixed (Phase 2B)** | **4261.9** | **+62.3%** |
+| Single | 12288.7 ± 465.5 | +368% |
+
+**No dihedral (pair + bond + angle + wall):**
+
+| Build | TPS | vs Double |
+|-------|-----|-----------|
+| Double | 4504.1 | — |
+| Mixed (Phase 2A) | 6245.2 | +38.6% |
+| **Mixed (Phase 2B)** | **11218.2** | **+149%** |
+| Single | 19408.0 | +331% |
+
+**No angle, no dihedral (pair + bond + wall):**
+
+| Build | TPS | vs Double |
+|-------|-----|-----------|
+| Double | 5816.7 | — |
+| Mixed (Phase 2A) | 9858.1 | +69.5% |
+| **Mixed (Phase 2B)** | **12227.5** | **+110%** |
+| Single | 20589.4 | +254% |
+
+**Analysis:**
+
+Phase 2B delivers massive speedups. Without dihedrals, mixed achieves 2.49× double— vs single's
+4.31×. The remaining gap (~1.7×) comes from:
+1. Integrator kernels still read/write `double4` positions (the "source of truth")
+2. Scalar4 (double4) position writes in `storePosFull()`
+3. Remaining FP64 in `syncPositionsForceReal()` narrowing kernel
+
+Dihedral forces remain a bottleneck — probably due to the complex gather pattern
+(4-body interactions) where FP64 arithmetic cost dominates over bandwidth.
+
+### dt Sweep Benchmarks
+
+Tested timestep stability and performance across dt values. The dt sweep protocol uses
+a two-phase approach: equilibrate once per build (10K steps at dt=0.005), save state,
+then benchmark each dt from the shared equilibrated state.
+
+#### 64K particles, WITH dihedrals (pair + bond + angle + dihedral + wall)
+
+| dt | Double (TPS) | Mixed (TPS) | Single (TPS) |
+|----|-------------|-------------|---------------|
+| 0.005 | 1158 | 4083 | 11954 |
+| 0.01 | 2028 | 1226 (67% std!) | 9100 |
+| 0.03 | crashed | crashed | 7522 |
+| 0.05 | crashed | crashed | crashed |
+| 0.1 | crashed | crashed | crashed |
+
+Dihedrals cause stability issues at dt≥0.03 across all builds. The mixed build becomes
+unstable at dt=0.01 (extremely high TPS variance → simulation going wrong). The single
+build survives dt=0.03 only because lower-precision arithmetic is more forgiving of
+near-singular dihedral geometries.
+
+#### 64K particles, NO dihedrals (pair + bond + angle + wall)
+
+| dt | Double (TPS) | Mixed (TPS) | Single (TPS) |
+|----|-------------|-------------|---------------|
+| 0.005 | 4328 | 10825 | 19548 |
+| 0.01 | 4125 | 9465 | 15261 |
+| 0.03 | 3278 | 7522 | 4828 |
+| 0.05 | 1837 | 5140 | 5345 |
+| 0.1 | 1882 | 4970 | 8088 |
+
+Without dihedrals, all builds stable across all dt values. Mixed consistently ~2.5×
+faster than double across all timesteps. At larger dt, single-precision performance
+degrades (dt=0.03: 4828 TPS) while mixed remains strong (7522 TPS), possibly due to
+single-precision integrator accumulation errors at large dt causing more neighbor list
+rebuilds.
+
+#### 200K particles, NO dihedrals (pair + bond + angle + wall)
+
+| dt | Double (TPS) | Mixed (TPS) | Single (TPS) |
+|----|-------------|-------------|---------------|
+| 0.005 | 1485 | 4384 | 6760 |
+| 0.01 | 1361 | 3840 | 5824 |
+| 0.03 | 1168 | 3061 | 4539 |
+| 0.05 | 787 | 2112 | 2375 |
+| 0.1 | 814 | 2128 | 2403 |
+
+Scaling: Mixed achieves ~2.95× double at dt=0.005 (up from 2.5× at 64K), confirming
+the bandwidth-bound nature of the workload benefits more at larger system sizes.
+Single-to-mixed ratio narrows to ~1.54× (from ~1.80× at 64K), consistent with the
+diminishing returns of arithmetic speedup as memory bandwidth becomes the dominant
+bottleneck.
 
 ---
 

@@ -57,7 +57,7 @@ Calls gpu_compute_bondtable_forces to do the leg work
 void BondTablePotentialGPU::computeForces(uint64_t timestep)
     {
     // access the particle data
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
     BoxDim box = m_pdata->getBox();
 
     // access the table data

@@ -42,7 +42,7 @@ struct dpd_pair_args_t
                     const size_t _virial_pitch,
                     const unsigned int _N,
                     const unsigned int _n_max,
-                    const Scalar4* _d_pos,
+                    const ForceReal4* _d_pos,
                     const Scalar4* _d_vel,
                     const unsigned int* _d_tag,
                     const BoxDim& _box,
@@ -74,7 +74,7 @@ struct dpd_pair_args_t
     const size_t virial_pitch; //!< Pitch of 2D virial array
     const unsigned int N;      //!< number of particles
     const unsigned int n_max;  //!< Maximum size of particle data arrays
-    const Scalar4* d_pos;      //!< particle positions
+    const ForceReal4* d_pos;      //!< particle positions
     const Scalar4* d_vel;      //!< particle velocities
     const unsigned int* d_tag; //!< particle tags
     const BoxDim box;          //!< Simulation box in GPU format
@@ -149,7 +149,7 @@ __global__ void gpu_compute_dpd_forces_kernel(ForceReal4* d_force,
                                               ForceReal* d_virial,
                                               const size_t virial_pitch,
                                               const unsigned int N,
-                                              const Scalar4* d_pos,
+                                              const ForceReal4* d_pos,
                                               const Scalar4* d_vel,
                                               const unsigned int* d_tag,
                                               BoxDim box,
@@ -207,7 +207,7 @@ __global__ void gpu_compute_dpd_forces_kernel(ForceReal4* d_force,
 
         // read in the position of our particle.
         // (MEM TRANSFER: 16 bytes)
-        Scalar4 postypei = __ldg(d_pos + idx);
+        ForceReal4 postypei = __ldg(d_pos + idx);
         ForceReal3 posi = make_forcereal3(ForceReal(postypei.x), ForceReal(postypei.y), ForceReal(postypei.z));
 
         // read in the velocity of our particle.
@@ -237,7 +237,7 @@ __global__ void gpu_compute_dpd_forces_kernel(ForceReal4* d_force,
                     }
 
                 // get the neighbor's position (MEM TRANSFER: 16 bytes)
-                Scalar4 postypej = __ldg(d_pos + cur_j);
+                ForceReal4 postypej = __ldg(d_pos + cur_j);
                 ForceReal3 posj = make_forcereal3(ForceReal(postypej.x), ForceReal(postypej.y), ForceReal(postypej.z));
 
                 // get the neighbor's position (MEM TRANSFER: 16 bytes)
@@ -260,7 +260,7 @@ __global__ void gpu_compute_dpd_forces_kernel(ForceReal4* d_force,
 
                 // access the per type pair parameters
                 unsigned int typpair
-                    = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
+                    = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
                 ForceReal rcutsq = ForceReal(s_rcutsq[typpair]);
                 typename evaluator::param_type& param = s_params[typpair];
 

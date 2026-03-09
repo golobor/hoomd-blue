@@ -45,7 +45,7 @@ struct tersoff_args_t
                    ForceReal* _d_virial,
                    size_t _virial_pitch,
                    bool _compute_virial,
-                   const Scalar4* _d_pos,
+                   const ForceReal4* _d_pos,
                    const BoxDim& _box,
                    const unsigned int* _d_n_neigh,
                    const unsigned int* _d_nlist,
@@ -68,7 +68,7 @@ struct tersoff_args_t
     ForceReal* d_virial;           //!< Virial to write out
     const size_t virial_pitch;  //!< Pitch for N*6 virial array
     bool compute_virial;        //!< True if we are supposed to compute the virial
-    const Scalar4* d_pos;       //!< particle positions
+    const ForceReal4* d_pos;       //!< particle positions
     const BoxDim box;           //!< Simulation box in GPU format
     const unsigned int*
         d_n_neigh;               //!< Device array listing the number of neighbors on each particle
@@ -173,7 +173,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                                                   const unsigned int N,
                                                   ForceReal* d_virial,
                                                   size_t virial_pitch,
-                                                  const Scalar4* d_pos,
+                                                  const ForceReal4* d_pos,
                                                   const BoxDim box,
                                                   const unsigned int* d_n_neigh,
                                                   const unsigned int* d_nlist,
@@ -221,7 +221,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
     unsigned int n_neigh = d_n_neigh[idx];
 
     // read in the position of the particle
-    Scalar4 postypei = __ldg(d_pos + idx);
+    ForceReal4 postypei = __ldg(d_pos + idx);
     Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
 
     // initialize the force to 0
@@ -258,7 +258,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                 }
 
             // read the position of j (MEM TRANSFER: 16 bytes)
-            Scalar4 postypej = __ldg(d_pos + cur_j);
+            ForceReal4 postypej = __ldg(d_pos + cur_j);
             Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
             // initialize the force on j
@@ -275,7 +275,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
 
             // access the per type-pair parameters
             unsigned int typpair
-                = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
+                = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
             Scalar rcutsq = s_rcutsq[typpair];
             const typename evaluator::param_type& param = s_params[typpair];
 
@@ -337,12 +337,12 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                     if ((cur_k > cur_j) && (cur_j > idx))
                         {
                         // get the position of neighbor k
-                        Scalar4 postypek = __ldg(d_pos + cur_k);
+                        ForceReal4 postypek = __ldg(d_pos + cur_k);
                         Scalar3 posk = make_scalar3(postypek.x, postypek.y, postypek.z);
 
                         // get the type pair parameters for i and k
                         typpair
-                            = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypek.w));
+                            = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypek.w));
                         Scalar temp_rcutsq = s_rcutsq[typpair];
                         typename evaluator::param_type temp_param = s_params[typpair];
 
@@ -477,7 +477,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                     }
 
                 // read the position of j (MEM TRANSFER: 16 bytes)
-                Scalar4 postypej = __ldg(d_pos + cur_j);
+                ForceReal4 postypej = __ldg(d_pos + cur_j);
                 Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
                 // initialize the force on j
@@ -494,12 +494,12 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
 
                 // access the per type-pair parameters
                 unsigned int typpair
-                    = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
+                    = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
                 Scalar rcutsq = s_rcutsq[typpair];
                 const typename evaluator::param_type& param = s_params[typpair];
 
                 evaluator eval(rij_sq, rcutsq, param);
-                eval.evalPhi(s_phi_ab[threadIdx.x * ntypes + __scalar_as_int(postypej.w)]);
+                eval.evalPhi(s_phi_ab[threadIdx.x * ntypes + __forcereal_as_int(postypej.w)]);
                 }
 
             // self-energy
@@ -516,7 +516,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
 
                 if (threadIdx.x % tpp == 0)
                     {
-                    unsigned int typpair = typpair_idx(__scalar_as_int(postypei.w), typ_b);
+                    unsigned int typpair = typpair_idx(__forcereal_as_int(postypei.w), typ_b);
                     Scalar rcutsq = s_rcutsq[typpair];
                     const typename evaluator::param_type& param = s_params[typpair];
 
@@ -549,7 +549,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                 }
 
             // read the position of j (MEM TRANSFER: 16 bytes)
-            Scalar4 postypej = __ldg(d_pos + cur_j);
+            ForceReal4 postypej = __ldg(d_pos + cur_j);
             Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
 
             // initialize the force on j
@@ -573,7 +573,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
 
             // access the per type-pair parameters
             unsigned int typpair
-                = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
+                = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
             Scalar rcutsq = s_rcutsq[typpair];
             const typename evaluator::param_type& param = s_params[typpair];
 
@@ -602,12 +602,12 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                         next_k = __ldg(d_nlist + head_idx + neigh_idy + 1);
 
                         // get the position of neighbor k
-                        Scalar4 postypek = __ldg(d_pos + cur_k);
+                        ForceReal4 postypek = __ldg(d_pos + cur_k);
                         Scalar3 posk = make_scalar3(postypek.x, postypek.y, postypek.z);
 
                         // get the type pair parameters for i and k
                         typpair
-                            = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypek.w));
+                            = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypek.w));
                         Scalar temp_rcutsq = s_rcutsq[typpair];
                         typename evaluator::param_type& temp_param = s_params[typpair];
 
@@ -646,7 +646,7 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                 Scalar force_divr = Scalar(0.0);
                 Scalar potential_eng = Scalar(0.0);
                 Scalar bij = Scalar(0.0);
-                const Scalar& phi = s_phi_ab[threadIdx.x * ntypes + __scalar_as_int(postypej.w)];
+                const Scalar& phi = s_phi_ab[threadIdx.x * ntypes + __forcereal_as_int(postypej.w)];
                 eval.evalForceij(fR, fA, chi, phi, bij, force_divr, potential_eng);
 
                 // add the forces and energies to their respective particles
@@ -702,12 +702,12 @@ __global__ void gpu_compute_triplet_forces_kernel(ForceReal4* d_force,
                         next_k = __ldg(d_nlist + head_idx + neigh_idy + 1);
 
                         // get the position of neighbor k
-                        Scalar4 postypek = __ldg(d_pos + cur_k);
+                        ForceReal4 postypek = __ldg(d_pos + cur_k);
                         Scalar3 posk = make_scalar3(postypek.x, postypek.y, postypek.z);
 
                         // get the type pair parameters for i and k
                         typpair
-                            = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypek.w));
+                            = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypek.w));
                         Scalar temp_rcutsq = s_rcutsq[typpair];
                         typename evaluator::param_type& temp_param = s_params[typpair];
 

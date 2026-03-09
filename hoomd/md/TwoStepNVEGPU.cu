@@ -46,6 +46,7 @@ namespace kernel
 */
 __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
                                         Scalar4* d_pos_correction,
+                                        ForceReal4* d_pos_forcereal,
                                         Scalar4* d_vel,
                                         const Scalar3* d_accel,
                                         int3* d_image,
@@ -105,7 +106,7 @@ __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
         box.wrap(pos, image);
 
         // write out the results (MEM_TRANSFER: 48 bytes)
-        storePosFull(d_pos, d_pos_correction, idx,
+        storePosFull(d_pos, d_pos_correction, d_pos_forcereal, idx,
                      make_scalar4(pos.x, pos.y, pos.z, postype.w));
         d_vel[idx] = make_scalar4(vel.x, vel.y, vel.z, velmass.w);
         d_image[idx] = image;
@@ -129,6 +130,7 @@ __global__ void gpu_nve_step_one_kernel(Scalar4* d_pos,
 */
 hipError_t gpu_nve_step_one(Scalar4* d_pos,
                             Scalar4* d_pos_correction,
+                            ForceReal4* d_pos_forcereal,
                             Scalar4* d_vel,
                             const Scalar3* d_accel,
                             int3* d_image,
@@ -162,6 +164,7 @@ hipError_t gpu_nve_step_one(Scalar4* d_pos,
                        0,
                        d_pos,
                        d_pos_correction,
+                       d_pos_forcereal,
                        d_vel,
                        d_accel,
                        d_image,

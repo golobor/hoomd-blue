@@ -63,8 +63,12 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
     ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
                                           access_location::device,
                                           access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_pos_forcereal(m_pdata->getPositionsForceReal(),
+                                            access_location::device,
+                                            access_mode::readwrite);
 #else
     struct { Scalar4* data = nullptr; } d_pos_correction;
+    struct { ForceReal4* data = nullptr; } d_pos_forcereal;
 #endif
 
     ArrayHandle<ForceReal4> d_net_force(net_force, access_location::device, access_mode::read);
@@ -109,6 +113,7 @@ void TwoStepBDGPU::integrateStepOne(uint64_t timestep)
     // perform the update on the GPU
     gpu_brownian_step_one(d_pos.data,
                           d_pos_correction.data,
+                          d_pos_forcereal.data,
                           d_vel.data,
                           d_image.data,
                           box,

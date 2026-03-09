@@ -72,8 +72,12 @@ void TwoStepConstantVolumeGPU::integrateStepOne(uint64_t timestep)
         ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
                                               access_location::device,
                                               access_mode::readwrite);
+        ArrayHandle<ForceReal4> d_pos_forcereal(m_pdata->getPositionsForceReal(),
+                                                access_location::device,
+                                                access_mode::readwrite);
 #else
         struct { Scalar4* data = nullptr; } d_pos_correction;
+        struct { ForceReal4* data = nullptr; } d_pos_forcereal;
 #endif
 
         BoxDim box = m_pdata->getBox();
@@ -89,6 +93,7 @@ void TwoStepConstantVolumeGPU::integrateStepOne(uint64_t timestep)
         m_tuner_one->begin();
         kernel::gpu_nvt_rescale_step_one(d_pos.data,
                                          d_pos_correction.data,
+                                         d_pos_forcereal.data,
                                          d_vel.data,
                                          d_accel.data,
                                          d_image.data,

@@ -64,7 +64,7 @@ void HarmonicAngleForceComputeGPU::setParams(unsigned int type, Scalar K, Scalar
 void HarmonicAngleForceComputeGPU::computeForces(uint64_t timestep)
     {
     // the angle table is up to date: we are good to go. Call the kernel
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
 
     BoxDim box = m_pdata->getGlobalBox();
 

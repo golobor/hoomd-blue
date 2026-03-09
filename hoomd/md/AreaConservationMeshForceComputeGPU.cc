@@ -64,7 +64,7 @@ void AreaConservationMeshForceComputeGPU::computeForces(uint64_t timestep)
     precomputeParameter();
 
     // access the particle data arrays
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
 
     BoxDim box = this->m_pdata->getGlobalBox();
 
@@ -126,7 +126,7 @@ void AreaConservationMeshForceComputeGPU::computeForces(uint64_t timestep)
 void AreaConservationMeshForceComputeGPU::precomputeParameter()
     {
     // access the particle data arrays
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
 
     BoxDim box = this->m_pdata->getGlobalBox();
 

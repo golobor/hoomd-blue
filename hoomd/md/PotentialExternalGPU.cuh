@@ -32,7 +32,7 @@ struct external_potential_args_t
                               ForceReal* _d_virial,
                               const size_t _virial_pitch,
                               const unsigned int _N,
-                              const Scalar4* _d_pos,
+                              const ForceReal4* _d_pos,
                               const Scalar4* _d_orientation,
                               const Scalar* _d_charge,
                               const BoxDim& _box,
@@ -48,7 +48,7 @@ struct external_potential_args_t
     const size_t virial_pitch;      //!< The pitch of the 2D array of virial matrix elements
     const BoxDim box;               //!< Simulation box in GPU format
     const unsigned int N;           //!< Number of particles
-    const Scalar4* d_pos;           //!< Device array of particle positions
+    const ForceReal4* d_pos;           //!< Device array of particle positions
     const Scalar4* d_orientation;   //!< Device array of particle orientations
     const Scalar* d_charge;         //!< particle charges
     const unsigned int block_size;  //!< Block size to execute
@@ -90,7 +90,7 @@ __global__ void gpu_compute_external_forces_kernel(ForceReal4* d_force,
                                                    ForceReal* d_virial,
                                                    const size_t virial_pitch,
                                                    const unsigned int N,
-                                                   const Scalar4* d_pos,
+                                                   const ForceReal4* d_pos,
                                                    const Scalar4* d_orientation,
                                                    const Scalar* d_charge,
                                                    const BoxDim box,
@@ -125,7 +125,7 @@ __global__ void gpu_compute_external_forces_kernel(ForceReal4* d_force,
         return;
 
     // read in the position of our particle.
-    Scalar4 posi = d_pos[idx];
+    ForceReal4 posi = d_pos[idx];
     ForceReal qi;
 
     if (evaluator::needsCharge())
@@ -141,7 +141,7 @@ __global__ void gpu_compute_external_forces_kernel(ForceReal4* d_force,
         virial[k] = ForceReal(0.0);
     ForceReal energy = ForceReal(0.0);
 
-    unsigned int typei = __scalar_as_int(posi.w);
+    unsigned int typei = __forcereal_as_int(posi.w);
     ForceReal3 Xi = make_forcereal3(ForceReal(posi.x), ForceReal(posi.y), ForceReal(posi.z));
     quat<Scalar> q(d_orientation[idx]);
     evaluator eval(Xi, q, box, params[typei], field);

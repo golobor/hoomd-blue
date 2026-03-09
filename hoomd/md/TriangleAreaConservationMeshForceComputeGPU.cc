@@ -51,7 +51,7 @@ TriangleAreaConservationMeshForceComputeGPU::TriangleAreaConservationMeshForceCo
 void TriangleAreaConservationMeshForceComputeGPU::computeForces(uint64_t timestep)
     {
     // access the particle data arrays
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
 
     const GPUArray<typename Angle::members_t>& gpu_meshtriangle_list
         = this->m_mesh_data->getMeshTriangleData()->getGPUTable();
@@ -104,7 +104,7 @@ void TriangleAreaConservationMeshForceComputeGPU::computeForces(uint64_t timeste
 void TriangleAreaConservationMeshForceComputeGPU::computeArea()
     {
     // access the particle data arrays
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
 
     const GPUArray<typename Angle::members_t>& gpu_meshtriangle_list
         = this->m_mesh_data->getMeshTriangleData()->getGPUTable();

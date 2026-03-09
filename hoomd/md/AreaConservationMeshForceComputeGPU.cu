@@ -37,7 +37,7 @@ __global__ void gpu_compute_area_constraint_area_kernel(Scalar* d_partial_sum_ar
                                                         const unsigned int N,
                                                         const unsigned int tN,
                                                         const unsigned int mtid,
-                                                        const Scalar4* d_pos,
+                                                        const ForceReal4* d_pos,
                                                         BoxDim box,
                                                         const group_storage<3>* tlist,
                                                         const unsigned int* tpos_list,
@@ -55,7 +55,7 @@ __global__ void gpu_compute_area_constraint_area_kernel(Scalar* d_partial_sum_ar
     if (idx < N)
         {
         int n_triangles = n_triangles_list[idx];
-        Scalar4 postype = __ldg(d_pos + idx);
+        ForceReal4 postype = __ldg(d_pos + idx);
         Scalar3 pos_a = make_scalar3(postype.x, postype.y, postype.z);
 
         for (int triangle_idx = 0; triangle_idx < n_triangles; triangle_idx++)
@@ -75,11 +75,11 @@ __global__ void gpu_compute_area_constraint_area_kernel(Scalar* d_partial_sum_ar
             int cur_triangle_abc = tpos_list[tlist_idx(idx, triangle_idx)];
 
             // get the b-particle's position (MEM TRANSFER: 16 bytes)
-            Scalar4 bb_postype = d_pos[cur_triangle_b];
+            ForceReal4 bb_postype = d_pos[cur_triangle_b];
             Scalar3 pos_b = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
 
             // get the c-particle's position (MEM TRANSFER: 16 bytes)
-            Scalar4 cc_postype = d_pos[cur_triangle_c];
+            ForceReal4 cc_postype = d_pos[cur_triangle_c];
             Scalar3 pos_c = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
 
             Scalar3 dab, dac;
@@ -206,7 +206,7 @@ hipError_t gpu_compute_area_constraint_area(Scalar* d_sum_area,
                                             Scalar* d_sum_partial_area,
                                             const unsigned int N,
                                             const unsigned int tN,
-                                            const Scalar4* d_pos,
+                                            const ForceReal4* d_pos,
                                             const BoxDim& box,
                                             const group_storage<3>* tlist,
                                             const unsigned int* tpos_list,
@@ -276,7 +276,7 @@ __global__ void gpu_compute_area_constraint_force_kernel(ForceReal4* d_force,
                                                          const unsigned int N,
                                                          const unsigned int* gN,
                                                          const unsigned int aN,
-                                                         const Scalar4* d_pos,
+                                                         const ForceReal4* d_pos,
                                                          BoxDim box,
                                                          const Scalar* area,
                                                          const group_storage<3>* tlist,
@@ -296,7 +296,7 @@ __global__ void gpu_compute_area_constraint_force_kernel(ForceReal4* d_force,
     int n_triangles = n_triangles_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     Scalar3 pos_a = make_scalar3(postype.x, postype.y, postype.z);
 
     ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
@@ -335,11 +335,11 @@ __global__ void gpu_compute_area_constraint_force_kernel(ForceReal4* d_force,
         int cur_triangle_abc = tpos_list[tlist_idx(idx, triangle_idx)];
 
         // get the b-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 bb_postype = d_pos[cur_triangle_b];
+        ForceReal4 bb_postype = d_pos[cur_triangle_b];
         Scalar3 pos_b = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
 
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 cc_postype = d_pos[cur_triangle_c];
+        ForceReal4 cc_postype = d_pos[cur_triangle_c];
         Scalar3 pos_c = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
 
         Scalar3 dab, dac;
@@ -447,7 +447,7 @@ hipError_t gpu_compute_area_constraint_force(ForceReal4* d_force,
                                              const unsigned int N,
                                              const unsigned int* gN,
                                              const unsigned int aN,
-                                             const Scalar4* d_pos,
+                                             const ForceReal4* d_pos,
                                              const BoxDim& box,
                                              const Scalar* area,
                                              const group_storage<3>* tlist,

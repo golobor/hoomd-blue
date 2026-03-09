@@ -53,6 +53,7 @@ namespace kernel
 */
 __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
                                              Scalar4* d_pos_correction,
+                                             ForceReal4* d_pos_forcereal,
                                              Scalar4* d_vel,
                                              int3* d_image,
                                              const BoxDim box,
@@ -189,7 +190,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
             }
 
         // write out data
-        storePosFull(d_pos, d_pos_correction, idx, postype);
+        storePosFull(d_pos, d_pos_correction, d_pos_forcereal, idx, postype);
         d_vel[idx] = vel;
         d_image[idx] = image;
 
@@ -323,6 +324,7 @@ __global__ void gpu_brownian_step_one_kernel(Scalar4* d_pos,
 */
 hipError_t gpu_brownian_step_one(Scalar4* d_pos,
                                  Scalar4* d_pos_correction,
+                                 ForceReal4* d_pos_forcereal,
                                  Scalar4* d_vel,
                                  int3* d_image,
                                  const BoxDim& box,
@@ -369,6 +371,7 @@ hipError_t gpu_brownian_step_one(Scalar4* d_pos,
                        0,
                        d_pos,
                        d_pos_correction,
+                       d_pos_forcereal,
                        d_vel,
                        d_image,
                        box,

@@ -44,7 +44,7 @@ __global__ void gpu_compute_bondtable_forces_kernel(ForceReal4* d_force,
                                                     ForceReal* d_virial,
                                                     const size_t virial_pitch,
                                                     const unsigned int N,
-                                                    const Scalar4* d_pos,
+                                                    const ForceReal4* d_pos,
                                                     const BoxDim box,
                                                     const group_storage<2>* blist,
                                                     size_t pitch,
@@ -74,7 +74,7 @@ __global__ void gpu_compute_bondtable_forces_kernel(ForceReal4* d_force,
     int n_bonds = n_bonds_list[idx];
 
     // read in the position of our particle.
-    Scalar4 postype = d_pos[idx];
+    ForceReal4 postype = d_pos[idx];
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
     // initialize the force to 0
@@ -94,7 +94,7 @@ __global__ void gpu_compute_bondtable_forces_kernel(ForceReal4* d_force,
         int cur_bond_type = cur_bond.idx[1];
 
         // get the bonded particle's position (MEM_TRANSFER: 16 bytes)
-        Scalar4 neigh_postype = d_pos[cur_bond_idx];
+        ForceReal4 neigh_postype = d_pos[cur_bond_idx];
         Scalar3 neigh_pos = make_scalar3(neigh_postype.x, neigh_postype.y, neigh_postype.z);
 
         // calculate dr (FLOPS: 3)
@@ -193,7 +193,7 @@ hipError_t gpu_compute_bondtable_forces(ForceReal4* d_force,
                                         ForceReal* d_virial,
                                         size_t virial_pitch,
                                         const unsigned int N,
-                                        const Scalar4* d_pos,
+                                        const ForceReal4* d_pos,
                                         const BoxDim& box,
                                         const group_storage<2>* blist,
                                         const unsigned int pitch,

@@ -33,7 +33,7 @@ template<int group_size> struct bond_args_t
                 const size_t _virial_pitch,
                 const unsigned int _N,
                 const unsigned int _n_max,
-                const Scalar4* _d_pos,
+                const ForceReal4* _d_pos,
                 const Scalar* _d_charge,
                 const BoxDim& _box,
                 const group_storage<group_size>* _d_gpu_bondlist,
@@ -54,7 +54,7 @@ template<int group_size> struct bond_args_t
     const size_t virial_pitch; //!< pitch of 2D array of virial matrix elements
     unsigned int N;            //!< number of particles
     unsigned int n_max;        //!< Size of local pdata arrays
-    const Scalar4* d_pos;      //!< particle positions
+    const ForceReal4* d_pos;      //!< particle positions
     const Scalar* d_charge;    //!< particle charges
     const BoxDim box;          //!< Simulation box in GPU format
     const group_storage<group_size>* d_gpu_bondlist; //!< List of bonds stored on the GPU
@@ -99,7 +99,7 @@ __global__ void gpu_compute_bond_forces_kernel(ForceReal4* d_force,
                                                ForceReal* d_virial,
                                                const size_t virial_pitch,
                                                const unsigned int N,
-                                               const Scalar4* d_pos,
+                                               const ForceReal4* d_pos,
                                                const Scalar* d_charge,
                                                const BoxDim box,
                                                const group_storage<group_size>* blist,
@@ -138,7 +138,7 @@ __global__ void gpu_compute_bond_forces_kernel(ForceReal4* d_force,
     int n_bonds = n_bonds_list[idx];
 
     // read in the position of our particle. (MEM TRANSFER: 16 bytes)
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     ForceReal3 pos = make_forcereal3(ForceReal(postype.x), ForceReal(postype.y), ForceReal(postype.z));
 
     ForceReal q(0);
@@ -170,7 +170,7 @@ __global__ void gpu_compute_bond_forces_kernel(ForceReal4* d_force,
         int cur_bond_type = cur_bond.idx[group_size - 1];
 
         // get the bonded particle's position (MEM_TRANSFER: 16 bytes)
-        Scalar4 neigh_postypej = __ldg(d_pos + cur_bond_idx);
+        ForceReal4 neigh_postypej = __ldg(d_pos + cur_bond_idx);
         ForceReal3 neigh_pos = make_forcereal3(ForceReal(neigh_postypej.x), ForceReal(neigh_postypej.y), ForceReal(neigh_postypej.z));
 
         // calculate dr (FLOPS: 3)

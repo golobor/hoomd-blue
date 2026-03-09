@@ -41,7 +41,7 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
                                                             ForceReal* d_virial,
                                                             const size_t virial_pitch,
                                                             unsigned int N,
-                                                            const Scalar4* d_pos,
+                                                            const ForceReal4* d_pos,
                                                             const Scalar2* d_params,
                                                             BoxDim box,
                                                             const group_storage<4>* tlist,
@@ -60,7 +60,7 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
     int n_impropers = n_dihedrals_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c-d quartet
+    ForceReal4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c-d quartet
     Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
     Scalar3 pos_a, pos_b, pos_c,
         pos_d; // allocate space for the a,b, and c atoms in the a-b-c-d quartet
@@ -86,13 +86,13 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
         int cur_improper_abcd = cur_ABCD;
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 x_postype = d_pos[cur_improper_x_idx];
+        ForceReal4 x_postype = d_pos[cur_improper_x_idx];
         Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 y_postype = d_pos[cur_improper_y_idx];
+        ForceReal4 y_postype = d_pos[cur_improper_y_idx];
         Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 z_postype = d_pos[cur_improper_z_idx];
+        ForceReal4 z_postype = d_pos[cur_improper_z_idx];
         Scalar3 z_pos = make_scalar3(z_postype.x, z_postype.y, z_postype.z);
 
         if (cur_improper_abcd == 0)
@@ -289,7 +289,7 @@ hipError_t gpu_compute_harmonic_improper_forces(ForceReal4* d_force,
                                                 ForceReal* d_virial,
                                                 const size_t virial_pitch,
                                                 const unsigned int N,
-                                                const Scalar4* d_pos,
+                                                const ForceReal4* d_pos,
                                                 const BoxDim& box,
                                                 const group_storage<4>* tlist,
                                                 const unsigned int* dihedral_ABCD,

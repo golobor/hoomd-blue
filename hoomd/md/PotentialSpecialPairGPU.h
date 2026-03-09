@@ -82,7 +82,7 @@ PotentialSpecialPairGPU<evaluator>::PotentialSpecialPairGPU(
 template<class evaluator> void PotentialSpecialPairGPU<evaluator>::computeForces(uint64_t timestep)
     {
     // access the particle data
-    ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
+    ArrayHandle<ForceReal4> d_pos(this->m_pdata->getPositionsForceReal(),
                                access_location::device,
                                access_mode::read);
     ArrayHandle<Scalar> d_charge(this->m_pdata->getCharges(),

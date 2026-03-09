@@ -439,6 +439,7 @@ def run_benchmark(
     save_state=None,
     load_state=None,
     equilibrate_only=False,
+    dt=0.005,
 ):
     """Run polymer chain benchmark and return TPS data."""
     import hoomd
@@ -486,7 +487,7 @@ def run_benchmark(
         filter=hoomd.filter.All(), kT=1.0, default_gamma=1.0,
     )
     integrator = hoomd.md.Integrator(
-        dt=0.005, methods=[langevin], forces=forces,
+        dt=dt, methods=[langevin], forces=forces,
     )
     if patchy is not None:
         integrator.integrate_rotational_dof = True
@@ -575,6 +576,8 @@ if __name__ == "__main__":
     p.add_argument("--load-state", default=None, metavar="PATH",
                    help="Load equilibrated state from this GSD path "
                         "(skip equilibration)")
+    p.add_argument("--dt", type=float, default=0.005,
+                   help="Integration timestep for benchmark phase (default: 0.005)")
     p.add_argument("--equilibrate-only", action="store_true",
                    help="Only equilibrate and save state, then exit")
     p.add_argument("--log", default=None, metavar="FILE",
@@ -604,4 +607,5 @@ if __name__ == "__main__":
         save_state=a.save_state,
         load_state=a.load_state,
         equilibrate_only=a.equilibrate_only,
+        dt=a.dt,
     )

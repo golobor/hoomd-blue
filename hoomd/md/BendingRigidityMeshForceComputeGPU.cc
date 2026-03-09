@@ -52,7 +52,7 @@ void BendingRigidityMeshForceComputeGPU::computeForces(uint64_t timestep)
         = this->m_mesh_data->getMeshBondData()->getGPUTable();
 
     // access the particle data arrays
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
     ArrayHandle<unsigned int> d_rtag(m_pdata->getRTags(),
                                      access_location::device,
                                      access_mode::read);

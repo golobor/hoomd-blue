@@ -44,7 +44,7 @@ struct a_pair_args_t
                   size_t _virial_pitch,
                   const unsigned int _N,
                   const unsigned int _n_max,
-                  const Scalar4* _d_pos,
+                  const ForceReal4* _d_pos,
                   const Scalar4* _d_vel,
                   const Scalar* _d_charge,
                   const Scalar4* _d_orientation,
@@ -82,7 +82,7 @@ struct a_pair_args_t
     const size_t virial_pitch;       //!< The pitch of the 2D array of virial matrix elements
     const unsigned int N;            //!< number of particles
     const unsigned int n_max;        //!< maximum size of particle data arrays
-    const Scalar4* d_pos;            //!< particle positions
+    const ForceReal4* d_pos;            //!< particle positions
     const Scalar4* d_vel;            //!< particle velocity
     const Scalar* d_charge;          //!< particle charges
     const Scalar4* d_orientation;    //!< particle orientation to compute forces over
@@ -164,7 +164,7 @@ gpu_compute_pair_friction_forces_kernel(ForceReal4* d_force,
                                         ForceReal* d_virial,
                                         const size_t virial_pitch,
                                         const unsigned int N,
-                                        const Scalar4* d_pos,
+                                        const ForceReal4* d_pos,
                                         const Scalar4* d_vel,
                                         const Scalar* d_charge,
                                         const Scalar4* d_orientation,
@@ -251,7 +251,7 @@ gpu_compute_pair_friction_forces_kernel(ForceReal4* d_force,
         unsigned int n_neigh = d_n_neigh[idx];
 
         // read in the particle data
-        Scalar4 postypei = __ldg(d_pos + idx);
+        ForceReal4 postypei = __ldg(d_pos + idx);
         Scalar4 veltypei = __ldg(d_vel + idx);
         Scalar3 posi = make_scalar3(postypei.x, postypei.y, postypei.z);
         Scalar3 veli = make_scalar3(veltypei.x, veltypei.y, veltypei.z);
@@ -297,7 +297,7 @@ gpu_compute_pair_friction_forces_kernel(ForceReal4* d_force,
                     }
 
                 // get the neighbor's particle data
-                Scalar4 postypej = __ldg(d_pos + cur_j);
+                ForceReal4 postypej = __ldg(d_pos + cur_j);
                 Scalar4 veltypej = __ldg(d_vel + cur_j);
                 Scalar3 posj = make_scalar3(postypej.x, postypej.y, postypej.z);
                 Scalar3 velj = make_scalar3(veltypej.x, veltypej.y, veltypej.z);
@@ -339,7 +339,7 @@ gpu_compute_pair_friction_forces_kernel(ForceReal4* d_force,
 
                 // access the per type pair parameters
                 unsigned int typpair
-                    = typpair_idx(__scalar_as_int(postypei.w), __scalar_as_int(postypej.w));
+                    = typpair_idx(__forcereal_as_int(postypei.w), __forcereal_as_int(postypej.w));
                 Scalar rcutsq = s_rcutsq[typpair];
                 const typename evaluator::param_type& param = s_params[typpair];
 

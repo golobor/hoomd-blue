@@ -82,9 +82,13 @@ void TwoStepLangevinGPU::integrateStepOne(uint64_t timestep)
     ArrayHandle<Scalar4> d_pos_correction(m_pdata->getPositionCorrections(),
                                           access_location::device,
                                           access_mode::readwrite);
+    ArrayHandle<ForceReal4> d_pos_forcereal(m_pdata->getPositionsForceReal(),
+                                            access_location::device,
+                                            access_mode::readwrite);
 #else
     // Provide a null pointer when mixed precision is disabled
     struct { Scalar4* data = nullptr; } d_pos_correction;
+    struct { ForceReal4* data = nullptr; } d_pos_forcereal;
 #endif
 
     m_exec_conf->setDevice();
@@ -92,6 +96,7 @@ void TwoStepLangevinGPU::integrateStepOne(uint64_t timestep)
     // perform the update on the GPU
     kernel::gpu_nve_step_one(d_pos.data,
                              d_pos_correction.data,
+                             d_pos_forcereal.data,
                              d_vel.data,
                              d_accel.data,
                              d_image.data,

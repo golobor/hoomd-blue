@@ -48,7 +48,7 @@ struct pair_args_t
                 const size_t _virial_pitch,
                 const unsigned int _N,
                 const unsigned int _n_max,
-                const Scalar4* _d_pos,
+                const ForceReal4* _d_pos,
                 const Scalar* _d_charge,
                 const BoxDim& _box,
                 const unsigned int* _d_n_neigh,
@@ -75,7 +75,7 @@ struct pair_args_t
     const size_t virial_pitch; //!< The pitch of the 2D array of virial matrix elements
     const unsigned int N;      //!< number of particles
     const unsigned int n_max;  //!< Max size of pdata arrays
-    const Scalar4* d_pos;      //!< particle positions
+    const ForceReal4* d_pos;      //!< particle positions
     const Scalar* d_charge;    //!< particle charges
     const BoxDim box;          //!< Simulation box in GPU format
     const unsigned int*
@@ -142,7 +142,7 @@ gpu_compute_pair_forces_shared_kernel(ForceReal4* d_force,
                                       ForceReal* d_virial,
                                       const size_t virial_pitch,
                                       const unsigned int N,
-                                      const Scalar4* d_pos,
+                                      const ForceReal4* d_pos,
                                       const Scalar* d_charge,
                                       const BoxDim box,
                                       const unsigned int* d_n_neigh,

@@ -107,7 +107,7 @@ template<class evaluator> void PotentialTersoffGPU<evaluator>::computeForces(uin
                                     access_mode::read);
 
     // access the particle data
-    ArrayHandle<Scalar4> d_pos(this->m_pdata->getPositions(),
+    ArrayHandle<ForceReal4> d_pos(this->m_pdata->getPositionsForceReal(),
                                access_location::device,
                                access_mode::read);
 

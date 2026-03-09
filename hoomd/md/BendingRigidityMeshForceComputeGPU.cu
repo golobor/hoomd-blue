@@ -35,7 +35,7 @@ __global__ void gpu_compute_bending_rigidity_force_kernel(ForceReal4* d_force,
                                                           ForceReal* d_virial,
                                                           const size_t virial_pitch,
                                                           const unsigned int N,
-                                                          const Scalar4* d_pos,
+                                                          const ForceReal4* d_pos,
                                                           const unsigned int* d_rtag,
                                                           BoxDim box,
                                                           const group_storage<4>* blist,
@@ -53,7 +53,7 @@ __global__ void gpu_compute_bending_rigidity_force_kernel(ForceReal4* d_force,
 
     int n_bonds = n_bonds_list[idx];
 
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
     ForceReal4 force = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
@@ -93,22 +93,22 @@ __global__ void gpu_compute_bending_rigidity_force_kernel(ForceReal4* d_force,
 
         Scalar K = __ldg(d_params + cur_bond_type);
 
-        Scalar4 bb_postype = d_pos[cur_idx_b];
+        ForceReal4 bb_postype = d_pos[cur_idx_b];
         Scalar3 bb_pos = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
-        Scalar4 dd_postype = d_pos[cur_idx_d];
+        ForceReal4 dd_postype = d_pos[cur_idx_d];
         Scalar3 dd_pos = make_scalar3(dd_postype.x, dd_postype.y, dd_postype.z);
         Scalar3 aa_pos, cc_pos;
 
         if (cur_bond_pos < 2)
             {
             aa_pos = pos;
-            Scalar4 cc_postype = d_pos[cur_idx_c];
+            ForceReal4 cc_postype = d_pos[cur_idx_c];
             cc_pos = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
             }
         else
             {
             cc_pos = pos;
-            Scalar4 aa_postype = d_pos[cur_idx_a];
+            ForceReal4 aa_postype = d_pos[cur_idx_a];
             aa_pos = make_scalar3(aa_postype.x, aa_postype.y, aa_postype.z);
             }
 
@@ -218,7 +218,7 @@ hipError_t gpu_compute_bending_rigidity_force(ForceReal4* d_force,
                                               ForceReal* d_virial,
                                               const size_t virial_pitch,
                                               const unsigned int N,
-                                              const Scalar4* d_pos,
+                                              const ForceReal4* d_pos,
                                               const unsigned int* d_rtag,
                                               const BoxDim& box,
                                               const group_storage<4>* blist,

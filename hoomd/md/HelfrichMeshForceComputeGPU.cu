@@ -38,7 +38,7 @@ namespace kernel
 __global__ void gpu_compute_helfrich_sigma_kernel(Scalar* d_sigma,
                                                   Scalar3* d_sigma_dash,
                                                   const unsigned int N,
-                                                  const Scalar4* d_pos,
+                                                  const ForceReal4* d_pos,
                                                   const unsigned int* d_rtag,
                                                   BoxDim box,
                                                   const group_storage<4>* blist,
@@ -56,7 +56,7 @@ __global__ void gpu_compute_helfrich_sigma_kernel(Scalar* d_sigma,
     int n_bonds = n_bonds_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
     // initialize the force to 0
@@ -83,13 +83,13 @@ __global__ void gpu_compute_helfrich_sigma_kernel(Scalar* d_sigma,
         unsigned int cur_bond_idx = cur_bond.idx[0];
 
         // get the b-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 bb_postype = d_pos[cur_bond_idx];
+        ForceReal4 bb_postype = d_pos[cur_bond_idx];
         Scalar3 bb_pos = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 cc_postype = d_pos[cur_idx_c];
+        ForceReal4 cc_postype = d_pos[cur_idx_c];
         Scalar3 cc_pos = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 dd_postype = d_pos[cur_idx_d];
+        ForceReal4 dd_postype = d_pos[cur_idx_d];
         Scalar3 dd_pos = make_scalar3(dd_postype.x, dd_postype.y, dd_postype.z);
 
         Scalar3 dab = pos - bb_pos;
@@ -185,7 +185,7 @@ __global__ void gpu_compute_helfrich_sigma_kernel(Scalar* d_sigma,
 hipError_t gpu_compute_helfrich_sigma(Scalar* d_sigma,
                                       Scalar3* d_sigma_dash,
                                       const unsigned int N,
-                                      const Scalar4* d_pos,
+                                      const ForceReal4* d_pos,
                                       const unsigned int* d_rtag,
                                       const BoxDim& box,
                                       const group_storage<4>* blist,
@@ -245,7 +245,7 @@ __global__ void gpu_compute_helfrich_force_kernel(ForceReal4* d_force,
                                                   ForceReal* d_virial,
                                                   const size_t virial_pitch,
                                                   const unsigned int N,
-                                                  const Scalar4* d_pos,
+                                                  const ForceReal4* d_pos,
                                                   const unsigned int* d_rtag,
                                                   BoxDim box,
                                                   const Scalar* d_sigma,
@@ -267,7 +267,7 @@ __global__ void gpu_compute_helfrich_force_kernel(ForceReal4* d_force,
     int n_bonds = n_bonds_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 postype = __ldg(d_pos + idx);
+    ForceReal4 postype = __ldg(d_pos + idx);
     Scalar3 pos = make_scalar3(postype.x, postype.y, postype.z);
 
     Scalar3 sigma_dash_a = d_sigma_dash[idx]; // precomputed
@@ -302,13 +302,13 @@ __global__ void gpu_compute_helfrich_force_kernel(ForceReal4* d_force,
         int cur_bond_type = cur_bond.idx[3];
 
         // get the b-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 bb_postype = d_pos[cur_bond_idx];
+        ForceReal4 bb_postype = d_pos[cur_bond_idx];
         Scalar3 bb_pos = make_scalar3(bb_postype.x, bb_postype.y, bb_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 cc_postype = d_pos[cur_idx_c];
+        ForceReal4 cc_postype = d_pos[cur_idx_c];
         Scalar3 cc_pos = make_scalar3(cc_postype.x, cc_postype.y, cc_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 dd_postype = d_pos[cur_idx_d];
+        ForceReal4 dd_postype = d_pos[cur_idx_d];
         Scalar3 dd_pos = make_scalar3(dd_postype.x, dd_postype.y, dd_postype.z);
 
         Scalar3 dab = pos - bb_pos;
@@ -526,7 +526,7 @@ hipError_t gpu_compute_helfrich_force(ForceReal4* d_force,
                                       ForceReal* d_virial,
                                       const size_t virial_pitch,
                                       const unsigned int N,
-                                      const Scalar4* d_pos,
+                                      const ForceReal4* d_pos,
                                       const unsigned int* d_rtag,
                                       const BoxDim& box,
                                       const Scalar* d_sigma,

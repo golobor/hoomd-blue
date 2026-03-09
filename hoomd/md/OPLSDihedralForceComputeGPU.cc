@@ -53,7 +53,7 @@ void OPLSDihedralForceComputeGPU::computeForces(uint64_t timestep)
                                                access_mode::read);
 
     // the dihedral table is up to date: we are good to go. Call the kernel
-    ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
+    ArrayHandle<ForceReal4> d_pos(m_pdata->getPositionsForceReal(), access_location::device, access_mode::read);
     BoxDim box = m_pdata->getGlobalBox();
 
     ArrayHandle<ForceReal4> d_force(m_force, access_location::device, access_mode::overwrite);

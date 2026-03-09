@@ -47,7 +47,7 @@ struct a_pair_args_t
                   size_t _virial_pitch,
                   const unsigned int _N,
                   const unsigned int _n_max,
-                  const Scalar4* _d_pos,
+                  const ForceReal4* _d_pos,
                   const Scalar* _d_charge,
                   const Scalar4* _d_orientation,
                   const unsigned int* _d_tag,
@@ -77,7 +77,7 @@ struct a_pair_args_t
     const size_t virial_pitch;    //!< The pitch of the 2D array of virial matrix elements
     const unsigned int N;         //!< number of particles
     const unsigned int n_max;     //!< maximum size of particle data arrays
-    const Scalar4* d_pos;         //!< particle positions
+    const ForceReal4* d_pos;         //!< particle positions
     const Scalar* d_charge;       //!< particle charges
     const Scalar4* d_orientation; //!< particle orientation to compute forces over
     const unsigned int* d_tag;    //!< particle tags to compute forces over
@@ -145,7 +145,7 @@ gpu_compute_pair_aniso_forces_kernel(ForceReal4* d_force,
                                      ForceReal* d_virial,
                                      const size_t virial_pitch,
                                      const unsigned int N,
-                                     const Scalar4* d_pos,
+                                     const ForceReal4* d_pos,
                                      const Scalar* d_charge,
                                      const Scalar4* d_orientation,
                                      const unsigned int* d_tag,

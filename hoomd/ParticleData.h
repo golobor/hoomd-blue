@@ -601,6 +601,35 @@ class PYBIND11_EXPORT ParticleData
         {
         return m_pos_correction;
         }
+
+    //! Sync float4 position mirror from full-precision positions
+    void syncPositionsForceReal();
+
+    //! Return float4 position mirror for GPU force kernels (halves bandwidth).
+    const GPUArray<ForceReal4>& getPositionsForceReal() const
+        {
+        return m_pos_forcereal;
+        }
+
+    //! Return float4 position mirror (alternate array for SFCPackTuner)
+    const GPUArray<ForceReal4>& getAltPositionsForceReal() const
+        {
+        return m_pos_forcereal_alt;
+        }
+
+    //! Swap in float4 positions
+    inline void swapPositionsForceReal()
+        {
+        m_pos_forcereal.swap(m_pos_forcereal_alt);
+        }
+#else
+    //! In uniform precision ForceReal4 == Scalar4, so positions ARE the forcereal array
+    const GPUArray<ForceReal4>& getPositionsForceReal() const
+        {
+        return m_pos;
+        }
+    //! No-op sync in uniform precision
+    void syncPositionsForceReal() {}
 #endif
 
     //! Return velocities and masses
@@ -1284,6 +1313,8 @@ class PYBIND11_EXPORT ParticleData
 #ifdef HOOMD_MIXED_PRECISION
     GPUArray<Scalar4> m_pos_correction; //!< position correction for mixed precision
     GPUArray<Scalar4> m_pos_correction_alt; //!< position correction (swap-in)
+    GPUArray<ForceReal4> m_pos_forcereal; //!< float4 position mirror for GPU force kernels
+    GPUArray<ForceReal4> m_pos_forcereal_alt; //!< float4 position mirror (swap-in)
 #endif
     GPUArray<Scalar4> m_vel;        //!< particle velocities and masses
     GPUArray<Scalar3> m_accel;      //!< particle accelerations

@@ -33,6 +33,12 @@ Examples
         --gpus 1,2,3 \
         --lib mixed=... --lib double=... -- 64000 200
 
+    # Sweep multiple dt values (auto-equilibrates once, then benchmarks each dt):
+    python run_benchmarks.py benchmark_chains.py \
+        --lib mixed=... --lib double=... \
+        --dt 0.005 0.01 0.02 \
+        -- 64000 200
+
 Notes
 -----
 - The benchmark script's FIRST positional argument must be gpu_id.
@@ -40,6 +46,7 @@ Notes
 - Each --lib flag is "label=pythonpath".  The label is used in output prefixes.
 - If more jobs than free GPUs, jobs are queued and run as GPUs become free.
 - Use {label} in script_args for per-build file paths.
+- --dt sweeps reuse a single equilibrated state per lib to save time.
 """
 
 import argparse
@@ -155,6 +162,18 @@ def main():
         help="Directory for per-job log files (default: /tmp). "
              "Each job writes to DIR/bench_LABEL.log via --log.",
     )
+    parser.add_argument(
+        "--dt", nargs="+", type=float,
+        default=[0.005, 0.01, 0.03, 0.05, 0.1], metavar="DT",
+        help="One or more dt values to sweep. Equilibrates once per lib, "
+             "then benchmarks each dt from the saved state. "
+             "(default: 0.005 0.01 0.03 0.05 0.1). "
+             "Use --no-dt to disable the sweep.",
+    )
+    parser.add_argument(
+        "--no-dt", action="store_true",
+        help="Disable dt sweep; run a single benchmark per lib.",
+    )
 
     # Split on -- to separate runner args from script args
     if "--" in sys.argv:
@@ -210,6 +229,24 @@ def main():
     log_dir = os.path.abspath(args.log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
+    if args.dt and not args.no_dt:
+        _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra)
+    else:
+        _run_simple(args, jobs, free_gpus, script_dst, log_dir, script_extra)
+
+    # Cleanup
+    try:
+        os.unlink(script_dst)
+        os.rmdir(tmp_dir)
+    except OSError:
+        pass
+
+
+def _run_simple(args, jobs, free_gpus, script_dst, log_dir, script_extra):
+    """Original behaviour: one run per lib, all in parallel."""
+    n_jobs = len(jobs)
+    n_gpus = len(free_gpus)
+
     # Assign GPUs round-robin and run in parallel
     gpu_assignment = {jobs[i][0]: free_gpus[i % n_gpus] for i in range(n_jobs)}
     for label, gpu in gpu_assignment.items():
@@ -253,12 +290,163 @@ def main():
         print(f"{'=' * 80}")
         print(stdout)
 
-    # Cleanup
-    try:
-        os.unlink(script_dst)
-        os.rmdir(tmp_dir)
-    except OSError:
-        pass
+
+def _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra):
+    """Two-phase dt sweep: equilibrate once per lib, then benchmark each dt."""
+    dt_values = args.dt
+    n_gpus = len(free_gpus)
+
+    # ── Phase 1: equilibrate once per lib (parallel across GPUs) ──────
+    print("=" * 80)
+    print(f"DT SWEEP — Phase 1: Equilibrating {len(jobs)} lib(s)")
+    print("=" * 80)
+
+    state_dir = os.path.join(log_dir, "dt_sweep_states")
+    os.makedirs(state_dir, exist_ok=True)
+    state_paths = {}  # label → gsd path
+
+    gpu_assignment_eq = {jobs[i][0]: free_gpus[i % n_gpus]
+                         for i in range(len(jobs))}
+    for label, gpu in gpu_assignment_eq.items():
+        print(f"  {label:>10s} → GPU {gpu}  (equilibrate)")
+    print(flush=True)
+
+    t0 = time.time()
+    eq_results = {}
+    with ThreadPoolExecutor(max_workers=min(len(jobs), n_gpus)) as pool:
+        futures = {}
+        for i, (label, pythonpath) in enumerate(jobs):
+            gpu = gpu_assignment_eq[label]
+            gsd_path = os.path.join(state_dir, f"eq_{label}.gsd")
+            state_paths[label] = gsd_path
+            log_path = os.path.join(log_dir, f"bench_{label}_equil.log")
+            # Build args: remove any user-supplied --load-state, --dt,
+            # --equilibrate-only and add our own
+            eq_extra = _strip_args(script_extra,
+                                   ["--load-state", "--equilibrate-only",
+                                    "--save-state", "--dt"])
+            eq_extra += ["--equilibrate-only",
+                         "--save-state", gsd_path,
+                         "--log", log_path]
+            fut = pool.submit(
+                run_one_benchmark, script_dst, gpu, label, pythonpath,
+                eq_extra,
+            )
+            futures[fut] = label
+
+        for fut in as_completed(futures):
+            label = futures[fut]
+            _, stdout, stderr, rc = fut.result()
+            eq_results[label] = rc
+            elapsed = time.time() - t0
+            status = "OK" if rc == 0 else f"FAILED (rc={rc})"
+            print(f"\n[{elapsed:6.1f}s] {label} equilibration — {status}",
+                  flush=True)
+
+    # Check all equilibrations succeeded
+    failed = [l for l, rc in eq_results.items() if rc != 0]
+    if failed:
+        print(f"\nERROR: equilibration failed for: {', '.join(failed)}",
+              file=sys.stderr)
+        print("Aborting dt sweep.", file=sys.stderr)
+        return
+
+    # ── Phase 2: benchmark each (lib × dt) combination ───────────────
+    sweep_jobs = []  # (combined_label, lib_label, pythonpath, dt)
+    for label, pythonpath in jobs:
+        for dt in dt_values:
+            dt_str = f"{dt:g}"
+            combined = f"{label}_dt{dt_str}"
+            sweep_jobs.append((combined, label, pythonpath, dt))
+
+    print(f"\n{'=' * 80}")
+    print(f"DT SWEEP — Phase 2: {len(sweep_jobs)} benchmark runs "
+          f"({len(jobs)} libs × {len(dt_values)} dt values)")
+    print(f"  dt values: {', '.join(f'{d:g}' for d in dt_values)}")
+    print("=" * 80)
+
+    gpu_assignment_bench = {sweep_jobs[i][0]: free_gpus[i % n_gpus]
+                            for i in range(len(sweep_jobs))}
+    for combined, gpu in gpu_assignment_bench.items():
+        print(f"  {combined:>20s} → GPU {gpu}")
+    print(flush=True)
+
+    t1 = time.time()
+    bench_results = {}
+    with ThreadPoolExecutor(max_workers=min(len(sweep_jobs), n_gpus)) as pool:
+        futures = {}
+        for combined, lib_label, pythonpath, dt in sweep_jobs:
+            gpu = gpu_assignment_bench[combined]
+            log_path = os.path.join(log_dir, f"bench_{combined}.log")
+            gsd_path = state_paths[lib_label]
+            bench_extra = _strip_args(script_extra,
+                                      ["--load-state", "--equilibrate-only",
+                                       "--save-state", "--dt"])
+            bench_extra += ["--load-state", gsd_path,
+                            "--dt", str(dt),
+                            "--log", log_path]
+            fut = pool.submit(
+                run_one_benchmark, script_dst, gpu, combined, pythonpath,
+                bench_extra,
+            )
+            futures[fut] = combined
+
+        for fut in as_completed(futures):
+            combined = futures[fut]
+            _, stdout, stderr, rc = fut.result()
+            bench_results[combined] = (stdout, stderr, rc)
+            elapsed = time.time() - t1
+            status = "OK" if rc == 0 else f"FAILED (rc={rc})"
+            print(f"\n[{elapsed:6.1f}s] {combined} — {status}", flush=True)
+
+    wall_time = time.time() - t0
+    print(f"\nAll jobs done in {wall_time:.1f}s")
+    print("=" * 80)
+
+    # Print collected outputs grouped by dt
+    for dt in dt_values:
+        dt_str = f"{dt:g}"
+        print(f"\n{'=' * 80}")
+        print(f" dt = {dt_str}")
+        print(f"{'=' * 80}")
+        for label, _ in jobs:
+            combined = f"{label}_dt{dt_str}"
+            if combined in bench_results:
+                stdout, stderr, rc = bench_results[combined]
+                print(f"\n--- {label} ---")
+                print(stdout)
+
+
+def _strip_args(args_list, flags_to_strip):
+    """Remove specified flags and their values from an argument list.
+
+    Handles both '--flag value' and '--flag=value' forms.
+    Flags without values (like --equilibrate-only) are also removed.
+    """
+    result = []
+    skip_next = False
+    for i, arg in enumerate(args_list):
+        if skip_next:
+            skip_next = False
+            continue
+        stripped = False
+        for flag in flags_to_strip:
+            if arg == flag:
+                # Check if it's a value-less flag (boolean) or has a next arg
+                if flag == "--equilibrate-only":
+                    stripped = True
+                elif i + 1 < len(args_list) and not args_list[i + 1].startswith("--"):
+                    skip_next = True
+                    stripped = True
+                else:
+                    stripped = True
+                break
+            elif arg.startswith(flag + "="):
+                stripped = True
+                break
+        if not stripped:
+            result.append(arg)
+    return result
 
 
 if __name__ == "__main__":

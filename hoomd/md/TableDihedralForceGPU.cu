@@ -48,7 +48,7 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
                                                          ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
-                                                         const Scalar4* device_pos,
+                                                         const ForceReal4* device_pos,
                                                          const BoxDim box,
                                                          const group_storage<4>* dlist,
                                                          const unsigned int* dihedral_ABCD,
@@ -68,7 +68,7 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
     int n_dihedrals = n_dihedrals_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 idx_postype = device_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
+    ForceReal4 idx_postype = device_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
     Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
     Scalar3 pos_a, pos_b, pos_c,
         pos_d; // allocate space for the a,b,c, and d atom in the a-b-c-d set
@@ -93,13 +93,13 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
         int cur_dihedral_abcd = cur_ABCD;
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 x_postype = device_pos[cur_dihedral_x_idx];
+        ForceReal4 x_postype = device_pos[cur_dihedral_x_idx];
         Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 y_postype = device_pos[cur_dihedral_y_idx];
+        ForceReal4 y_postype = device_pos[cur_dihedral_y_idx];
         Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
         // get the d-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 z_postype = device_pos[cur_dihedral_z_idx];
+        ForceReal4 z_postype = device_pos[cur_dihedral_z_idx];
         Scalar3 z_pos = make_scalar3(z_postype.x, z_postype.y, z_postype.z);
 
         if (cur_dihedral_abcd == 0)
@@ -319,7 +319,7 @@ hipError_t gpu_compute_table_dihedral_forces(ForceReal4* d_force,
                                              ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
-                                             const Scalar4* device_pos,
+                                             const ForceReal4* device_pos,
                                              const BoxDim& box,
                                              const group_storage<4>* dlist,
                                              const unsigned int* dihedral_ABCD,

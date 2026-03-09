@@ -40,7 +40,7 @@ __global__ void gpu_compute_harmonic_angle_forces_kernel(ForceReal4* d_force,
                                                          ForceReal* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
-                                                         const Scalar4* d_pos,
+                                                         const ForceReal4* d_pos,
                                                          const Scalar2* d_params,
                                                          BoxDim box,
                                                          const group_storage<3>* alist,
@@ -58,7 +58,7 @@ __global__ void gpu_compute_harmonic_angle_forces_kernel(ForceReal4* d_force,
     int n_angles = n_angles_list[idx];
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
-    Scalar4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
+    ForceReal4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
     ForceReal3 idx_pos = make_forcereal3(ForceReal(idx_postype.x), ForceReal(idx_postype.y), ForceReal(idx_postype.z));
     ForceReal3 a_pos, b_pos, c_pos; // allocate space for the a,b, and c atom in the a-b-c triplet
 
@@ -84,10 +84,10 @@ __global__ void gpu_compute_harmonic_angle_forces_kernel(ForceReal4* d_force,
         int cur_angle_abc = apos_list[pitch * angle_idx + idx];
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 x_postype = d_pos[cur_angle_x_idx];
+        ForceReal4 x_postype = d_pos[cur_angle_x_idx];
         ForceReal3 x_pos = make_forcereal3(ForceReal(x_postype.x), ForceReal(x_postype.y), ForceReal(x_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
-        Scalar4 y_postype = d_pos[cur_angle_y_idx];
+        ForceReal4 y_postype = d_pos[cur_angle_y_idx];
         ForceReal3 y_pos = make_forcereal3(ForceReal(y_postype.x), ForceReal(y_postype.y), ForceReal(y_postype.z));
 
         if (cur_angle_abc == 0)
@@ -226,7 +226,7 @@ hipError_t gpu_compute_harmonic_angle_forces(ForceReal4* d_force,
                                              ForceReal* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
-                                             const Scalar4* d_pos,
+                                             const ForceReal4* d_pos,
                                              const BoxDim& box,
                                              const group_storage<3>* atable,
                                              const unsigned int* apos_list,

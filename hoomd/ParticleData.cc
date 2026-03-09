@@ -13,6 +13,7 @@
 
 #ifdef ENABLE_HIP
 #include "CachedAllocator.h"
+#include "ParticleData.cuh"
 #endif
 
 #include <pybind11/numpy.h>
@@ -272,6 +273,45 @@ void ParticleData::notifyGhostParticlesRemoved()
     m_ghost_particles_removed_signal.emit();
     }
 
+#ifdef HOOMD_MIXED_PRECISION
+/*! Sync the float4 position mirror from full-precision positions.
+    On GPU builds, this launches a device kernel. On CPU builds, this does a host-side copy.
+*/
+void ParticleData::syncPositionsForceReal()
+    {
+    unsigned int N = m_nparticles + m_nghosts;
+    if (N == 0)
+        return;
+
+#ifdef ENABLE_HIP
+    if (m_exec_conf->isCUDAEnabled())
+        {
+        ArrayHandle<Scalar4> d_pos(m_pos, access_location::device, access_mode::read);
+        ArrayHandle<ForceReal4> d_pos_fr(m_pos_forcereal,
+                                         access_location::device,
+                                         access_mode::overwrite);
+        kernel::gpu_sync_pos_forcereal(d_pos_fr.data, d_pos.data, N);
+        return;
+        }
+#endif
+    // Host fallback
+    ArrayHandle<Scalar4> h_pos(m_pos, access_location::host, access_mode::read);
+    ArrayHandle<ForceReal4> h_pos_fr(m_pos_forcereal,
+                                     access_location::host,
+                                     access_mode::overwrite);
+    for (unsigned int i = 0; i < N; i++)
+        {
+        // .w stores particle type as int bits via __int_as_scalar(); extract and
+        // re-pack using __int_as_forcereal() to preserve the integer correctly
+        int type_int = __scalar_as_int(h_pos.data[i].w);
+        h_pos_fr.data[i] = make_forcereal4(ForceReal(h_pos.data[i].x),
+                                            ForceReal(h_pos.data[i].y),
+                                            ForceReal(h_pos.data[i].z),
+                                            __int_as_forcereal(type_int));
+        }
+    }
+#endif
+
 /*! \param name Type name to get the index of
     \return Type index of the corresponding type name
     \note Throws an exception if the type name is not found
@@ -346,9 +386,12 @@ void ParticleData::allocate(unsigned int N)
     GPUArray<Scalar4> pos_correction(N, m_exec_conf);
     m_pos_correction.swap(pos_correction);
     m_pos_correction.zeroFill();
-#endif
 
-    // velocities
+    // float4 position mirror for GPU force kernels
+    GPUArray<ForceReal4> pos_forcereal(N, m_exec_conf);
+    m_pos_forcereal.swap(pos_forcereal);
+    m_pos_forcereal.zeroFill();
+#endif
     GPUArray<Scalar4> vel(N, m_exec_conf);
     m_vel.swap(vel);
 
@@ -433,6 +476,11 @@ void ParticleData::allocateAlternateArrays(unsigned int N)
     GPUArray<Scalar4> pos_correction_alt(N, m_exec_conf);
     m_pos_correction_alt.swap(pos_correction_alt);
     m_pos_correction_alt.zeroFill();
+
+    // float4 position mirror alt
+    GPUArray<ForceReal4> pos_forcereal_alt(N, m_exec_conf);
+    m_pos_forcereal_alt.swap(pos_forcereal_alt);
+    m_pos_forcereal_alt.zeroFill();
 #endif
 
     // velocities
@@ -573,6 +621,7 @@ void ParticleData::reallocate(unsigned int max_n)
     m_pos.resize(max_n);
 #ifdef HOOMD_MIXED_PRECISION
     m_pos_correction.resize(max_n);
+    m_pos_forcereal.resize(max_n);
 #endif
     m_vel.resize(max_n);
     m_accel.resize(max_n);
@@ -613,6 +662,7 @@ void ParticleData::reallocate(unsigned int max_n)
         m_pos_alt.resize(max_n);
 #ifdef HOOMD_MIXED_PRECISION
         m_pos_correction_alt.resize(max_n);
+        m_pos_forcereal_alt.resize(max_n);
 #endif
         m_vel_alt.resize(max_n);
         m_accel_alt.resize(max_n);
@@ -1096,6 +1146,24 @@ void ParticleData::initializeFromSnapshot(const SnapshotParticleData<Real>& snap
     // zero the origin
     m_origin = make_scalar3(0, 0, 0);
     m_o_image = make_int3(0, 0, 0);
+
+#ifdef HOOMD_MIXED_PRECISION
+    // populate float4 position mirror from full-precision positions
+        {
+        ArrayHandle<Scalar4> h_pos(m_pos, access_location::host, access_mode::read);
+        ArrayHandle<ForceReal4> h_pos_fr(m_pos_forcereal,
+                                         access_location::host,
+                                         access_mode::overwrite);
+        for (unsigned int idx = 0; idx < m_nparticles; idx++)
+            {
+            int type_int = __scalar_as_int(h_pos.data[idx].w);
+            h_pos_fr.data[idx] = make_forcereal4(ForceReal(h_pos.data[idx].x),
+                                                  ForceReal(h_pos.data[idx].y),
+                                                  ForceReal(h_pos.data[idx].z),
+                                                  __int_as_forcereal(type_int));
+            }
+        }
+#endif
 
     unsigned int snapshot_size = snapshot.size;
 

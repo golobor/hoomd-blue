@@ -466,6 +466,8 @@ void ForceCompute::compute(uint64_t timestep)
     // flags do not match
     if (m_particles_sorted || shouldCompute(timestep) || m_pdata->getFlags() != m_computed_flags)
         {
+        // Sync float4 position mirror before GPU force kernels read it
+        m_pdata->syncPositionsForceReal();
         computeForces(timestep);
         }
 
