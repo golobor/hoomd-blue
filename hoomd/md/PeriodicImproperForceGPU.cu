@@ -6,6 +6,9 @@
 
 #include <assert.h>
 
+// SMALL a relatively small number
+#define SMALL ForceReal(0.001)
+
 namespace hoomd
     {
 namespace md
@@ -144,14 +147,18 @@ gpu_compute_periodic_improper_forces_kernel(ForceReal4* d_force,
         ForceReal rgsq = dcbm.x * dcbm.x + dcbm.y * dcbm.y + dcbm.z * dcbm.z;
         ForceReal rg = fast::sqrt(rgsq);
 
+        // Clamp squared cross-product magnitudes to prevent overflow
+        if (raasq < SMALL)
+            raasq = SMALL;
+        if (rbbsq < SMALL)
+            rbbsq = SMALL;
+
         ForceReal rginv, raa2inv, rbb2inv;
         rginv = raa2inv = rbb2inv = ForceReal(0.0);
         if (rg > ForceReal(0.0))
             rginv = ForceReal(1.0) / rg;
-        if (raasq > ForceReal(0.0))
-            raa2inv = ForceReal(1.0) / raasq;
-        if (rbbsq > ForceReal(0.0))
-            rbb2inv = ForceReal(1.0) / rbbsq;
+        raa2inv = ForceReal(1.0) / raasq;
+        rbb2inv = ForceReal(1.0) / rbbsq;
         ForceReal rabinv = fast::sqrt(raa2inv * rbb2inv);
 
         ForceReal c_abcd = (aax * bbx + aay * bby + aaz * bbz) * rabinv;
@@ -161,6 +168,10 @@ gpu_compute_periodic_improper_forces_kernel(ForceReal4* d_force,
             c_abcd = ForceReal(1.0);
         if (c_abcd < -ForceReal(1.0))
             c_abcd = -ForceReal(1.0);
+        if (s_abcd > ForceReal(1.0))
+            s_abcd = ForceReal(1.0);
+        if (s_abcd < -ForceReal(1.0))
+            s_abcd = -ForceReal(1.0);
 
         ForceReal p = ForceReal(1.0);
         ForceReal ddfab;

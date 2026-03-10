@@ -12,6 +12,9 @@
 #define __scalar2int_rn __double2int_rn
 #endif
 
+// SMALL a relatively small number
+#define SMALL ForceReal(0.001)
+
 /*! \file HarmonicDihedralForceGPU.cu
     \brief Defines GPU kernel code for calculating the harmonic dihedral forces. Used by
    HarmonicDihedralForceComputeGPU.
@@ -154,14 +157,21 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
         ForceReal rgsq = dcbm.x * dcbm.x + dcbm.y * dcbm.y + dcbm.z * dcbm.z;
         ForceReal rg = fast::sqrt(rgsq);
 
+        // Clamp squared cross-product magnitudes to prevent 1/raasq overflow
+        // in float. Near-linear geometries produce raasq ~ 0, giving huge
+        // inverse values that overflow rabinv and force intermediates.
+        // Matches SMALL convention used in HarmonicImproperForceGPU.cu.
+        if (raasq < SMALL)
+            raasq = SMALL;
+        if (rbbsq < SMALL)
+            rbbsq = SMALL;
+
         ForceReal rginv, raa2inv, rbb2inv;
         rginv = raa2inv = rbb2inv = ForceReal(0.0);
         if (rg > ForceReal(0.0))
             rginv = ForceReal(1.0) / rg;
-        if (raasq > ForceReal(0.0))
-            raa2inv = ForceReal(1.0) / raasq;
-        if (rbbsq > ForceReal(0.0))
-            rbb2inv = ForceReal(1.0) / rbbsq;
+        raa2inv = ForceReal(1.0) / raasq;
+        rbb2inv = ForceReal(1.0) / rbbsq;
         ForceReal rabinv = fast::sqrt(raa2inv * rbb2inv);
 
         ForceReal c_abcd = (aax * bbx + aay * bby + aaz * bbz) * rabinv;
@@ -171,6 +181,10 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
             c_abcd = ForceReal(1.0);
         if (c_abcd < -ForceReal(1.0))
             c_abcd = -ForceReal(1.0);
+        if (s_abcd > ForceReal(1.0))
+            s_abcd = ForceReal(1.0);
+        if (s_abcd < -ForceReal(1.0))
+            s_abcd = -ForceReal(1.0);
 
         ForceReal p = ForceReal(1.0);
         ForceReal ddfab;

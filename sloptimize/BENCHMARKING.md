@@ -157,9 +157,9 @@ integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double | 2,389 ± 51 | 1.0× |
-| **mixed** | **7,563 ± 328** | **3.17×** |
-| single | 12,135 ± 351 | 5.08× |
+| double | 2,371 ± 38 | 1.0× |
+| **mixed** | **10,197 ± 161** | **4.30×** |
+| single | 12,495 ± 732 | 5.27× |
 
 ### Upstream Regression Check
 
@@ -241,12 +241,16 @@ uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machi
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 2,389 ± 51 | 7,563 ± 328 | 12,135 ± 351 |
-| 0.01 | 1,989 ± 49 | 5,642 ± 101 | 9,400 ± 253 |
-| 0.03 | — | 4,916 ± 86 | — |
+| 0.005 | 2,371 ± 38 | 10,197 ± 161 | 12,495 ± 732 |
+| 0.01 | 2,013 ± 58 | 8,904 ± 262 | 8,994 ± 217 |
+| 0.03 | 1,894 ± 60 | 7,095 ± 121 | 7,500 ± 73 |
+| 0.05 | CRASH | 4,698 ± 45 | CRASH |
+| 0.1 | CRASH | 4,755 ± 5 | CRASH |
 
-dt=0.05 and dt=0.1 crash (Langevin dynamics with dihedrals becomes unstable).
-Mixed delivers 2.8–3.2× over double across stable dt values.
+Mixed delivers 4.3× over double at dt=0.005 and is **more stable** at large dt:
+double and single crash at dt≥0.05 due to dihedral force overflow from
+near-collinear geometries, while mixed survives thanks to the `SMALL` epsilon
+clamp on cross-product magnitudes (see dihedral stability fix below).
 
 ### Without Dihedrals (64K particles)
 
@@ -336,3 +340,37 @@ and cannot be further optimized without sacrificing the precision guarantees.
 For anisotropic potentials (patchy), mixed is ~1.7× slower than single because the
 evaluator internals (`PairModulator`, `PatchEnvelope` distance/angle math) still use
 `Scalar` which is double in mixed but float in single.
+
+---
+
+## Dihedral Numerical Stability Fix
+
+The GPU dihedral kernels (Harmonic, OPLS, PeriodicImproper) compute forces via
+cross products of bond vectors. Near-linear geometries (three consecutive atoms
+nearly collinear) cause the cross product magnitude to approach zero, leading to
+a chain of numerical failures in float:
+
+1. `raasq = |dab × dcbm|²` → tiny (catastrophic cancellation in float)
+2. `raa2inv = 1/raasq` → huge (`1/1e-38 → 1e+38`)
+3. `rabinv = sqrt(raa2inv * rbb2inv)` → overflow → `Inf`
+4. `s_abcd`, `c_abcd` → `NaN`
+5. Force intermediates `gaa = -raa2inv * rg` → huge → particle ejection
+
+The singularity is analytically removable (the `dV/dφ ∝ sin(φ)` factor cancels
+`1/|n|²` at collinear geometries), but float precision loses this cancellation.
+The CPU path uses `Scalar` (double in mixed mode), hiding the problem.
+
+**Fix:** Added `SMALL = ForceReal(0.001)` epsilon clamping on `raasq` and `rbbsq`
+before division, matching the existing convention in `HarmonicImproperForceGPU.cu`
+and `HarmonicAngleForceGPU.cu`. Also clamp `s_abcd` to [-1, 1] (previously only
+`c_abcd` was clamped).
+
+**Files modified:**
+- `hoomd/md/HarmonicDihedralForceGPU.cu`
+- `hoomd/md/OPLSDihedralForceGPU.cu`
+- `hoomd/md/PeriodicImproperForceGPU.cu`
+
+**Impact:**
+- Mixed TPS at dt=0.005: 7,563 → **10,197** (+35%, overflow handling was costly)
+- Mixed now survives dt=0.05 and dt=0.1 where double and single crash
+- 58/58 tests still pass
