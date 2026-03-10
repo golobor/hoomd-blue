@@ -116,111 +116,14 @@ but touches infrastructure shared with HPMC.
 
 ---
 
-## Accuracy
+## Accuracy & Benchmark Results
 
-Measured on 64K-particle polymer system (benchmark_chains.py configuration, 100 steps).
+See [BENCHMARKING.md](BENCHMARKING.md) for full accuracy measurements, performance
+tables across phases, dt sweep data, and scaling analysis.
 
-### Force Accuracy (vs Double Reference)
+**Headline**: 3× speedup over double on RTX 4090 (64K polymers + dihedrals), with
+force accuracy indistinguishable from single-precision (mean relative error ~3.6×10⁻⁷).
 
-| Metric | Mixed | Single |
-|--------|-------|--------|
-| Max relative error | 1.82×10⁻⁵ | 1.82×10⁻⁵ |
-| Mean relative error | 3.64×10⁻⁷ | 3.64×10⁻⁷ |
-| Mean absolute error | 2.87×10⁻⁶ | 2.87×10⁻⁶ |
-
-Mixed and single produce identical force errors — confirming all force computation now
-uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machine epsilon.
-
-### Energy Accuracy (vs Double Reference)
-
-| Metric | Mixed | Single |
-|--------|-------|--------|
-| PE relative difference | 4.85×10⁻⁸ | 4.85×10⁻⁸ |
-| KE relative difference | 2.30×10⁻⁷ | 2.30×10⁻⁷ |
-
-### Energy Conservation (100-step drift)
-
-| Build | ΔE/E₀ |
-|-------|--------|
-| Double | -6.30×10⁻⁵ |
-| Mixed | -6.23×10⁻⁵ |
-| Single | -6.23×10⁻⁵ |
-
----
-
-## Benchmark Results
-
-### Headline (64K polymers + dihedrals, dt=0.005, RTX 4090)
-
-| Build | TPS | vs Double |
-|-------|-----|-----------|
-| double | ~2,500 | 1.0× |
-| **mixed** | **~7,500** | **3.0×** |
-| single | ~12,000 | 4.8× |
-
-### Progression Through Phases
-
-**With dihedrals (64K particles, dt=0.005):**
-
-| Phase | Mixed TPS | vs Double | vs Single |
-|-------|-----------|-----------|-----------|
-| Phase 2A (external evaluators only) | 3,059 | +16.5% | 0.25× |
-| Phase 2B (float4 positions) | 4,262 | +62.3% | 0.35× |
-| Phase 2C (dihedral fix) | 7,474 | +199% | 0.62× |
-
-**Without dihedrals (64K particles, dt=0.005):**
-
-| Build | TPS | vs Double |
-|-------|-----|-----------|
-| Double | 4,504 | — |
-| Mixed (Phase 2B) | 11,218 | +149% |
-| Single | 19,408 | +331% |
-
-### dt Sweep — With Dihedrals (64K particles)
-
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 2,499 | 7,474 | 12,062 |
-| 0.01 | — | 5,312 (15% std) | 9,100 |
-| 0.03 | crashed | **4,023 (survives!)** | 7,522 |
-| 0.05 | crashed | crashed | crashed |
-
-Mixed is the **most stable build** for dihedrals at large dt.
-
-### dt Sweep — Without Dihedrals (64K particles)
-
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 4,328 | 10,825 | 19,548 |
-| 0.01 | 4,125 | 9,465 | 15,261 |
-| 0.03 | 3,278 | 7,522 | 4,828 |
-| 0.05 | 1,837 | 5,140 | 5,345 |
-| 0.1 | 1,882 | 4,970 | 8,088 |
-
-All builds stable. Mixed consistently ~2.5× double. At large dt single degrades
-(likely more nlist rebuilds from float integrator drift).
-
-### 200K Particles — Without Dihedrals
-
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 1,485 | 4,384 | 6,760 |
-| 0.01 | 1,361 | 3,840 | 5,824 |
-| 0.03 | 1,168 | 3,061 | 4,539 |
-
-Mixed achieves ~2.95× double at 200K — bandwidth-bound workloads benefit more at
-larger system sizes. Mixed-to-single gap narrows to 1.54× (from 1.80× at 64K).
-
----
-
-## Remaining Mixed→Single Performance Gap
-
-The 1.6× gap between mixed (~7,500 TPS) and single (~12,000 TPS) is structural:
-
-1. **Integrator I/O**: Read/write `double4` positions for integration accuracy
-2. **Position sync**: `syncPositionsForceReal()` reads double4, writes float4 (
-   one extra kernel per timestep)
-3. **CellList**: Stores `Scalar4` positions — nlist reads double4 neighbors
-
-These are fundamental to the mixed-precision design (double integration is the point)
-and cannot be further optimized without sacrificing the precision guarantees.
+The remaining 1.6× gap to single is structural: double-precision integrator I/O,
+position sync kernel, and double4 CellList reads — all fundamental to the
+mixed-precision design.

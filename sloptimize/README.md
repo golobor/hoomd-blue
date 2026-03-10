@@ -33,10 +33,12 @@ benefit more from halved data widths at larger system sizes).
 
 ## Further reading
 
-- [**DESIGN.md**](DESIGN.md) — Technical decisions, accuracy data, benchmark tables,
+- [**DESIGN.md**](DESIGN.md) — Technical decisions, accuracy data,
   and analysis of what was/wasn't done and why.
+- [**BENCHMARKING.md**](BENCHMARKING.md) — How to build comparison configurations,
+  run benchmarks, and full results (accuracy, dt sweeps, scaling).
 - [**CHANGELOG.md**](CHANGELOG.md) — Full implementation diary: every phase, every bug,
-  every file changed. The unabridged developer log.
+  every file changed.
 
 ## Build
 
@@ -46,58 +48,18 @@ benefit more from halved data widths at larger system sizes).
 eval "$(~/miniforge3/bin/conda shell.bash hook)" && conda activate main
 ```
 
-### Three build configurations
-
-| Config | CMake flags | Install prefix |
-|--------|------------|----------------|
-| mixed | `-DHOOMD_MIXED_PRECISION=ON -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | `build/install_mixed/` |
-| double | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | `build/install_double/` |
-| single | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | `build/install_single/` |
-
-### Build and test (mixed)
+### Build and test
 
 ```bash
 cd build && make -j8 && ctest --output-on-failure -j8
 make install  # installs to build/install_mixed/
 ```
 
-### Switch between builds
+The mixed build uses CMake flags:
+`-DHOOMD_MIXED_PRECISION=ON -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32`
 
-```bash
-source sloptimize/use_hoomd.sh mixed    # forces=float, integration=double
-source sloptimize/use_hoomd.sh double   # original, everything double
-source sloptimize/use_hoomd.sh single   # everything float
-```
-
-Auto-detects repo root and Python version from the script location.
-
-## Run benchmarks
-
-```bash
-cd sloptimize
-
-# Single dt, all three builds in parallel (one per GPU):
-python run_benchmarks.py benchmark_chains.py \
-  --lib mixed=../build/install_mixed/lib/python3.12/site-packages \
-  --lib double=../build/install_double/lib/python3.12/site-packages \
-  --lib single=../build/install_single/lib/python3.12/site-packages \
-  --no-dt \
-  -- 64000 200
-
-# dt sweep:
-python run_benchmarks.py benchmark_chains.py \
-  --lib mixed=... --lib double=... --lib single=... \
-  -- 64000 200
-
-# Without dihedrals:
-python run_benchmarks.py benchmark_chains.py \
-  --lib mixed=... --lib double=... --lib single=... \
-  --no-dt \
-  -- 64000 200 --no-dihedral
-```
-
-The runner auto-detects free GPUs and assigns one job per GPU. Use `--gpus 0,1,2`
-to restrict to specific devices.
+To build the double/single comparison configurations for benchmarking, see
+[BENCHMARKING.md](BENCHMARKING.md).
 
 ## Commit history
 
