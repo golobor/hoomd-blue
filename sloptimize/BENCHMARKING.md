@@ -187,6 +187,22 @@ workloads benefit more at larger system sizes. Mixed-to-single gap narrows to
 1.43× (from 1.64× at 64K), consistent with memory bandwidth becoming the
 dominant bottleneck.
 
+### With Attraction, No Dihedrals (64K particles, A=-0.5, r_cut=1.5)
+
+Adds a second DPDConservative pair force (attractive, separate neighbor list).
+
+| dt | Double | Mixed | Single | Mixed/Double |
+|----|--------|-------|--------|-------------|
+| 0.005 | 2,013 ± 85 | 7,012 ± 126 | 10,200 ± 100 | 3.48× |
+| 0.01 | 1,880 ± 126 | 5,689 ± 186 | 8,730 ± 164 | 3.03× |
+| 0.03 | 1,527 ± 95 | 3,954 ± 97 | 5,763 ± 129 | 2.59× |
+| 0.05 | 1,079 ± 53 | 2,364 ± 44 | 3,732 ± 49 | 2.19× |
+| 0.1 | 1,078 ± 24 | 2,439 ± 21 | 3,821 ± 16 | 2.26× |
+
+All stable at every dt. The second pair force increases compute intensity,
+giving mixed a higher speedup (3.5× vs 2.5× without attraction at dt=0.005) —
+more pair-force compute means more float savings to harvest.
+
 ---
 
 ## Remaining Mixed→Single Performance Gap
