@@ -962,11 +962,58 @@ ForceReal — positions are narrowed to `ForceReal3` immediately after load, and
 
 The neighbor reads are the dominant bandwidth consumer. Converting them to ForceReal4
 would halve the bandwidth of the most frequent memory access in the nlist kernel,
-but requires changing CellList infrastructure (`CellListGPU` stores `Scalar4` xyzf
-arrays), which is shared by many components.
+but requires changing CellList infrastructure.
 
-**Decision**: Defer CellList conversion. The nlist compute path is already correct
-(ForceReal math). The remaining bandwidth overhead is a potential future optimization.
+### CellList `d_cell_xyzf` deep dive
+
+**What it is:** `GPUArray<Scalar4> m_xyzf` in `CellList.h` — stores `(x, y, z, flag)` for
+every particle slot in the cell list. The flag is either charge, type, or particle index
+depending on configuration. This is the main data structure the nlist kernels read to find
+neighbor positions.
+
+**Writer:** One kernel in `CellListGPU.cu`:
+```cpp
+d_xyzf[write_pos] = make_scalar4(pos.x, pos.y, pos.z, flag);
+```
+Reads positions from `d_pos` (Scalar4), bins them into cells.
+
+**Consumers (files that would need changes):**
+
+| File | Role |
+|------|------|
+| `CellList.h` | Declaration: `GPUArray<Scalar4> m_xyzf`, `getXYZFArray()` return type |
+| `CellList.cc` | Host CPU path: allocates and fills `m_xyzf` |
+| `CellListGPU.cu` | GPU kernel: writes `Scalar4` → would write `ForceReal4` |
+| `CellListGPU.cc` | Host side: ArrayHandle types |
+| `CellListGPU.cuh` | Kernel signature |
+| `NeighborListGPUBinned.cu/.cuh/.cc` | GPU Cell nlist (benchmark uses this) |
+| `NeighborListGPUStencil.cu/.cuh/.cc` | GPU Stencil nlist variant |
+| `NeighborListBinned.cc` | CPU Cell nlist fallback |
+| `NeighborListStencil.cc` | CPU Stencil nlist fallback |
+| `ComputeFreeVolumeGPU.h` | HPMC (Monte Carlo, not MD) |
+| `test_cell_list.cc` | Test expectations |
+
+~12 files total, but changes in each are mechanical: `Scalar4` → `ForceReal4` in
+signatures, `make_scalar4` → `make_forcereal4` in the write kernel. The `.w` flag field
+needs care: when storing particle index as `__int_as_scalar(idx)`, would need
+`__int_as_forcereal(idx)` (already exists).
+
+### Cost-benefit analysis
+
+The nlist is rebuilt only every ~100 steps (with typical buffer). During the 99 steps
+where the nlist is reused, the bandwidth savings is zero. During the 1 rebuild step,
+we'd halve the dominant memory access (each particle reads ~20-50 neighbor candidates
+from `d_cell_xyzf`).
+
+Estimated improvement: `(1/100) × (fraction of rebuild time that is xyzf bandwidth) × 50%`,
+which works out to roughly **~0.05%** for the polymer workload — negligible.
+
+Would matter more for systems with fast-moving particles or small buffers (frequent
+nlist rebuilds), but not for the target polymer/chromatin workloads.
+
+**Decision**: Defer. The nlist compute path is already correct (ForceReal math). The
+change is moderate scope (~12 files, mechanical) but the payoff is negligible for
+target workloads.
 
 ---
 
