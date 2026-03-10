@@ -120,48 +120,31 @@ class PatchEnvelope
         {
         // compute current particle direction vectors
 
-        // rotate from particle to world frame — use LongReal for rotation accuracy
-        vec3<LongReal> ex(1, 0, 0);
-        vec3<LongReal> ey(0, 1, 0);
-        vec3<LongReal> ez(0, 0, 1);
-
         // a1, a2, a3 are orientation vectors of particle a in world frame
         // b1, b2, b3 are orientation vectors of particle b in world frame
         // ni_world is patch direction of particle i in world frame
 
-        auto q_i = quat<LongReal>(_q_i);
-        auto q_j = quat<LongReal>(_q_j);
+        // Build rotation matrices in ForceReal. The cancellation-free rotmat3
+        // constructor (1 - 2c² - 2d² diagonals) makes float-precision safe.
+        // Quaternions are narrowed from Scalar→ForceReal; float has ~7 digits
+        // of angular precision (~10⁻⁷ rad ≈ 0.006 millideg), more than adequate.
+        auto q_i_fr = quat<ForceReal>(_q_i);
+        auto q_j_fr = quat<ForceReal>(_q_j);
+        auto R_i = rotmat3<ForceReal>(q_i_fr);
+        auto R_j = rotmat3<ForceReal>(q_j_fr);
 
-#ifndef __HIPCC__
-        auto R_i = rotmat3<LongReal>(q_i);
-        auto R_j = rotmat3<LongReal>(q_j);
-        auto a1_lr = R_i * ex;
-        auto a2_lr = R_i * ey;
-        auto a3_lr = R_i * ez;
-        auto ni_world_lr = R_i * (vec3<LongReal>)p_i;
-        auto b1_lr = R_j * ex;
-        auto b2_lr = R_j * ey;
-        auto b3_lr = R_j * ez;
-        auto nj_world_lr = R_j * (vec3<LongReal>)p_j;
-#else
-        auto a1_lr = rotate(q_i, ex);
-        auto a2_lr = rotate(q_i, ey);
-        auto a3_lr = rotate(q_i, ez);
-        auto ni_world_lr = rotate(q_i, vec3<LongReal>(p_i.x, p_i.y, p_i.z));
-        auto b1_lr = rotate(q_j, ex);
-        auto b2_lr = rotate(q_j, ey);
-        auto b3_lr = rotate(q_j, ez);
-        auto nj_world_lr = rotate(q_j, vec3<LongReal>(p_j.x, p_j.y, p_j.z));
-#endif
-        // narrow rotation results to ForceReal for force computation
-        a1 = vec3<ForceReal>(ForceReal(a1_lr.x), ForceReal(a1_lr.y), ForceReal(a1_lr.z));
-        a2 = vec3<ForceReal>(ForceReal(a2_lr.x), ForceReal(a2_lr.y), ForceReal(a2_lr.z));
-        a3 = vec3<ForceReal>(ForceReal(a3_lr.x), ForceReal(a3_lr.y), ForceReal(a3_lr.z));
-        ni_world = vec3<ForceReal>(ForceReal(ni_world_lr.x), ForceReal(ni_world_lr.y), ForceReal(ni_world_lr.z));
-        b1 = vec3<ForceReal>(ForceReal(b1_lr.x), ForceReal(b1_lr.y), ForceReal(b1_lr.z));
-        b2 = vec3<ForceReal>(ForceReal(b2_lr.x), ForceReal(b2_lr.y), ForceReal(b2_lr.z));
-        b3 = vec3<ForceReal>(ForceReal(b3_lr.x), ForceReal(b3_lr.y), ForceReal(b3_lr.z));
-        nj_world = vec3<ForceReal>(ForceReal(nj_world_lr.x), ForceReal(nj_world_lr.y), ForceReal(nj_world_lr.z));
+        vec3<ForceReal> ex(1, 0, 0);
+        vec3<ForceReal> ey(0, 1, 0);
+        vec3<ForceReal> ez(0, 0, 1);
+
+        a1 = R_i * ex;
+        a2 = R_i * ey;
+        a3 = R_i * ez;
+        ni_world = R_i * vec3<ForceReal>(ForceReal(p_i.x), ForceReal(p_i.y), ForceReal(p_i.z));
+        b1 = R_j * ex;
+        b2 = R_j * ey;
+        b3 = R_j * ez;
+        nj_world = R_j * vec3<ForceReal>(ForceReal(p_j.x), ForceReal(p_j.y), ForceReal(p_j.z));
 
         // compute distance
         drsq = dot(dr, dr);

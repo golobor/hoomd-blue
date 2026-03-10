@@ -419,6 +419,51 @@ equivalent to `minImage()`. Also simplified remaining `#ifdef`-guarded call site
 
 ---
 
+## Aniso Evaluator: Float Rotation Optimization
+
+**Goal**: Eliminate double-precision quaternion rotation from the patchy force kernel to
+unlock mixed-precision speedup for anisotropic potentials.
+
+### rotmat3(quat) cancellation-free constructor (VectorMath.h)
+
+The original `rotmat3(quat)` constructor used `a²+b²-c²-d²` for diagonal elements, which
+suffers catastrophic cancellation when the quaternion represents rotations near 90° (where
+`a²+b² ≈ c²+d²`). This makes float precision unsafe.
+
+**Fix**: Rewrote using the identity `a²+b²-c²-d² = 1-2c²-2d²` (from the unit quaternion
+constraint `a²+b²+c²+d² = 1`). This subtracts small values from 1, eliminating cancellation.
+Same formula already used in `EvaluatorPairALJ::quat2mat()`.
+
+Off-diagonal elements (`2(xy ± sz)` etc.) are inherently safe — no cancellation.
+
+**File changed**: `hoomd/VectorMath.h` (~L1143-1175)
+
+### PatchEnvelope rotation unified to ForceReal (PatchEnvelope.h)
+
+Previously, PatchEnvelope had separate CPU and GPU rotation paths:
+- **CPU** (`#ifndef __HIPCC__`): `rotmat3<LongReal>` → mat×vec in double
+- **GPU** (`#else`): `rotate(quat<LongReal>, vec3<LongReal>)` → 8 double-precision rotations
+
+Both used `LongReal` (double in mixed builds), wasting the RTX 4090's 64:1 FP32:FP64 ratio.
+
+**Fix**: Unified to a single path using `rotmat3<ForceReal>` with the cancellation-free
+constructor. Quaternions are narrowed from `Scalar4` to `quat<ForceReal>` (float has ~7
+significant digits = ~0.006 millidegree angular precision, more than sufficient for
+molecular simulations).
+
+**File changed**: `hoomd/md/PatchEnvelope.h` (~L118-150)
+
+### Benchmark results
+
+The rotation optimization gave only ~3-6% mixed-over-double improvement. The rotation
+FLOPs were NOT the bottleneck — the rest of the evaluator pipeline (`PairModulator::evaluate()`,
+`PatchEnvelope` distance/angle math, and the `AnisoPotentialPairGPU` kernel's position
+arithmetic) still operates entirely in `Scalar` (double).
+
+See BENCHMARKING.md "Patchy Particles — After Rotation Optimization" for full results.
+
+---
+
 ## Commit History
 
 ```

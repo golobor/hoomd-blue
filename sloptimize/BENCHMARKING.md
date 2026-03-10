@@ -228,6 +228,32 @@ float.
 For orientation-heavy potentials, the evaluator internals must also be
 converted to `ForceReal` to see gains.
 
+### Patchy Particles — After Rotation Optimization (rotmat3 → ForceReal)
+
+Same parameters as above. `rotmat3(quat)` constructor rewritten with
+cancellation-free formula (`1 − 2c² − 2d²` diagonals), and PatchEnvelope
+rotation unified to use `rotmat3<ForceReal>` on both CPU and GPU (eliminating
+all double-precision FLOPs from the quaternion rotation path).
+
+| dt | Double | Mixed | Single | Mixed/Double |
+|----|--------|-------|--------|-------------|
+| 0.005 | 328 ± 19 | 351 ± 20 | 5,181 ± 160 | 1.07× |
+| 0.01 | 361 ± 28 | 372 ± 32 | 4,532 ± 155 | 1.03× |
+| 0.03 | 367 ± 20 | 389 ± 24 | 3,941 ± 111 | 1.06× |
+| 0.05 | 340 ± 12 | 345 ± 10 | 2,691 ± 21 | 1.01× |
+| 0.1 | 332 ± 2 | 351 ± 2 | 2,837 ± 11 | 1.06× |
+
+**Marginal improvement** (~3–6% mixed over double). The rotation was NOT the
+bottleneck — the rest of the evaluator pipeline (`PairModulator::evaluate()`,
+`PatchEnvelope` distance/angle math, pair loop position arithmetic in the
+`AnisoPotentialPairGPU` kernel) still operates in `Scalar` (double).
+
+**Conclusion**: To bring mixed close to single for anisotropic potentials, the
+_entire_ aniso pair kernel and evaluator chain would need ForceReal conversion,
+analogous to what was done for isotropic `PotentialPairGPU`. The rotation fix
+is still valuable as a correctness improvement (float-safe cancellation-free
+formula) but does not unlock the expected throughput gain on its own.
+
 ---
 
 ## Remaining Mixed→Single Performance Gap

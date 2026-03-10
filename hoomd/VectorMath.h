@@ -1142,20 +1142,35 @@ template<class Real> struct rotmat3
     */
     DEVICE explicit rotmat3(const quat<Real>& q)
         {
-        // formula from https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
-        Real a = q.s, b = q.v.x, c = q.v.y, d = q.v.z;
+        // Cancellation-free formula: uses 1 - 2c² - 2d² instead of a²+b²-c²-d²
+        // for diagonals. Avoids catastrophic cancellation when a²+b² ≈ c²+d²
+        // (i.e. rotations near 90°), making float-precision construction safe.
+        // Same formula used by EvaluatorPairALJ::quat2mat().
+        Real two_x = Real(2) * q.v.x;
+        Real two_y = Real(2) * q.v.y;
+        Real two_z = Real(2) * q.v.z;
+        Real two_x_sq = q.v.x * two_x;
+        Real two_y_sq = q.v.y * two_y;
+        Real two_z_sq = q.v.z * two_z;
 
-        row0.x = a * a + b * b - c * c - d * d;
-        row0.y = 2 * b * c - 2 * a * d;
-        row0.z = 2 * b * d + 2 * a * c;
+        row0.x = Real(1) - two_y_sq - two_z_sq;
+        row1.y = Real(1) - two_x_sq - two_z_sq;
+        row2.z = Real(1) - two_x_sq - two_y_sq;
 
-        row1.x = 2 * b * c + 2 * a * d;
-        row1.y = a * a - b * b + c * c - d * d;
-        row1.z = 2 * c * d - 2 * a * b;
+        Real xy = q.v.x * two_y;
+        Real sz = q.s * two_z;
+        row0.y = xy - sz;
+        row1.x = xy + sz;
 
-        row2.x = 2 * b * d - 2 * a * c;
-        row2.y = 2 * c * d + 2 * a * b;
-        row2.z = a * a - b * b - c * c + d * d;
+        Real xz = q.v.x * two_z;
+        Real sy = q.s * two_y;
+        row0.z = xz + sy;
+        row2.x = xz - sy;
+
+        Real yz = q.v.y * two_z;
+        Real sx = q.s * two_x;
+        row1.z = yz - sx;
+        row2.y = yz + sx;
         }
 
     //! Default construct an identity matrix
