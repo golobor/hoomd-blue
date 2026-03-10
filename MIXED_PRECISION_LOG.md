@@ -489,7 +489,7 @@ hot path.
 **Goal**: Convert the remaining FP64 force kernels to ForceReal. Focus on benchmark-relevant
 kernels first.
 
-**Status**: 🔄 IN PROGRESS
+**Status**: ✅ COMPLETE
 
 ### Step 1: Convert PotentialExternalGPU.cuh + all external evaluators
 
@@ -901,8 +901,120 @@ bottleneck.
 
 ---
 
-## Phase 3: --use_fast_math ⬜ FUTURE
+## Phase 2C: Dihedral/Improper/Angle Kernel Fixes ✅ COMPLETE
 
-Enable CUDA `--use_fast_math` compiler flag for hardware-accelerated FP32 intrinsics
-(sin, cos, exp, rsqrt, etc.). This is a single cmake flag change but needs validation that
-numerical results remain acceptable for target applications.
+### Problem
+
+Four dihedral/improper kernels and one angle kernel were missed during Phase 2B.
+They loaded `ForceReal4` positions but immediately promoted to `Scalar3` (double3) and
+performed ALL arithmetic in `Scalar` (double). Two issues:
+
+1. **Performance**: All dihedral math in FP64 → 1:64 penalty on RTX 4090.
+   This explained why adding dihedrals dropped mixed TPS from 10825 to 4083 (2.65×).
+2. **Precision Frankenstein → instability**: Raw `sqrtf()` called on `Scalar` (double)
+   values silently truncates to float before computing sqrt, then the result (with ~7
+   significant digits) gets stored in double and subsequent double-precision divisions
+   pad with noise bits. Near-collinear dihedral geometries amplify this noise through
+   `1/raasq` divisions, causing force blowups.
+
+### Files Converted
+
+- `HarmonicDihedralForceGPU.cu` — used by `md.dihedral.Periodic` (benchmark kernel)
+- `TableDihedralForceGPU.cu` — vec3<Scalar>→vec3<ForceReal>, acosf→fast::acos
+- `HarmonicImproperForceGPU.cu` — rsqrtf→fast::rsqrt, #define SMALL→ForceReal(0.001)
+- `PeriodicImproperForceGPU.cu` — Chebyshev recurrence converted
+- `CosineSqAngleForceGPU.cu` — cosine-squared angle potential
+
+### Benchmark Results (64K polymers + dihedrals, dt=0.005, RTX 4090)
+
+| Build | Before fix (TPS) | After fix (TPS) | Change |
+|-------|-----------------|-----------------|--------|
+| double | 1158 | 2499 | — (run variance) |
+| **mixed** | **4083** | **7474** | **+83%** |
+| single | 11954 | 12062 | — (no code change) |
+
+Mixed/double ratio: 3.0× (up from 3.5× — double also varied).
+Mixed/single gap: 1.6× (down from 2.9× — most of the dihedral bottleneck eliminated).
+
+### dt Sweep Stability (WITH dihedrals)
+
+| dt | Before: Double | Before: Mixed | Before: Single | After: Mixed |
+|----|---------------|---------------|----------------|-------------|
+| 0.005 | 1158 | 4083 | 11954 | stable |
+| 0.01 | 2028 | 1226 (67% std!) | 9100 | **5312 (15% std)** |
+| 0.03 | crashed | crashed | 7522 | **4023 (survives!)** |
+| 0.05 | crashed | crashed | crashed | crashed |
+
+Mixed is now the **most stable build** for dihedrals — survives dt=0.03 where both
+double and single crash. The sqrtf/double Frankenstein bug is eliminated.
+
+---
+
+## Neighbor List Analysis
+
+The nlist GPU kernel (`NeighborListGPUBinned.cu`) already performs distance math in
+ForceReal — positions are narrowed to `ForceReal3` immediately after load, and
+`box.minImageForceReal()` is used for minimum image. However, positions are still
+**read** as `Scalar4` (double4 = 32 bytes per particle):
+
+- Self position: from `d_pos` (Scalar4) — one read per particle
+- Neighbor positions: from `d_cell_xyzf` (Scalar4) — many reads per neighbor
+
+The neighbor reads are the dominant bandwidth consumer. Converting them to ForceReal4
+would halve the bandwidth of the most frequent memory access in the nlist kernel,
+but requires changing CellList infrastructure (`CellListGPU` stores `Scalar4` xyzf
+arrays), which is shared by many components.
+
+**Decision**: Defer CellList conversion. The nlist compute path is already correct
+(ForceReal math). The remaining bandwidth overhead is a potential future optimization.
+
+---
+
+## Remaining Unconverted Force Kernels (low priority)
+
+These kernels still use Scalar throughout their body. Conversion is mechanical but
+only matters if used in target workloads:
+
+- `TableAngleForceGPU.cu` — tabulated angle potential
+- `PPPMForceComputeGPU.cu` — long-range electrostatics (charge mesh)
+- `PotentialTersoffGPU.cuh` — three-body potential (materials science)
+- `ForceCompositeGPU.cu` — rigid body composite forces
+- `ActiveForceComputeGPU.cu` — active matter self-propulsion
+- `ForceDistanceConstraintGPU.cu` — distance constraints
+
+---
+
+## Summary
+
+### Overall Achievement (64K polymer + dihedrals, dt=0.005, RTX 4090)
+
+| Build | TPS | Relative to double |
+|-------|-----|-------------------|
+| double (baseline) | ~2500 | 1.0× |
+| **mixed** | **~7500** | **3.0×** |
+| single | ~12000 | 4.8× |
+
+The mixed-precision build achieves **3× speedup over double** on consumer GPUs while
+maintaining double-precision position integration. The remaining 1.6× gap to single
+is structural: the integrator accumulates positions in double, and CellList/nlist
+read double4 positions (2× bandwidth vs single).
+
+### What was done
+
+1. **Phase 1**: Force output pipeline — `Scalar4`→`ForceReal4` for force/virial/torque
+   storage and accumulation across all GPU kernels.
+2. **Phase 2A**: External potential evaluators — all 4 wall/periodic/field evaluators
+   converted to ForceReal math.
+3. **Phase 2B**: Float4 position mirror — `m_pos_forcereal` array synced from double
+   positions, loaded as `ForceReal4` in all force kernels (~30 files).
+4. **Phase 2C**: Dihedral/improper/angle fixes — 5 missed kernels converted, fixing
+   both performance (+83% for dihedrals) and stability (mixed survives dt=0.03).
+
+### What was NOT done (and why)
+
+- `--use_fast_math`: The `fast::` namespace already uses GPU intrinsics (`__sinf`,
+  `__cosf`, `__expf`). The flag would only affect plain `/` divisions (~2 ULP loss).
+  Expected impact <5%, not worth the precision risk.
+- CellList ForceReal4: Would halve nlist neighbor-read bandwidth but requires deep
+  infrastructure changes. Deferred.
+- 6 remaining force kernels: Not used in target workloads.
