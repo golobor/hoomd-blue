@@ -11,7 +11,7 @@
 #include <assert.h>
 
 // SMALL a relatively small number
-#define SMALL Scalar(0.001)
+#define SMALL ForceReal(0.001)
 
 namespace hoomd
     {
@@ -61,17 +61,17 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
     ForceReal4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c-d quartet
-    Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
-    Scalar3 pos_a, pos_b, pos_c,
+    ForceReal3 idx_pos = make_forcereal3(ForceReal(idx_postype.x), ForceReal(idx_postype.y), ForceReal(idx_postype.z));
+    ForceReal3 pos_a, pos_b, pos_c,
         pos_d; // allocate space for the a,b, and c atoms in the a-b-c-d quartet
 
     // initialize the force to 0
-    ForceReal4 force_idx = make_forcereal4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force_idx = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
     // initialize the virial to 0
-    Scalar virial_idx[6];
+    ForceReal virial_idx[6];
     for (int i = 0; i < 6; i++)
-        virial_idx[i] = Scalar(0.0);
+        virial_idx[i] = ForceReal(0.0);
 
     // loop over all impropers
     for (int improper_idx = 0; improper_idx < n_impropers; improper_idx++)
@@ -87,13 +87,13 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 x_postype = d_pos[cur_improper_x_idx];
-        Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
+        ForceReal3 x_pos = make_forcereal3(ForceReal(x_postype.x), ForceReal(x_postype.y), ForceReal(x_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 y_postype = d_pos[cur_improper_y_idx];
-        Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
+        ForceReal3 y_pos = make_forcereal3(ForceReal(y_postype.x), ForceReal(y_postype.y), ForceReal(y_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 z_postype = d_pos[cur_improper_z_idx];
-        Scalar3 z_pos = make_scalar3(z_postype.x, z_postype.y, z_postype.z);
+        ForceReal3 z_pos = make_forcereal3(ForceReal(z_postype.x), ForceReal(z_postype.y), ForceReal(z_postype.z));
 
         if (cur_improper_abcd == 0)
             {
@@ -125,108 +125,108 @@ __global__ void gpu_compute_harmonic_improper_forces_kernel(ForceReal4* d_force,
             }
 
         // calculate dr for a-b,c-b,and a-c
-        Scalar3 dab = pos_a - pos_b;
-        Scalar3 dcb = pos_c - pos_b;
-        Scalar3 ddc = pos_d - pos_c;
+        ForceReal3 dab = pos_a - pos_b;
+        ForceReal3 dcb = pos_c - pos_b;
+        ForceReal3 ddc = pos_d - pos_c;
 
-        dab = box.minImage(dab);
-        dcb = box.minImage(dcb);
-        ddc = box.minImage(ddc);
+        dab = box.minImageForceReal(dab);
+        dcb = box.minImageForceReal(dcb);
+        ddc = box.minImageForceReal(ddc);
 
         // get the improper parameters (MEM TRANSFER: 12 bytes)
         Scalar2 params = __ldg(d_params + cur_improper_type);
-        Scalar K = params.x;
-        Scalar chi = params.y;
+        ForceReal K = ForceReal(params.x);
+        ForceReal chi = ForceReal(params.y);
 
-        Scalar r1 = rsqrtf(dot(dab, dab));
-        Scalar r2 = rsqrtf(dot(dcb, dcb));
-        Scalar r3 = rsqrtf(dot(ddc, ddc));
+        ForceReal r1 = fast::rsqrt(dot(dab, dab));
+        ForceReal r2 = fast::rsqrt(dot(dcb, dcb));
+        ForceReal r3 = fast::rsqrt(dot(ddc, ddc));
 
-        Scalar ss1 = r1 * r1;
-        Scalar ss2 = r2 * r2;
-        Scalar ss3 = r3 * r3;
+        ForceReal ss1 = r1 * r1;
+        ForceReal ss2 = r2 * r2;
+        ForceReal ss3 = r3 * r3;
 
         // Cosine and Sin of the angle between the planes
-        Scalar c0 = dot(dab, ddc) * r1 * r3;
-        Scalar c1 = dot(dab, dcb) * r1 * r2;
-        Scalar c2 = -dot(ddc, dcb) * r3 * r2;
+        ForceReal c0 = dot(dab, ddc) * r1 * r3;
+        ForceReal c1 = dot(dab, dcb) * r1 * r2;
+        ForceReal c2 = -dot(ddc, dcb) * r3 * r2;
 
-        Scalar s1 = Scalar(1.0) - c1 * c1;
+        ForceReal s1 = ForceReal(1.0) - c1 * c1;
         if (s1 < SMALL)
             s1 = SMALL;
-        s1 = Scalar(1.0) / s1;
+        s1 = ForceReal(1.0) / s1;
 
-        Scalar s2 = Scalar(1.0) - c2 * c2;
+        ForceReal s2 = ForceReal(1.0) - c2 * c2;
         if (s2 < SMALL)
             s2 = SMALL;
-        s2 = Scalar(1.0) / s2;
+        s2 = ForceReal(1.0) / s2;
 
-        Scalar s12 = sqrtf(s1 * s2);
-        Scalar c = (c1 * c2 + c0) * s12;
+        ForceReal s12 = fast::sqrt(s1 * s2);
+        ForceReal c = (c1 * c2 + c0) * s12;
 
-        if (c > Scalar(1.0))
-            c = Scalar(1.0);
-        if (c < -Scalar(1.0))
-            c = -Scalar(1.0);
+        if (c > ForceReal(1.0))
+            c = ForceReal(1.0);
+        if (c < -ForceReal(1.0))
+            c = -ForceReal(1.0);
 
-        Scalar s = sqrtf(Scalar(1.0) - c * c);
+        ForceReal s = fast::sqrt(ForceReal(1.0) - c * c);
         if (s < SMALL)
             s = SMALL;
 
-        Scalar domega = fast::acos(c) - chi;
-        Scalar a = K * domega;
+        ForceReal domega = fast::acos(c) - chi;
+        ForceReal a = K * domega;
 
         // calculate the energy, 1/4th for each atom
-        // Scalar improper_eng = 0.25*a*domega;
-        Scalar improper_eng = Scalar(0.125) * a * domega; // the .125 term is 1/2 * 1/4
+        // ForceReal improper_eng = 0.25*a*domega;
+        ForceReal improper_eng = ForceReal(0.125) * a * domega; // the .125 term is 1/2 * 1/4
 
         // a = -a * 2.0/s;
         a = -a / s; // the missing 2.0 factor is to ensure K/2 is factored in for the forces
         c = c * a;
         s12 = s12 * a;
-        Scalar a11 = c * ss1 * s1;
-        Scalar a22 = -ss2 * (Scalar(2.0) * c0 * s12 - c * (s1 + s2));
-        Scalar a33 = c * ss3 * s2;
+        ForceReal a11 = c * ss1 * s1;
+        ForceReal a22 = -ss2 * (ForceReal(2.0) * c0 * s12 - c * (s1 + s2));
+        ForceReal a33 = c * ss3 * s2;
 
-        Scalar a12 = -r1 * r2 * (c1 * c * s1 + c2 * s12);
-        Scalar a13 = -r1 * r3 * s12;
-        Scalar a23 = r2 * r3 * (c2 * c * s2 + c1 * s12);
+        ForceReal a12 = -r1 * r2 * (c1 * c * s1 + c2 * s12);
+        ForceReal a13 = -r1 * r3 * s12;
+        ForceReal a23 = r2 * r3 * (c2 * c * s2 + c1 * s12);
 
-        Scalar sx2 = a22 * dcb.x + a23 * ddc.x + a12 * dab.x;
-        Scalar sy2 = a22 * dcb.y + a23 * ddc.y + a12 * dab.y;
-        Scalar sz2 = a22 * dcb.z + a23 * ddc.z + a12 * dab.z;
+        ForceReal sx2 = a22 * dcb.x + a23 * ddc.x + a12 * dab.x;
+        ForceReal sy2 = a22 * dcb.y + a23 * ddc.y + a12 * dab.y;
+        ForceReal sz2 = a22 * dcb.z + a23 * ddc.z + a12 * dab.z;
 
         // calculate the forces for each particle
-        Scalar ffax = a12 * dcb.x + a13 * ddc.x + a11 * dab.x;
-        Scalar ffay = a12 * dcb.y + a13 * ddc.y + a11 * dab.y;
-        Scalar ffaz = a12 * dcb.z + a13 * ddc.z + a11 * dab.z;
+        ForceReal ffax = a12 * dcb.x + a13 * ddc.x + a11 * dab.x;
+        ForceReal ffay = a12 * dcb.y + a13 * ddc.y + a11 * dab.y;
+        ForceReal ffaz = a12 * dcb.z + a13 * ddc.z + a11 * dab.z;
 
-        Scalar ffbx = -sx2 - ffax;
-        Scalar ffby = -sy2 - ffay;
-        Scalar ffbz = -sz2 - ffaz;
+        ForceReal ffbx = -sx2 - ffax;
+        ForceReal ffby = -sy2 - ffay;
+        ForceReal ffbz = -sz2 - ffaz;
 
-        Scalar ffdx = a23 * dcb.x + a33 * ddc.x + a13 * dab.x;
-        Scalar ffdy = a23 * dcb.y + a33 * ddc.y + a13 * dab.y;
-        Scalar ffdz = a23 * dcb.z + a33 * ddc.z + a13 * dab.z;
+        ForceReal ffdx = a23 * dcb.x + a33 * ddc.x + a13 * dab.x;
+        ForceReal ffdy = a23 * dcb.y + a33 * ddc.y + a13 * dab.y;
+        ForceReal ffdz = a23 * dcb.z + a33 * ddc.z + a13 * dab.z;
 
-        Scalar ffcx = sx2 - ffdx;
-        Scalar ffcy = sy2 - ffdy;
-        Scalar ffcz = sz2 - ffdz;
+        ForceReal ffcx = sx2 - ffdx;
+        ForceReal ffcy = sy2 - ffdy;
+        ForceReal ffcz = sz2 - ffdz;
 
         // and calculate the virial (upper triangular version)
-        Scalar improper_virial[6];
+        ForceReal improper_virial[6];
         improper_virial[0]
-            = Scalar(1. / 4.) * (dab.x * ffax + dcb.x * ffcx + (ddc.x + dcb.x) * ffdx);
+            = ForceReal(1. / 4.) * (dab.x * ffax + dcb.x * ffcx + (ddc.x + dcb.x) * ffdx);
         improper_virial[1]
-            = Scalar(1. / 4.) * (dab.y * ffax + dcb.y * ffcx + (ddc.y + dcb.y) * ffdx);
+            = ForceReal(1. / 4.) * (dab.y * ffax + dcb.y * ffcx + (ddc.y + dcb.y) * ffdx);
         improper_virial[2]
-            = Scalar(1. / 4.) * (dab.z * ffax + dcb.z * ffcx + (ddc.z + dcb.z) * ffdx);
+            = ForceReal(1. / 4.) * (dab.z * ffax + dcb.z * ffcx + (ddc.z + dcb.z) * ffdx);
         improper_virial[3]
-            = Scalar(1. / 4.) * (dab.y * ffay + dcb.y * ffcy + (ddc.y + dcb.y) * ffdy);
+            = ForceReal(1. / 4.) * (dab.y * ffay + dcb.y * ffcy + (ddc.y + dcb.y) * ffdy);
         improper_virial[4]
-            = Scalar(1. / 4.) * (dab.z * ffay + dcb.z * ffcy + (ddc.z + dcb.z) * ffdy);
+            = ForceReal(1. / 4.) * (dab.z * ffay + dcb.z * ffcy + (ddc.z + dcb.z) * ffdy);
         improper_virial[5]
-            = Scalar(1. / 4.) * (dab.z * ffaz + dcb.z * ffcz + (ddc.z + dcb.z) * ffdz);
+            = ForceReal(1. / 4.) * (dab.z * ffaz + dcb.z * ffcz + (ddc.z + dcb.z) * ffdz);
 
         if (cur_improper_abcd == 0)
             {

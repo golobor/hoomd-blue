@@ -59,17 +59,17 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
 
     // read in the position of our b-particle from the a-b-c-d set. (MEM TRANSFER: 16 bytes)
     ForceReal4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c-d quartet
-    Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
-    Scalar3 pos_a, pos_b, pos_c,
+    ForceReal3 idx_pos = make_forcereal3(ForceReal(idx_postype.x), ForceReal(idx_postype.y), ForceReal(idx_postype.z));
+    ForceReal3 pos_a, pos_b, pos_c,
         pos_d; // allocate space for the a,b, and c atoms in the a-b-c-d quartet
 
     // initialize the force to 0
-    ForceReal4 force_idx = make_forcereal4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force_idx = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
     // initialize the virial to 0
-    Scalar virial_idx[6];
+    ForceReal virial_idx[6];
     for (unsigned int i = 0; i < 6; i++)
-        virial_idx[i] = Scalar(0.0);
+        virial_idx[i] = ForceReal(0.0);
 
     // loop over all dihedrals
     for (int dihedral_idx = 0; dihedral_idx < n_dihedrals; dihedral_idx++)
@@ -85,13 +85,13 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 x_postype = d_pos[cur_dihedral_x_idx];
-        Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
+        ForceReal3 x_pos = make_forcereal3(ForceReal(x_postype.x), ForceReal(x_postype.y), ForceReal(x_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 y_postype = d_pos[cur_dihedral_y_idx];
-        Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
+        ForceReal3 y_pos = make_forcereal3(ForceReal(y_postype.x), ForceReal(y_postype.y), ForceReal(y_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 z_postype = d_pos[cur_dihedral_z_idx];
-        Scalar3 z_pos = make_scalar3(z_postype.x, z_postype.y, z_postype.z);
+        ForceReal3 z_pos = make_forcereal3(ForceReal(z_postype.x), ForceReal(z_postype.y), ForceReal(z_postype.z));
 
         if (cur_dihedral_abcd == 0)
             {
@@ -123,59 +123,59 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
             }
 
         // calculate dr for a-b,c-b,and a-c
-        Scalar3 dab = pos_a - pos_b;
-        Scalar3 dcb = pos_c - pos_b;
-        Scalar3 ddc = pos_d - pos_c;
+        ForceReal3 dab = pos_a - pos_b;
+        ForceReal3 dcb = pos_c - pos_b;
+        ForceReal3 ddc = pos_d - pos_c;
 
-        dab = box.minImage(dab);
-        dcb = box.minImage(dcb);
-        ddc = box.minImage(ddc);
+        dab = box.minImageForceReal(dab);
+        dcb = box.minImageForceReal(dcb);
+        ddc = box.minImageForceReal(ddc);
 
-        Scalar3 dcbm = -dcb;
-        dcbm = box.minImage(dcbm);
+        ForceReal3 dcbm = -dcb;
+        dcbm = box.minImageForceReal(dcbm);
 
         // get the dihedral parameters (MEM TRANSFER: 12 bytes)
         Scalar4 params = __ldg(d_params + cur_dihedral_type);
-        Scalar K = params.x;
-        Scalar sign = params.y;
-        Scalar multi = params.z;
-        Scalar phi_0 = params.w;
+        ForceReal K = ForceReal(params.x);
+        ForceReal sign = ForceReal(params.y);
+        ForceReal multi = ForceReal(params.z);
+        ForceReal phi_0 = ForceReal(params.w);
 
-        Scalar aax = dab.y * dcbm.z - dab.z * dcbm.y;
-        Scalar aay = dab.z * dcbm.x - dab.x * dcbm.z;
-        Scalar aaz = dab.x * dcbm.y - dab.y * dcbm.x;
+        ForceReal aax = dab.y * dcbm.z - dab.z * dcbm.y;
+        ForceReal aay = dab.z * dcbm.x - dab.x * dcbm.z;
+        ForceReal aaz = dab.x * dcbm.y - dab.y * dcbm.x;
 
-        Scalar bbx = ddc.y * dcbm.z - ddc.z * dcbm.y;
-        Scalar bby = ddc.z * dcbm.x - ddc.x * dcbm.z;
-        Scalar bbz = ddc.x * dcbm.y - ddc.y * dcbm.x;
+        ForceReal bbx = ddc.y * dcbm.z - ddc.z * dcbm.y;
+        ForceReal bby = ddc.z * dcbm.x - ddc.x * dcbm.z;
+        ForceReal bbz = ddc.x * dcbm.y - ddc.y * dcbm.x;
 
-        Scalar raasq = aax * aax + aay * aay + aaz * aaz;
-        Scalar rbbsq = bbx * bbx + bby * bby + bbz * bbz;
-        Scalar rgsq = dcbm.x * dcbm.x + dcbm.y * dcbm.y + dcbm.z * dcbm.z;
-        Scalar rg = sqrtf(rgsq);
+        ForceReal raasq = aax * aax + aay * aay + aaz * aaz;
+        ForceReal rbbsq = bbx * bbx + bby * bby + bbz * bbz;
+        ForceReal rgsq = dcbm.x * dcbm.x + dcbm.y * dcbm.y + dcbm.z * dcbm.z;
+        ForceReal rg = fast::sqrt(rgsq);
 
-        Scalar rginv, raa2inv, rbb2inv;
-        rginv = raa2inv = rbb2inv = Scalar(0.0);
-        if (rg > Scalar(0.0))
-            rginv = Scalar(1.0) / rg;
-        if (raasq > Scalar(0.0))
-            raa2inv = Scalar(1.0) / raasq;
-        if (rbbsq > Scalar(0.0))
-            rbb2inv = Scalar(1.0) / rbbsq;
-        Scalar rabinv = sqrtf(raa2inv * rbb2inv);
+        ForceReal rginv, raa2inv, rbb2inv;
+        rginv = raa2inv = rbb2inv = ForceReal(0.0);
+        if (rg > ForceReal(0.0))
+            rginv = ForceReal(1.0) / rg;
+        if (raasq > ForceReal(0.0))
+            raa2inv = ForceReal(1.0) / raasq;
+        if (rbbsq > ForceReal(0.0))
+            rbb2inv = ForceReal(1.0) / rbbsq;
+        ForceReal rabinv = fast::sqrt(raa2inv * rbb2inv);
 
-        Scalar c_abcd = (aax * bbx + aay * bby + aaz * bbz) * rabinv;
-        Scalar s_abcd = rg * rabinv * (aax * ddc.x + aay * ddc.y + aaz * ddc.z);
+        ForceReal c_abcd = (aax * bbx + aay * bby + aaz * bbz) * rabinv;
+        ForceReal s_abcd = rg * rabinv * (aax * ddc.x + aay * ddc.y + aaz * ddc.z);
 
-        if (c_abcd > Scalar(1.0))
-            c_abcd = Scalar(1.0);
-        if (c_abcd < -Scalar(1.0))
-            c_abcd = -Scalar(1.0);
+        if (c_abcd > ForceReal(1.0))
+            c_abcd = ForceReal(1.0);
+        if (c_abcd < -ForceReal(1.0))
+            c_abcd = -ForceReal(1.0);
 
-        Scalar p = Scalar(1.0);
-        Scalar ddfab;
-        Scalar dfab = Scalar(0.0);
-        int m = __scalar2int_rn(multi);
+        ForceReal p = ForceReal(1.0);
+        ForceReal ddfab;
+        ForceReal dfab = ForceReal(0.0);
+        int m = __scalar2int_rn(params.z);
 
         for (int jj = 0; jj < m; jj++)
             {
@@ -189,82 +189,82 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
         // Adding charmm dihedral functionality, sin_shift not always 0,
         // cos_shift not always 1
         /////////////////////////
-        Scalar sin_phi_0 = fast::sin(phi_0);
-        Scalar cos_phi_0 = fast::cos(phi_0);
+        ForceReal sin_phi_0 = fast::sin(phi_0);
+        ForceReal cos_phi_0 = fast::cos(phi_0);
         p = p * cos_phi_0 + dfab * sin_phi_0;
         p *= sign;
         dfab = dfab * cos_phi_0 - ddfab * sin_phi_0;
         dfab *= sign;
         dfab *= -multi;
-        p += Scalar(1.0);
+        p += ForceReal(1.0);
 
-        if (multi < Scalar(1.0))
+        if (multi < ForceReal(1.0))
             {
-            p = Scalar(1.0) + sign;
-            dfab = Scalar(0.0);
+            p = ForceReal(1.0) + sign;
+            dfab = ForceReal(0.0);
             }
 
-        Scalar fg = dab.x * dcbm.x + dab.y * dcbm.y + dab.z * dcbm.z;
-        Scalar hg = ddc.x * dcbm.x + ddc.y * dcbm.y + ddc.z * dcbm.z;
+        ForceReal fg = dab.x * dcbm.x + dab.y * dcbm.y + dab.z * dcbm.z;
+        ForceReal hg = ddc.x * dcbm.x + ddc.y * dcbm.y + ddc.z * dcbm.z;
 
-        Scalar fga = fg * raa2inv * rginv;
-        Scalar hgb = hg * rbb2inv * rginv;
-        Scalar gaa = -raa2inv * rg;
-        Scalar gbb = rbb2inv * rg;
+        ForceReal fga = fg * raa2inv * rginv;
+        ForceReal hgb = hg * rbb2inv * rginv;
+        ForceReal gaa = -raa2inv * rg;
+        ForceReal gbb = rbb2inv * rg;
 
-        Scalar dtfx = gaa * aax;
-        Scalar dtfy = gaa * aay;
-        Scalar dtfz = gaa * aaz;
-        Scalar dtgx = fga * aax - hgb * bbx;
-        Scalar dtgy = fga * aay - hgb * bby;
-        Scalar dtgz = fga * aaz - hgb * bbz;
-        Scalar dthx = gbb * bbx;
-        Scalar dthy = gbb * bby;
-        Scalar dthz = gbb * bbz;
+        ForceReal dtfx = gaa * aax;
+        ForceReal dtfy = gaa * aay;
+        ForceReal dtfz = gaa * aaz;
+        ForceReal dtgx = fga * aax - hgb * bbx;
+        ForceReal dtgy = fga * aay - hgb * bby;
+        ForceReal dtgz = fga * aaz - hgb * bbz;
+        ForceReal dthx = gbb * bbx;
+        ForceReal dthy = gbb * bby;
+        ForceReal dthz = gbb * bbz;
 
         // Scalar df = -K * dfab;
-        Scalar df = -K * dfab * Scalar(0.500); // the 0.5 term is for 1/2K in the forces
+        ForceReal df = -K * dfab * ForceReal(0.500); // the 0.5 term is for 1/2K in the forces
 
-        Scalar sx2 = df * dtgx;
-        Scalar sy2 = df * dtgy;
-        Scalar sz2 = df * dtgz;
+        ForceReal sx2 = df * dtgx;
+        ForceReal sy2 = df * dtgy;
+        ForceReal sz2 = df * dtgz;
 
-        Scalar ffax = df * dtfx;
-        Scalar ffay = df * dtfy;
-        Scalar ffaz = df * dtfz;
+        ForceReal ffax = df * dtfx;
+        ForceReal ffay = df * dtfy;
+        ForceReal ffaz = df * dtfz;
 
-        Scalar ffbx = sx2 - ffax;
-        Scalar ffby = sy2 - ffay;
-        Scalar ffbz = sz2 - ffaz;
+        ForceReal ffbx = sx2 - ffax;
+        ForceReal ffby = sy2 - ffay;
+        ForceReal ffbz = sz2 - ffaz;
 
-        Scalar ffdx = df * dthx;
-        Scalar ffdy = df * dthy;
-        Scalar ffdz = df * dthz;
+        ForceReal ffdx = df * dthx;
+        ForceReal ffdy = df * dthy;
+        ForceReal ffdz = df * dthz;
 
-        Scalar ffcx = -sx2 - ffdx;
-        Scalar ffcy = -sy2 - ffdy;
-        Scalar ffcz = -sz2 - ffdz;
+        ForceReal ffcx = -sx2 - ffdx;
+        ForceReal ffcy = -sy2 - ffdy;
+        ForceReal ffcz = -sz2 - ffdz;
 
         // Now, apply the force to each individual atom a,b,c,d
         // and accumulate the energy/virial
         // compute 1/4 of the energy, 1/4 for each atom in the dihedral
-        // Scalar dihedral_eng = p*K*Scalar(1.0/4.0);
-        Scalar dihedral_eng = p * K * Scalar(1.0 / 8.0); // the 1/8th term is (1/2)K * 1/4
+        // ForceReal dihedral_eng = p*K*ForceReal(1.0/4.0);
+        ForceReal dihedral_eng = p * K * ForceReal(1.0 / 8.0); // the 1/8th term is (1/2)K * 1/4
         // compute 1/4 of the virial, 1/4 for each atom in the dihedral
         // upper triangular version of virial tensor
-        Scalar dihedral_virial[6];
+        ForceReal dihedral_virial[6];
         dihedral_virial[0]
-            = Scalar(1. / 4.) * (dab.x * ffax + dcb.x * ffcx + (ddc.x + dcb.x) * ffdx);
+            = ForceReal(1. / 4.) * (dab.x * ffax + dcb.x * ffcx + (ddc.x + dcb.x) * ffdx);
         dihedral_virial[1]
-            = Scalar(1. / 4.) * (dab.y * ffax + dcb.y * ffcx + (ddc.y + dcb.y) * ffdx);
+            = ForceReal(1. / 4.) * (dab.y * ffax + dcb.y * ffcx + (ddc.y + dcb.y) * ffdx);
         dihedral_virial[2]
-            = Scalar(1. / 4.) * (dab.z * ffax + dcb.z * ffcx + (ddc.z + dcb.z) * ffdx);
+            = ForceReal(1. / 4.) * (dab.z * ffax + dcb.z * ffcx + (ddc.z + dcb.z) * ffdx);
         dihedral_virial[3]
-            = Scalar(1. / 4.) * (dab.y * ffay + dcb.y * ffcy + (ddc.y + dcb.y) * ffdy);
+            = ForceReal(1. / 4.) * (dab.y * ffay + dcb.y * ffcy + (ddc.y + dcb.y) * ffdy);
         dihedral_virial[4]
-            = Scalar(1. / 4.) * (dab.z * ffay + dcb.z * ffcy + (ddc.z + dcb.z) * ffdy);
+            = ForceReal(1. / 4.) * (dab.z * ffay + dcb.z * ffcy + (ddc.z + dcb.z) * ffdy);
         dihedral_virial[5]
-            = Scalar(1. / 4.) * (dab.z * ffaz + dcb.z * ffcz + (ddc.z + dcb.z) * ffdz);
+            = ForceReal(1. / 4.) * (dab.z * ffaz + dcb.z * ffcz + (ddc.z + dcb.z) * ffdz);
 
         if (cur_dihedral_abcd == 0)
             {

@@ -69,15 +69,15 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
     ForceReal4 idx_postype = device_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
-    Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
-    Scalar3 pos_a, pos_b, pos_c,
+    ForceReal3 idx_pos = make_forcereal3(ForceReal(idx_postype.x), ForceReal(idx_postype.y), ForceReal(idx_postype.z));
+    ForceReal3 pos_a, pos_b, pos_c,
         pos_d; // allocate space for the a,b,c, and d atom in the a-b-c-d set
 
     // initialize the force to 0
     ForceReal4 force_idx = make_forcereal4(0.0f, 0.0f, 0.0f, 0.0f);
 
     // initialize the virial tensor to 0
-    Scalar virial_idx[6];
+    ForceReal virial_idx[6];
     for (unsigned int i = 0; i < 6; i++)
         virial_idx[i] = 0;
 
@@ -94,13 +94,13 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 x_postype = device_pos[cur_dihedral_x_idx];
-        Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
+        ForceReal3 x_pos = make_forcereal3(ForceReal(x_postype.x), ForceReal(x_postype.y), ForceReal(x_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 y_postype = device_pos[cur_dihedral_y_idx];
-        Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
+        ForceReal3 y_pos = make_forcereal3(ForceReal(y_postype.x), ForceReal(y_postype.y), ForceReal(y_postype.z));
         // get the d-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 z_postype = device_pos[cur_dihedral_z_idx];
-        Scalar3 z_pos = make_scalar3(z_postype.x, z_postype.y, z_postype.z);
+        ForceReal3 z_pos = make_forcereal3(ForceReal(z_postype.x), ForceReal(z_postype.y), ForceReal(z_postype.z));
 
         if (cur_dihedral_abcd == 0)
             {
@@ -132,133 +132,134 @@ __global__ void gpu_compute_table_dihedral_forces_kernel(ForceReal4* d_force,
             }
 
         // calculate dr for a-b,c-b,and a-c
-        Scalar3 dab = pos_a - pos_b;
-        Scalar3 dcb = pos_c - pos_b;
-        Scalar3 ddc = pos_d - pos_c;
+        ForceReal3 dab = pos_a - pos_b;
+        ForceReal3 dcb = pos_c - pos_b;
+        ForceReal3 ddc = pos_d - pos_c;
 
-        dab = box.minImage(dab);
-        dcb = box.minImage(dcb);
-        ddc = box.minImage(ddc);
+        dab = box.minImageForceReal(dab);
+        dcb = box.minImageForceReal(dcb);
+        ddc = box.minImageForceReal(ddc);
 
-        Scalar3 dcbm = -dcb;
-        dcbm = box.minImage(dcbm);
+        ForceReal3 dcbm = -dcb;
+        dcbm = box.minImageForceReal(dcbm);
 
         // c0 calculation
-        Scalar sb1 = Scalar(1.0) / (dab.x * dab.x + dab.y * dab.y + dab.z * dab.z);
-        Scalar sb3 = Scalar(1.0) / (ddc.x * ddc.x + ddc.y * ddc.y + ddc.z * ddc.z);
+        ForceReal sb1 = ForceReal(1.0) / (dab.x * dab.x + dab.y * dab.y + dab.z * dab.z);
+        ForceReal sb3 = ForceReal(1.0) / (ddc.x * ddc.x + ddc.y * ddc.y + ddc.z * ddc.z);
 
-        Scalar rb1 = fast::sqrt(sb1);
-        Scalar rb3 = fast::sqrt(sb3);
+        ForceReal rb1 = fast::sqrt(sb1);
+        ForceReal rb3 = fast::sqrt(sb3);
 
-        Scalar c0 = (dab.x * ddc.x + dab.y * ddc.y + dab.z * ddc.z) * rb1 * rb3;
+        ForceReal c0 = (dab.x * ddc.x + dab.y * ddc.y + dab.z * ddc.z) * rb1 * rb3;
 
         // 1st and 2nd angle
 
-        Scalar b1mag2 = dab.x * dab.x + dab.y * dab.y + dab.z * dab.z;
-        Scalar b1mag = fast::sqrt(b1mag2);
-        Scalar b2mag2 = dcb.x * dcb.x + dcb.y * dcb.y + dcb.z * dcb.z;
-        Scalar b2mag = fast::sqrt(b2mag2);
-        Scalar b3mag2 = ddc.x * ddc.x + ddc.y * ddc.y + ddc.z * ddc.z;
-        Scalar b3mag = fast::sqrt(b3mag2);
+        ForceReal b1mag2 = dab.x * dab.x + dab.y * dab.y + dab.z * dab.z;
+        ForceReal b1mag = fast::sqrt(b1mag2);
+        ForceReal b2mag2 = dcb.x * dcb.x + dcb.y * dcb.y + dcb.z * dcb.z;
+        ForceReal b2mag = fast::sqrt(b2mag2);
+        ForceReal b3mag2 = ddc.x * ddc.x + ddc.y * ddc.y + ddc.z * ddc.z;
+        ForceReal b3mag = fast::sqrt(b3mag2);
 
-        Scalar ctmp = dab.x * dcb.x + dab.y * dcb.y + dab.z * dcb.z;
-        Scalar r12c1 = Scalar(1.0) / (b1mag * b2mag);
-        Scalar c1mag = ctmp * r12c1;
+        ForceReal ctmp = dab.x * dcb.x + dab.y * dcb.y + dab.z * dcb.z;
+        ForceReal r12c1 = ForceReal(1.0) / (b1mag * b2mag);
+        ForceReal c1mag = ctmp * r12c1;
 
         ctmp = dcbm.x * ddc.x + dcbm.y * ddc.y + dcbm.z * ddc.z;
-        Scalar r12c2 = Scalar(1.0) / (b2mag * b3mag);
-        Scalar c2mag = ctmp * r12c2;
+        ForceReal r12c2 = ForceReal(1.0) / (b2mag * b3mag);
+        ForceReal c2mag = ctmp * r12c2;
 
         // cos and sin of 2 angles and final c
 
-        Scalar sin2 = Scalar(1.0) - c1mag * c1mag;
+        ForceReal sin2 = ForceReal(1.0) - c1mag * c1mag;
         if (sin2 < 0.0f)
             sin2 = 0.0f;
-        Scalar sc1 = fast::sqrt(sin2);
+        ForceReal sc1 = fast::sqrt(sin2);
         if (sc1 < SMALL)
             sc1 = SMALL;
-        sc1 = Scalar(1.0) / sc1;
+        sc1 = ForceReal(1.0) / sc1;
 
-        sin2 = Scalar(1.0) - c2mag * c2mag;
+        sin2 = ForceReal(1.0) - c2mag * c2mag;
         if (sin2 < 0.0f)
             sin2 = 0.0f;
-        Scalar sc2 = fast::sqrt(sin2);
+        ForceReal sc2 = fast::sqrt(sin2);
         if (sc2 < SMALL)
             sc2 = SMALL;
-        sc2 = Scalar(1.0) / sc2;
+        sc2 = ForceReal(1.0) / sc2;
 
-        Scalar s12 = sc1 * sc2;
-        Scalar c = (c0 + c1mag * c2mag) * s12;
+        ForceReal s12 = sc1 * sc2;
+        ForceReal c = (c0 + c1mag * c2mag) * s12;
 
-        if (c > Scalar(1.0))
-            c = Scalar(1.0);
-        if (c < -Scalar(1.0))
-            c = -Scalar(1.0);
+        if (c > ForceReal(1.0))
+            c = ForceReal(1.0);
+        if (c < -ForceReal(1.0))
+            c = -ForceReal(1.0);
 
         // determinant
-        Scalar det = dot(dab,
-                         make_scalar3(ddc.y * dcb.z - ddc.z * dcb.y,
+        ForceReal det = dot(dab,
+                         make_forcereal3(ddc.y * dcb.z - ddc.z * dcb.y,
                                       ddc.z * dcb.x - ddc.x * dcb.z,
                                       ddc.x * dcb.y - ddc.y * dcb.x));
 
         // phi
-        Scalar phi = acosf(c);
+        ForceReal phi = fast::acos(c);
 
         if (det < 0)
             phi = -phi;
 
         // precomputed term
-        Scalar value_f = (Scalar(M_PI) + phi) / delta_phi;
+        ForceReal delta_phi_fr = ForceReal(delta_phi);
+        ForceReal value_f = (ForceReal(M_PI) + phi) / delta_phi_fr;
 
         // compute index into the table and read in values
         unsigned int value_i = value_f;
         Scalar2 VT0 = __ldg(d_tables + table_value(value_i, cur_dihedral_type));
         Scalar2 VT1 = __ldg(d_tables + table_value(value_i + 1, cur_dihedral_type));
         // unpack the data
-        Scalar V0 = VT0.x;
-        Scalar V1 = VT1.x;
-        Scalar T0 = VT0.y;
-        Scalar T1 = VT1.y;
+        ForceReal V0 = ForceReal(VT0.x);
+        ForceReal V1 = ForceReal(VT1.x);
+        ForceReal T0 = ForceReal(VT0.y);
+        ForceReal T1 = ForceReal(VT1.y);
 
         // compute the linear interpolation coefficient
-        Scalar f = value_f - Scalar(value_i);
+        ForceReal f = value_f - ForceReal(value_i);
 
         // interpolate to get V and T;
-        Scalar V = V0 + f * (V1 - V0);
-        Scalar T = T0 + f * (T1 - T0);
+        ForceReal V = V0 + f * (V1 - V0);
+        ForceReal T = T0 + f * (T1 - T0);
 
         // from Blondel and Karplus 1995
-        vec3<Scalar> A = cross(vec3<Scalar>(dab), vec3<Scalar>(dcbm));
-        Scalar Asq = dot(A, A);
+        vec3<ForceReal> A = cross(vec3<ForceReal>(dab.x, dab.y, dab.z), vec3<ForceReal>(dcbm.x, dcbm.y, dcbm.z));
+        ForceReal Asq = dot(A, A);
 
-        vec3<Scalar> B = cross(vec3<Scalar>(ddc), vec3<Scalar>(dcbm));
-        Scalar Bsq = dot(B, B);
+        vec3<ForceReal> B = cross(vec3<ForceReal>(ddc.x, ddc.y, ddc.z), vec3<ForceReal>(dcbm.x, dcbm.y, dcbm.z));
+        ForceReal Bsq = dot(B, B);
 
-        Scalar3 f_a = -T * vec_to_scalar3(b2mag / Asq * A);
-        Scalar3 f_b
+        ForceReal3 f_a = -T * vec_to_forcereal3(b2mag / Asq * A);
+        ForceReal3 f_b
             = -f_a
-              + T / b2mag * vec_to_scalar3(dot(dab, dcbm) / Asq * A - dot(ddc, dcbm) / Bsq * B);
-        Scalar3 f_c = T
-                      * vec_to_scalar3(dot(ddc, dcbm) / Bsq / b2mag * B
+              + T / b2mag * vec_to_forcereal3(dot(dab, dcbm) / Asq * A - dot(ddc, dcbm) / Bsq * B);
+        ForceReal3 f_c = T
+                      * vec_to_forcereal3(dot(ddc, dcbm) / Bsq / b2mag * B
                                        - dot(dab, dcbm) / Asq / b2mag * A - b2mag / Bsq * B);
-        Scalar3 f_d = T * b2mag / Bsq * vec_to_scalar3(B);
+        ForceReal3 f_d = T * b2mag / Bsq * vec_to_forcereal3(B);
 
         // Now, apply the force to each individual atom a,b,c,d
         // and accumulate the energy/virial
 
         // compute 1/4 of the energy, 1/4 for each atom in the dihedral
-        Scalar dihedral_eng = V * Scalar(1.0 / 4.0);
+        ForceReal dihedral_eng = V * ForceReal(1.0 / 4.0);
 
         // compute 1/4 of the virial, 1/4 for each atom in the dihedral
         // upper triangular version of virial tensor
-        Scalar dihedral_virial[6];
+        ForceReal dihedral_virial[6];
 
-        dihedral_virial[0] = (1. / 4.) * (dab.x * f_a.x + dcb.x * f_c.x + (ddc.x + dcb.x) * f_d.x);
-        dihedral_virial[1] = (1. / 4.) * (dab.y * f_a.x + dcb.y * f_c.x + (ddc.y + dcb.y) * f_d.x);
-        dihedral_virial[2] = (1. / 4.) * (dab.z * f_a.x + dcb.z * f_c.x + (ddc.z + dcb.z) * f_d.x);
-        dihedral_virial[3] = (1. / 4.) * (dab.y * f_a.y + dcb.y * f_c.y + (ddc.y + dcb.y) * f_d.y);
-        dihedral_virial[4] = (1. / 4.) * (dab.z * f_a.y + dcb.z * f_c.y + (ddc.z + dcb.z) * f_d.y);
-        dihedral_virial[5] = (1. / 4.) * (dab.z * f_a.z + dcb.z * f_c.z + (ddc.z + dcb.z) * f_d.z);
+        dihedral_virial[0] = ForceReal(1. / 4.) * (dab.x * f_a.x + dcb.x * f_c.x + (ddc.x + dcb.x) * f_d.x);
+        dihedral_virial[1] = ForceReal(1. / 4.) * (dab.y * f_a.x + dcb.y * f_c.x + (ddc.y + dcb.y) * f_d.x);
+        dihedral_virial[2] = ForceReal(1. / 4.) * (dab.z * f_a.x + dcb.z * f_c.x + (ddc.z + dcb.z) * f_d.x);
+        dihedral_virial[3] = ForceReal(1. / 4.) * (dab.y * f_a.y + dcb.y * f_c.y + (ddc.y + dcb.y) * f_d.y);
+        dihedral_virial[4] = ForceReal(1. / 4.) * (dab.z * f_a.y + dcb.z * f_c.y + (ddc.z + dcb.z) * f_d.y);
+        dihedral_virial[5] = ForceReal(1. / 4.) * (dab.z * f_a.z + dcb.z * f_c.z + (ddc.z + dcb.z) * f_d.z);
 
         if (cur_dihedral_abcd == 0)
             {
