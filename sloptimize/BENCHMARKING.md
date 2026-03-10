@@ -76,8 +76,9 @@ python run_benchmarks.py benchmark_chains.py \
   -- 64000 200 --no-dihedral
 ```
 
-The runner auto-detects free GPUs and assigns one job per GPU (round-robin assignment,
-`max_workers = min(n_jobs, n_gpus)`). Use `--gpus 0,1,2` to restrict to specific devices.
+The runner auto-detects free GPUs and uses a queue-based GPU pool — each worker
+acquires a GPU before starting and releases it when done, guaranteeing no two jobs
+share a GPU simultaneously. Use `--gpus 0,1,2` to restrict to specific devices.
 
 ### Workload
 
@@ -93,9 +94,9 @@ integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double | ~2,500 | 1.0× |
-| **mixed** | **~7,500** | **3.0×** |
-| single | ~12,000 | 4.8× |
+| double | 2,538 ± 46 | 1.0× |
+| **mixed** | **7,741 ± 298** | **3.05×** |
+| single | 12,093 ± 347 | 4.77× |
 
 ### Progression Through Phases
 
@@ -106,14 +107,6 @@ integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 
 | Phase 2A (external evaluators only) | 3,059 | +16.5% | 0.25× |
 | Phase 2B (float4 positions) | 4,262 | +62.3% | 0.35× |
 | Phase 2C (dihedral fix) | 7,474 | +199% | 0.62× |
-
-**Without dihedrals (64K particles, dt=0.005):**
-
-| Build | TPS | vs Double |
-|-------|-----|-----------|
-| Double | 4,504 | — |
-| Mixed (Phase 2B) | 11,218 | +149% |
-| Single | 19,408 | +331% |
 
 ---
 
@@ -155,36 +148,44 @@ uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machi
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 2,499 | 7,474 | 12,062 |
-| 0.01 | — | 5,312 (15% std) | 9,100 |
-| 0.03 | crashed | **4,023 (survives!)** | 7,522 |
+| 0.005 | 2,538 ± 46 | 7,741 ± 298 | 12,093 ± 347 |
+| 0.01 | 2,144 ± 59 | 5,616 ± 103 | 9,391 ± 420 |
+| 0.03 | 1,984 ± 60 | 4,775 ± 90 | 7,641 ± 52 |
 | 0.05 | crashed | crashed | crashed |
+| 0.1 | crashed | crashed | crashed |
 
-Mixed is the **most stable build** for dihedrals at large dt.
+All builds stable through dt=0.03. All crash at dt=0.05 (Langevin dynamics
+with dihedrals becomes unstable). Mixed delivers 2.4–3.1× over double across
+all stable dt values.
 
 ### Without Dihedrals (64K particles)
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 4,328 | 10,825 | 19,548 |
-| 0.01 | 4,125 | 9,465 | 15,261 |
-| 0.03 | 3,278 | 7,522 | 4,828 |
-| 0.05 | 1,837 | 5,140 | 5,345 |
-| 0.1 | 1,882 | 4,970 | 8,088 |
+| 0.005 | 4,374 ± 77 | 11,141 ± 257 | 18,330 ± 59 |
+| 0.01 | 4,178 ± 147 | 9,700 ± 223 | 16,168 ± 373 |
+| 0.03 | 3,540 ± 131 | 7,617 ± 110 | 11,643 ± 103 |
+| 0.05 | 2,730 ± 69 | 4,894 ± 60 | 8,048 ± 12 |
+| 0.1 | 2,677 ± 23 | 4,961 ± 7 | 8,255 ± 5 |
 
-All builds stable. Mixed consistently ~2.5× double. At large dt single degrades
-(likely more nlist rebuilds from float integrator drift).
+All builds stable at all dt values. Mixed consistently 1.8–2.5× double.
+At large dt (0.05–0.1) all builds' TPS plateaus — the overhead of more
+frequent neighbor list rebuilds dominates.
 
-### 200K Particles — Without Dihedrals
+### Without Dihedrals (256K particles)
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 1,485 | 4,384 | 6,760 |
-| 0.01 | 1,361 | 3,840 | 5,824 |
-| 0.03 | 1,168 | 3,061 | 4,539 |
+| 0.005 | 1,189 ± 13 | 3,730 ± 92 | 5,336 ± 159 |
+| 0.01 | 1,097 ± 24 | 3,202 ± 69 | 4,676 ± 86 |
+| 0.03 | 976 ± 37 | 2,547 ± 27 | 3,641 ± 11 |
+| 0.05 | 775 ± 31 | 1,659 ± 8 | 2,518 ± 15 |
+| 0.1 | 772 ± 19 | 1,686 ± 5 | 2,475 ± 11 |
 
-Mixed achieves ~2.95× double at 200K — bandwidth-bound workloads benefit more at
-larger system sizes. Mixed-to-single gap narrows to 1.54× (from 1.80× at 64K).
+All builds stable. Mixed achieves ~3.1× double at dt=0.005 — bandwidth-bound
+workloads benefit more at larger system sizes. Mixed-to-single gap narrows to
+1.43× (from 1.64× at 64K), consistent with memory bandwidth becoming the
+dominant bottleneck.
 
 ---
 

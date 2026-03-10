@@ -19,16 +19,16 @@ force evaluation — only position integration truly needs double.
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double (baseline) | ~2,500 | 1.0× |
-| **mixed (this fork)** | **~7,500** | **3.0×** |
-| single | ~12,000 | 4.8× |
+| double (baseline) | 2,538 ± 46 | 1.0× |
+| **mixed (this fork)** | **7,741 ± 298** | **3.05×** |
+| single | 12,093 ± 347 | 4.77× |
 
 - **3× speedup** over double with double-precision position integration preserved
 - Force accuracy: mean relative error ~3.6×10⁻⁷ vs double (consistent with float32 ε)
 - Energy conservation: indistinguishable from double over 100 steps
-- Stability: mixed survives dt=0.03 with dihedrals where double and single crash
+- Stability: all builds stable through dt=0.03 with dihedrals; all crash at dt=0.05
 
-Scaling: at 200K particles, mixed achieves **~3× double** (bandwidth-bound workloads
+Scaling: at 256K particles, mixed achieves **~3.1× double** (bandwidth-bound workloads
 benefit more from halved data widths at larger system sizes).
 
 ## Further reading

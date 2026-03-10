@@ -51,6 +51,7 @@ Notes
 
 import argparse
 import os
+import queue
 import shutil
 import subprocess
 import sys
@@ -243,30 +244,37 @@ def main():
 
 
 def _run_simple(args, jobs, free_gpus, script_dst, log_dir, script_extra):
-    """Original behaviour: one run per lib, all in parallel."""
+    """Original behaviour: one run per lib, all in parallel.
+
+    Uses a GPU pool to guarantee no two jobs share a GPU simultaneously.
+    """
     n_jobs = len(jobs)
     n_gpus = len(free_gpus)
 
-    # Assign GPUs round-robin and run in parallel
-    gpu_assignment = {jobs[i][0]: free_gpus[i % n_gpus] for i in range(n_jobs)}
-    for label, gpu in gpu_assignment.items():
-        log_path = os.path.join(log_dir, f"bench_{label}.log")
-        print(f"  {label:>10s} → GPU {gpu}  (log: {log_path})")
+    gpu_pool = queue.Queue()
+    for g in free_gpus:
+        gpu_pool.put(g)
+
+    print(f"  GPU pool: {free_gpus} ({n_gpus} GPUs for {n_jobs} jobs)")
     print(flush=True)
 
     t0 = time.time()
 
+    def _run_with_pool(label, pythonpath, extra):
+        gpu = gpu_pool.get()
+        try:
+            print(f"  {label:>10s} → GPU {gpu}  (started)", flush=True)
+            return run_one_benchmark(script_dst, gpu, label, pythonpath, extra)
+        finally:
+            gpu_pool.put(gpu)
+
     results = {}
     with ThreadPoolExecutor(max_workers=min(n_jobs, n_gpus)) as pool:
         futures = {}
-        for i, (label, pythonpath) in enumerate(jobs):
-            gpu = gpu_assignment[label]
+        for label, pythonpath in jobs:
             log_path = os.path.join(log_dir, f"bench_{label}.log")
             job_extra = list(script_extra) + ["--log", log_path]
-            fut = pool.submit(
-                run_one_benchmark, script_dst, gpu, label, pythonpath,
-                job_extra,
-            )
+            fut = pool.submit(_run_with_pool, label, pythonpath, job_extra)
             futures[fut] = label
 
         for fut in as_completed(futures):
@@ -305,33 +313,36 @@ def _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra):
     os.makedirs(state_dir, exist_ok=True)
     state_paths = {}  # label → gsd path
 
-    gpu_assignment_eq = {jobs[i][0]: free_gpus[i % n_gpus]
-                         for i in range(len(jobs))}
-    for label, gpu in gpu_assignment_eq.items():
-        print(f"  {label:>10s} → GPU {gpu}  (equilibrate)")
+    gpu_pool = queue.Queue()
+    for g in free_gpus:
+        gpu_pool.put(g)
+
+    print(f"  GPU pool: {free_gpus} ({n_gpus} GPUs for {len(jobs)} libs)")
     print(flush=True)
+
+    def _run_with_pool(label, pythonpath, extra):
+        gpu = gpu_pool.get()
+        try:
+            print(f"  {label:>20s} → GPU {gpu}  (started)", flush=True)
+            return run_one_benchmark(script_dst, gpu, label, pythonpath, extra)
+        finally:
+            gpu_pool.put(gpu)
 
     t0 = time.time()
     eq_results = {}
     with ThreadPoolExecutor(max_workers=min(len(jobs), n_gpus)) as pool:
         futures = {}
         for i, (label, pythonpath) in enumerate(jobs):
-            gpu = gpu_assignment_eq[label]
             gsd_path = os.path.join(state_dir, f"eq_{label}.gsd")
             state_paths[label] = gsd_path
             log_path = os.path.join(log_dir, f"bench_{label}_equil.log")
-            # Build args: remove any user-supplied --load-state, --dt,
-            # --equilibrate-only and add our own
             eq_extra = _strip_args(script_extra,
                                    ["--load-state", "--equilibrate-only",
                                     "--save-state", "--dt"])
             eq_extra += ["--equilibrate-only",
                          "--save-state", gsd_path,
                          "--log", log_path]
-            fut = pool.submit(
-                run_one_benchmark, script_dst, gpu, label, pythonpath,
-                eq_extra,
-            )
+            fut = pool.submit(_run_with_pool, label, pythonpath, eq_extra)
             futures[fut] = label
 
         for fut in as_completed(futures):
@@ -363,12 +374,8 @@ def _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra):
     print(f"DT SWEEP — Phase 2: {len(sweep_jobs)} benchmark runs "
           f"({len(jobs)} libs × {len(dt_values)} dt values)")
     print(f"  dt values: {', '.join(f'{d:g}' for d in dt_values)}")
+    print(f"  GPU pool: {free_gpus} ({n_gpus} GPUs)")
     print("=" * 80)
-
-    gpu_assignment_bench = {sweep_jobs[i][0]: free_gpus[i % n_gpus]
-                            for i in range(len(sweep_jobs))}
-    for combined, gpu in gpu_assignment_bench.items():
-        print(f"  {combined:>20s} → GPU {gpu}")
     print(flush=True)
 
     t1 = time.time()
@@ -376,7 +383,6 @@ def _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra):
     with ThreadPoolExecutor(max_workers=min(len(sweep_jobs), n_gpus)) as pool:
         futures = {}
         for combined, lib_label, pythonpath, dt in sweep_jobs:
-            gpu = gpu_assignment_bench[combined]
             log_path = os.path.join(log_dir, f"bench_{combined}.log")
             gsd_path = state_paths[lib_label]
             bench_extra = _strip_args(script_extra,
@@ -386,8 +392,7 @@ def _run_dt_sweep(args, jobs, free_gpus, script_dst, log_dir, script_extra):
                             "--dt", str(dt),
                             "--log", log_path]
             fut = pool.submit(
-                run_one_benchmark, script_dst, gpu, combined, pythonpath,
-                bench_extra,
+                _run_with_pool, combined, pythonpath, bench_extra,
             )
             futures[fut] = combined
 
