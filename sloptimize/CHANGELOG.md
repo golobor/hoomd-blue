@@ -455,12 +455,35 @@ molecular simulations).
 
 ### Benchmark results
 
-The rotation optimization gave only ~3-6% mixed-over-double improvement. The rotation
-FLOPs were NOT the bottleneck — the rest of the evaluator pipeline (`PairModulator::evaluate()`,
-`PatchEnvelope` distance/angle math, and the `AnisoPotentialPairGPU` kernel's position
-arithmetic) still operates entirely in `Scalar` (double).
+With a correctly configured mixed build (`HOOMD_SHORTREAL_SIZE=32`), patchy particles show
+**8.8× mixed-over-double speedup** at dt=0.005, and 5–9× across all dt values. The rotation
+optimisation contributes to this, though the majority of the gain comes from the isotropic
+portions of the aniso kernel (pair I/O, minimum-image, nlist traversal) using `ForceReal`.
 
-See BENCHMARKING.md "Patchy Particles — After Rotation Optimization" for full results.
+Note: earlier benchmarks incorrectly showed mixed ≈ double (1.0×) because the mixed build
+had `HOOMD_SHORTREAL_SIZE=64` in `CMakeCache.txt`, making it an effective double build.
+All benchmark data in BENCHMARKING.md has been re-collected with the corrected build.
+
+See BENCHMARKING.md "Patchy Particles, No Dihedrals" for full results.
+
+---
+
+## Benchmark Configuration Fix
+
+**Problem**: The `build/` directory ("mixed") had `HOOMD_SHORTREAL_SIZE=64` in its CMake
+cache, meaning `ShortReal = double` and `ForceReal = double` — identical to the double build.
+All previous "mixed" benchmark numbers were actually double-precision runs, reporting
+`floating_point_precision: (64, 64)` and `DOUBLE[DOUBLE]`.
+
+**Root cause**: CMake cache variable persisted from an earlier configure. The CMakeLists.txt
+default is `SHORTREAL_SIZE=32`, but once cached, changing the source doesn't update it.
+
+**Fix**: Reconfigured with `cmake . -DHOOMD_SHORTREAL_SIZE=32`, triggering a full rebuild.
+Verified with `hoomd.version.floating_point_precision == (64, 32)` and `DOUBLE[SINGLE]`.
+
+**Impact**: All benchmark data re-collected. The corrected results show the expected speedups
+(2.7–3.6× for isotropic, 5–9× for patchy) rather than the ~1.0× previously reported for
+anisotropic potentials.
 
 ---
 

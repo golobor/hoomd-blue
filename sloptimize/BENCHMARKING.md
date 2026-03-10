@@ -11,32 +11,54 @@ codebase**. Precision is controlled entirely by CMake flags:
 
 | Config | CMake flags | What it does |
 |--------|------------|--------------|
-| mixed | `-DHOOMD_MIXED_PRECISION=ON -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | Forces in float, integration in double |
+| mixed | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | Forces in float, integration in double |
 | double | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | Original upstream behavior |
 | single | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | Everything float (theoretical max speed) |
+
+`HOOMD_MIXED_PRECISION` is **not** a CMake variable — it is a C preprocessor macro
+auto-defined when `SHORTREAL_SIZE != LONGREAL_SIZE`. The only CMake knobs are
+`HOOMD_LONGREAL_SIZE` and `HOOMD_SHORTREAL_SIZE`.
 
 The double and single builds exist only for benchmark comparison. Regular users only
 need the mixed build.
 
 ### Building all three
 
-Each configuration needs its own build tree and install prefix:
+Each configuration needs its own build tree and install prefix.
+**Always pass the precision flags explicitly** — CMake caches variables, so a stale
+cache can silently produce the wrong build.
 
 ```bash
 # Mixed (the default build/ directory)
-cd build && make -j8 && make install   # → build/install_mixed/
+cd build
+cmake .. -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32 \
+         -DENABLE_GPU=ON
+make -j8
+cmake --install . --prefix install_mixed
 
 # Double (separate build tree)
 mkdir -p build_double && cd build_double
 cmake .. -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64 \
-         -DCMAKE_INSTALL_PREFIX=../build/install_double
-make -j8 && make install
+         -DENABLE_GPU=ON -DBUILD_TESTING=OFF -DBUILD_MPCD=OFF
+make -j8
+cmake --install . --prefix ../build/install_double
 
 # Single (separate build tree)
 mkdir -p build_single && cd build_single
 cmake .. -DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32 \
-         -DCMAKE_INSTALL_PREFIX=../build/install_single
-make -j8 && make install
+         -DENABLE_GPU=ON -DBUILD_TESTING=OFF -DBUILD_MPCD=OFF
+make -j8
+cmake --install . --prefix ../build/install_single
+```
+
+**Verify** each build reports the expected precision:
+
+```bash
+cd /tmp && PYTHONPATH=<install>/lib/python3.12/site-packages \
+  python3 -c "import hoomd; print(hoomd.version.floating_point_precision)"
+# mixed  → (64, 32)    compile_flags: DOUBLE[SINGLE]
+# double → (64, 64)    compile_flags: DOUBLE[DOUBLE]
+# single → (32, 32)    compile_flags: SINGLE[SINGLE]
 ```
 
 ### Switching between builds
@@ -94,9 +116,9 @@ integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double | 2,538 ± 46 | 1.0× |
-| **mixed** | **7,741 ± 298** | **3.05×** |
-| single | 12,093 ± 347 | 4.77× |
+| double | 2,389 ± 51 | 1.0× |
+| **mixed** | **7,563 ± 328** | **3.17×** |
+| single | 12,135 ± 351 | 5.08× |
 
 ### Progression Through Phases
 
@@ -148,27 +170,24 @@ uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machi
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 2,538 ± 46 | 7,741 ± 298 | 12,093 ± 347 |
-| 0.01 | 2,144 ± 59 | 5,616 ± 103 | 9,391 ± 420 |
-| 0.03 | 1,984 ± 60 | 4,775 ± 90 | 7,641 ± 52 |
-| 0.05 | crashed | crashed | crashed |
-| 0.1 | crashed | crashed | crashed |
+| 0.005 | 2,389 ± 51 | 7,563 ± 328 | 12,135 ± 351 |
+| 0.01 | 1,989 ± 49 | 5,642 ± 101 | 9,400 ± 253 |
+| 0.03 | — | 4,916 ± 86 | — |
 
-All builds stable through dt=0.03. All crash at dt=0.05 (Langevin dynamics
-with dihedrals becomes unstable). Mixed delivers 2.4–3.1× over double across
-all stable dt values.
+dt=0.05 and dt=0.1 crash (Langevin dynamics with dihedrals becomes unstable).
+Mixed delivers 2.8–3.2× over double across stable dt values.
 
 ### Without Dihedrals (64K particles)
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 4,374 ± 77 | 11,141 ± 257 | 18,330 ± 59 |
-| 0.01 | 4,178 ± 147 | 9,700 ± 223 | 16,168 ± 373 |
-| 0.03 | 3,540 ± 131 | 7,617 ± 110 | 11,643 ± 103 |
-| 0.05 | 2,730 ± 69 | 4,894 ± 60 | 8,048 ± 12 |
-| 0.1 | 2,677 ± 23 | 4,961 ± 7 | 8,255 ± 5 |
+| 0.005 | 4,229 ± 69 | 11,583 ± 200 | 18,316 ± 41 |
+| 0.01 | 3,955 ± 143 | 9,903 ± 225 | 15,735 ± 104 |
+| 0.03 | 3,394 ± 125 | 7,553 ± 93 | 11,853 ± 171 |
+| 0.05 | 2,627 ± 73 | 5,042 ± 48 | 8,135 ± 85 |
+| 0.1 | 2,554 ± 21 | 5,040 ± 16 | 8,229 ± 6 |
 
-All builds stable at all dt values. Mixed consistently 1.8–2.5× double.
+All builds stable at all dt values. Mixed consistently 1.9–2.7× double.
 At large dt (0.05–0.1) all builds' TPS plateaus — the overhead of more
 frequent neighbor list rebuilds dominates.
 
@@ -176,15 +195,15 @@ frequent neighbor list rebuilds dominates.
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
-| 0.005 | 1,189 ± 13 | 3,730 ± 92 | 5,336 ± 159 |
-| 0.01 | 1,097 ± 24 | 3,202 ± 69 | 4,676 ± 86 |
-| 0.03 | 976 ± 37 | 2,547 ± 27 | 3,641 ± 11 |
-| 0.05 | 775 ± 31 | 1,659 ± 8 | 2,518 ± 15 |
-| 0.1 | 772 ± 19 | 1,686 ± 5 | 2,475 ± 11 |
+| 0.005 | 1,140 ± 11 | 3,725 ± 67 | 5,464 ± 166 |
+| 0.01 | 1,060 ± 22 | 3,215 ± 61 | 4,741 ± 98 |
+| 0.03 | 934 ± 40 | 2,558 ± 29 | 3,728 ± 63 |
+| 0.05 | 735 ± 31 | 1,702 ± 22 | 2,514 ± 10 |
+| 0.1 | 730 ± 19 | 1,724 ± 12 | 2,450 ± 4 |
 
-All builds stable. Mixed achieves ~3.1× double at dt=0.005 — bandwidth-bound
+All builds stable. Mixed achieves ~3.3× double at dt=0.005 — bandwidth-bound
 workloads benefit more at larger system sizes. Mixed-to-single gap narrows to
-1.43× (from 1.64× at 64K), consistent with memory bandwidth becoming the
+1.47× (from 1.58× at 64K), consistent with memory bandwidth becoming the
 dominant bottleneck.
 
 ### With Attraction, No Dihedrals (64K particles, A=-0.5, r_cut=1.5)
@@ -193,14 +212,14 @@ Adds a second DPDConservative pair force (attractive, separate neighbor list).
 
 | dt | Double | Mixed | Single | Mixed/Double |
 |----|--------|-------|--------|-------------|
-| 0.005 | 2,013 ± 85 | 7,012 ± 126 | 10,200 ± 100 | 3.48× |
-| 0.01 | 1,880 ± 126 | 5,689 ± 186 | 8,730 ± 164 | 3.03× |
-| 0.03 | 1,527 ± 95 | 3,954 ± 97 | 5,763 ± 129 | 2.59× |
-| 0.05 | 1,079 ± 53 | 2,364 ± 44 | 3,732 ± 49 | 2.19× |
-| 0.1 | 1,078 ± 24 | 2,439 ± 21 | 3,821 ± 16 | 2.26× |
+| 0.005 | 1,935 ± 83 | 6,917 ± 170 | 10,200 ± 226 | 3.57× |
+| 0.01 | 1,796 ± 122 | 5,685 ± 202 | 8,720 ± 173 | 3.17× |
+| 0.03 | 1,450 ± 95 | 3,958 ± 90 | 5,835 ± 147 | 2.73× |
+| 0.05 | 1,034 ± 53 | 2,393 ± 51 | 3,751 ± 35 | 2.31× |
+| 0.1 | 1,012 ± 24 | 2,502 ± 29 | 3,646 ± 17 | 2.47× |
 
 All stable at every dt. The second pair force increases compute intensity,
-giving mixed a higher speedup (3.5× vs 2.5× without attraction at dt=0.005) —
+giving mixed a higher speedup (3.6× vs 2.7× without attraction at dt=0.005) —
 more pair-force compute means more float savings to harvest.
 
 ### Patchy Particles, No Dihedrals (64K particles, PatchyGaussian)
@@ -209,56 +228,31 @@ Uses `AnisoPotentialPairPatchyGauss` with parameters `eps=1.0, sigma=0.5,
 alpha=0.6, omega=20, r_cut=1.5, npatches=2`. This exercises the anisotropic
 pair kernel which evaluates orientational (quaternion) math.
 
-| dt | Double | Mixed | Single | Mixed/Double |
-|----|--------|-------|--------|-------------|
-| 0.005 | 329 ± 19 | 334 ± 18 | 5,211 ± 165 | 1.02× |
-| 0.01 | 363 ± 29 | 353 ± 30 | 4,566 ± 157 | 0.97× |
-| 0.03 | 367 ± 20 | 376 ± 20 | 3,945 ± 89 | 1.02× |
-| 0.05 | 342 ± 10 | 338 ± 11 | 2,738 ± 26 | 0.99× |
-| 0.1 | 330 ± 3 | 331 ± 2 | 2,777 ± 7 | 1.00× |
-
-**Mixed ≈ Double** — no speedup. The anisotropic pair evaluator
-(`PatchEnvelope`, `PairModulator`) uses `Scalar` (double) quaternion and
-orientation math internally. Only the outer force output pipeline and
-minimum-image call use `ForceReal` (float), which is a tiny fraction of the
-workload. **Single is 8–16× faster** because all `Scalar` operations become
-float.
-
-**Takeaway**: Mixed precision only helps when `ForceReal` dominates compute.
-For orientation-heavy potentials, the evaluator internals must also be
-converted to `ForceReal` to see gains.
-
-### Patchy Particles — After Rotation Optimization (rotmat3 → ForceReal)
-
-Same parameters as above. `rotmat3(quat)` constructor rewritten with
-cancellation-free formula (`1 − 2c² − 2d²` diagonals), and PatchEnvelope
-rotation unified to use `rotmat3<ForceReal>` on both CPU and GPU (eliminating
-all double-precision FLOPs from the quaternion rotation path).
+Includes the cancellation-free `rotmat3(quat)` constructor (`1 − 2c² − 2d²`
+diagonals) and PatchEnvelope rotation unified to `rotmat3<ForceReal>` on both
+CPU and GPU.
 
 | dt | Double | Mixed | Single | Mixed/Double |
 |----|--------|-------|--------|-------------|
-| 0.005 | 328 ± 19 | 351 ± 20 | 5,181 ± 160 | 1.07× |
-| 0.01 | 361 ± 28 | 372 ± 32 | 4,532 ± 155 | 1.03× |
-| 0.03 | 367 ± 20 | 389 ± 24 | 3,941 ± 111 | 1.06× |
-| 0.05 | 340 ± 12 | 345 ± 10 | 2,691 ± 21 | 1.01× |
-| 0.1 | 332 ± 2 | 351 ± 2 | 2,837 ± 11 | 1.06× |
+| 0.005 | 329 ± 19 | 2,902 ± 42 | 4,892 ± 135 | 8.82× |
+| 0.01 | 357 ± 31 | 2,613 ± 62 | 4,507 ± 161 | 7.32× |
+| 0.03 | 366 ± 20 | 2,232 ± 56 | 3,756 ± 79 | 6.10× |
+| 0.05 | 352 ± 12 | 1,674 ± 16 | 2,709 ± 29 | 4.76× |
+| 0.1 | 338 ± 2 | 1,694 ± 9 | 2,702 ± 6 | 5.01× |
 
-**Marginal improvement** (~3–6% mixed over double). The rotation was NOT the
-bottleneck — the rest of the evaluator pipeline (`PairModulator::evaluate()`,
-`PatchEnvelope` distance/angle math, pair loop position arithmetic in the
-`AnisoPotentialPairGPU` kernel) still operates in `Scalar` (double).
-
-**Conclusion**: To bring mixed close to single for anisotropic potentials, the
-_entire_ aniso pair kernel and evaluator chain would need ForceReal conversion,
-analogous to what was done for isotropic `PotentialPairGPU`. The rotation fix
-is still valuable as a correctness improvement (float-safe cancellation-free
-formula) but does not unlock the expected throughput gain on its own.
+**Mixed 5–9× faster than double.** The anisotropic pair evaluator internally
+uses `Scalar` (double on mixed, float on single), so mixed does NOT reach
+single-precision speed. But the isotropic portions of the kernel (pair force
+I/O, minimum-image, neighbor list traversal) all use `ForceReal` (float),
+giving a massive speedup over pure double. Double is extremely slow because
+the RTX 4090 has a 64:1 FP32:FP64 throughput ratio.
 
 ---
 
 ## Remaining Mixed→Single Performance Gap
 
-The 1.6× gap between mixed (~7,500 TPS) and single (~12,000 TPS) is structural:
+The ~1.6× gap between mixed (~7,500 TPS) and single (~12,000 TPS) for isotropic
+pair forces is structural:
 
 1. **Integrator I/O**: Read/write `double4` positions for integration accuracy
 2. **Position sync**: `syncPositionsForceReal()` reads double4, writes float4
@@ -267,3 +261,7 @@ The 1.6× gap between mixed (~7,500 TPS) and single (~12,000 TPS) is structural:
 
 These are fundamental to the mixed-precision design (double integration is the point)
 and cannot be further optimized without sacrificing the precision guarantees.
+
+For anisotropic potentials (patchy), mixed is ~1.7× slower than single because the
+evaluator internals (`PairModulator`, `PatchEnvelope` distance/angle math) still use
+`Scalar` which is double in mixed but float in single.

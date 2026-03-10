@@ -51,12 +51,22 @@ eval "$(~/miniforge3/bin/conda shell.bash hook)" && conda activate main
 ### Build and test
 
 ```bash
-cd build && make -j8 && ctest --output-on-failure -j8
-make install  # installs to build/install_mixed/
+cd build
+cmake .. -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32 -DENABLE_GPU=ON
+make -j8 && ctest --output-on-failure -j8
+cmake --install . --prefix install_mixed
 ```
 
-The mixed build uses CMake flags:
-`-DHOOMD_MIXED_PRECISION=ON -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32`
+The mixed-precision mode is activated by setting `SHORTREAL_SIZE != LONGREAL_SIZE`.
+This auto-defines `HOOMD_MIXED_PRECISION` at compile time (it is **not** a CMake
+variable). Always pass the precision flags explicitly — CMake caches them, so a
+stale cache can silently produce the wrong build. Verify with:
+
+```bash
+cd /tmp && PYTHONPATH=<install>/lib/python3.12/site-packages \
+  python3 -c "import hoomd; print(hoomd.version.floating_point_precision)"
+# Expected: (64, 32)
+```
 
 To build the double/single comparison configurations for benchmarking, see
 [BENCHMARKING.md](BENCHMARKING.md).
