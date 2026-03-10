@@ -170,11 +170,11 @@ point (`af55fdf58`, trunk tip) to verify our changes don't regress performance.
 
 | Build | TPS | vs upstream |
 |-------|-----|-------------|
-| upstream_double | 2,558 ± 58 | — |
-| double | 2,404 ± 46 | −6.0% |
-| upstream_single | 11,962 ± 458 | — |
-| single | 11,982 ± 404 | +0.2% |
-| **mixed** | **7,321 ± 224** | **+186% vs upstream_double** |
+| upstream_double | 2,577 ± 49 | — |
+| double | 2,409 ± 52 | −6.5% |
+| upstream_single | 12,099 ± 335 | — |
+| single | 11,754 ± 461 | −2.9% |
+| **mixed** | **10,063 ± 147** | **+290% vs upstream_double** |
 
 **64K particles, no dihedrals, dt=0.005:**
 
@@ -186,10 +186,13 @@ point (`af55fdf58`, trunk tip) to verify our changes don't regress performance.
 | single | 18,099 ± 544 | −6.1% |
 | **mixed** | **11,141 ± 181** | **+150% vs upstream_double** |
 
-**Summary:** Our code changes introduce ~5–6% overhead in pure-double and
+**Summary:** Our code changes introduce ~3–7% overhead in pure-double and
 pure-single modes (likely from the extra `syncPositionsForceReal` kernel launch and
 template instantiation that exist even when `ForceReal == Scalar`). The mixed build
-delivers **2.5–3×** over upstream double, far outweighing the small regression.
+delivers **2.5–3.9×** over upstream double, far outweighing the small regression.
+The dihedral epsilon clamp (see below) has no measurable effect on upstream, double,
+or single — it only benefits mixed, where float cross-product overflow was the
+bottleneck.
 
 ### Progression Through Phases
 
