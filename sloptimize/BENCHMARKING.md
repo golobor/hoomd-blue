@@ -6,27 +6,32 @@ How to build comparison configurations, run benchmarks, and the full results.
 
 ## Comparison Builds
 
-All three builds — **mixed**, **double**, **single** — are compiled from **this same
-codebase**. Precision is controlled entirely by CMake flags:
+Five builds are used for benchmarking — three from the **sloptimized** source tree and
+two **upstream baselines** from the pre-fork commit. Precision is controlled entirely
+by CMake flags:
 
-| Config | CMake flags | What it does |
-|--------|------------|--------------|
-| mixed | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | Forces in float, integration in double |
-| double | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | Original upstream behavior |
-| single | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | Everything float (theoretical max speed) |
+| Config | Source | CMake flags | What it does |
+|--------|--------|------------|--------------|
+| mixed | sloptimized | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | Forces in float, integration in double |
+| double | sloptimized | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | Double with our code changes |
+| single | sloptimized | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | Everything float, with our code changes |
+| upstream_double | upstream | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | Unmodified upstream double (regression check) |
+| upstream_single | upstream | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | Unmodified upstream single (regression check) |
 
 `HOOMD_MIXED_PRECISION` is **not** a CMake variable — it is a C preprocessor macro
 auto-defined when `SHORTREAL_SIZE != LONGREAL_SIZE`. The only CMake knobs are
 `HOOMD_LONGREAL_SIZE` and `HOOMD_SHORTREAL_SIZE`.
 
-The double and single builds exist only for benchmark comparison. Regular users only
-need the mixed build.
+Mixed is the primary build. Double and single exist for speedup comparison.
+Upstream_double and upstream_single verify our changes didn't regress performance.
 
-### Building all three
+### Building all five
 
 Each configuration needs its own build tree and install prefix.
 **Always pass the precision flags explicitly** — CMake caches variables, so a stale
 cache can silently produce the wrong build.
+
+**Sloptimized builds** (from working tree):
 
 ```bash
 # Mixed (the default build/ directory)
@@ -51,14 +56,50 @@ make -j8
 cmake --install . --prefix ../build/install_single
 ```
 
+**Upstream baselines** (from pre-fork commit via `git worktree`):
+
+```bash
+# Find the fork point (last upstream commit before our changes)
+FORK=$(git merge-base mixed-precision trunk 2>/dev/null \
+    || git rev-parse v6.1.1)  # fallback to tag
+echo "Fork point: $FORK"
+
+# Create a worktree checkout of the upstream code
+git worktree add ../hoomd-upstream $FORK
+cd ../hoomd-upstream && git submodule update --init
+
+# Upstream double
+mkdir -p build_double && cd build_double
+cmake .. -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64 \
+         -DENABLE_GPU=ON -DBUILD_TESTING=OFF -DBUILD_MPCD=OFF
+make -j8
+cmake --install . --prefix ../../hoomd-blue/build/install_upstream_double
+cd ..
+
+# Upstream single
+mkdir -p build_single && cd build_single
+cmake .. -DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32 \
+         -DENABLE_GPU=ON -DBUILD_TESTING=OFF -DBUILD_MPCD=OFF
+make -j8
+cmake --install . --prefix ../../hoomd-blue/build/install_upstream_single
+```
+
 **Verify** each build reports the expected precision:
 
 ```bash
 cd /tmp && PYTHONPATH=<install>/lib/python3.12/site-packages \
   python3 -c "import hoomd; print(hoomd.version.floating_point_precision)"
-# mixed  → (64, 32)    compile_flags: DOUBLE[SINGLE]
-# double → (64, 64)    compile_flags: DOUBLE[DOUBLE]
-# single → (32, 32)    compile_flags: SINGLE[SINGLE]
+# mixed            → (64, 32)    compile_flags: DOUBLE[SINGLE]
+# double           → (64, 64)    compile_flags: DOUBLE[DOUBLE]
+# single           → (32, 32)    compile_flags: SINGLE[SINGLE]
+# upstream_double  → (64, 64)    + git_sha1 matches $FORK
+# upstream_single  → (32, 32)    + git_sha1 matches $FORK
+```
+
+Clean up the worktree when done:
+
+```bash
+git worktree remove ../hoomd-upstream
 ```
 
 ### Switching between builds
@@ -119,6 +160,36 @@ integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 
 | double | 2,389 ± 51 | 1.0× |
 | **mixed** | **7,563 ± 328** | **3.17×** |
 | single | 12,135 ± 351 | 5.08× |
+
+### Upstream Regression Check
+
+Comparing sloptimized double/single against unmodified upstream code at the fork
+point (`af55fdf58`, trunk tip) to verify our changes don't regress performance.
+
+**64K particles + dihedrals, dt=0.005:**
+
+| Build | TPS | vs upstream |
+|-------|-----|-------------|
+| upstream_double | 2,558 ± 58 | — |
+| double | 2,404 ± 46 | −6.0% |
+| upstream_single | 11,962 ± 458 | — |
+| single | 11,982 ± 404 | +0.2% |
+| **mixed** | **7,321 ± 224** | **+186% vs upstream_double** |
+
+**64K particles, no dihedrals, dt=0.005:**
+
+| Build | TPS | vs upstream |
+|-------|-----|-------------|
+| upstream_double | 4,459 ± 92 | — |
+| double | 4,231 ± 80 | −5.1% |
+| upstream_single | 19,282 ± 556 | — |
+| single | 18,099 ± 544 | −6.1% |
+| **mixed** | **11,141 ± 181** | **+150% vs upstream_double** |
+
+**Summary:** Our code changes introduce ~5–6% overhead in pure-double and
+pure-single modes (likely from the extra `syncPositionsForceReal` kernel launch and
+template instantiation that exist even when `ForceReal == Scalar`). The mixed build
+delivers **2.5–3×** over upstream double, far outweighing the small regression.
 
 ### Progression Through Phases
 
