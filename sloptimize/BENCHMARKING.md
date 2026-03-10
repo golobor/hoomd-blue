@@ -374,3 +374,27 @@ and `HarmonicAngleForceGPU.cu`. Also clamp `s_abcd` to [-1, 1] (previously only
 - Mixed TPS at dt=0.005: 7,563 → **10,197** (+35%, overflow handling was costly)
 - Mixed now survives dt=0.05 and dt=0.1 where double and single crash
 - 58/58 tests still pass
+
+### Why Mixed Survives at Large dt While Double and Single Crash
+
+The three builds crash (or don't) for fundamentally different reasons:
+
+- **Double** crashes from **physics instability**, not numerical overflow.
+  At dt=0.05 the Verlet integrator over-shoots the stiff dihedral potential,
+  particles swing past the barrier, and the integrator diverges. The `SMALL`
+  clamp never triggers because double has enough mantissa bits to represent
+  the cross-product magnitudes accurately — `raasq` stays well above 0.001.
+
+- **Single** crashes from **both** problems: (1) float cross products overflow
+  exactly as described above (the clamp fixes this), but also (2) float
+  position integration accumulates truncation error that misplaces particles
+  into overlapping configurations. Even with the clamp preventing force NaNs,
+  the float integrator still produces bad trajectories at large dt.
+
+- **Mixed** only had problem (1) — float force overflow. Its integrator runs
+  in double, so positions and velocities stay accurate even at dt=0.05. Once
+  the `SMALL` clamp removes the float overflow pathway, mixed has no remaining
+  failure mode at these timesteps. The double integrator keeps the trajectory
+  on the correct energy surface, and the clamped float forces are accurate
+  enough (the clamp only activates for near-collinear geometries where the
+  true force is near zero anyway).
