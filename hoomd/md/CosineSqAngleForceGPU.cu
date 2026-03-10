@@ -56,18 +56,18 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(ForceReal4* d_force,
 
     // read in the position of our b-particle from the a-b-c triplet. (MEM TRANSFER: 16 bytes)
     ForceReal4 idx_postype = d_pos[idx]; // we can be either a, b, or c in the a-b-c triplet
-    Scalar3 idx_pos = make_scalar3(idx_postype.x, idx_postype.y, idx_postype.z);
-    Scalar3 a_pos, b_pos, c_pos; // allocate space for the a,b, and c atom in the a-b-c triplet
+    ForceReal3 idx_pos = make_forcereal3(ForceReal(idx_postype.x), ForceReal(idx_postype.y), ForceReal(idx_postype.z));
+    ForceReal3 a_pos, b_pos, c_pos; // allocate space for the a,b, and c atom in the a-b-c triplet
 
     // initialize the force to 0
-    ForceReal4 force_idx = make_forcereal4(Scalar(0.0), Scalar(0.0), Scalar(0.0), Scalar(0.0));
+    ForceReal4 force_idx = make_forcereal4(ForceReal(0.0), ForceReal(0.0), ForceReal(0.0), ForceReal(0.0));
 
-    Scalar fab[3], fcb[3];
+    ForceReal fab[3], fcb[3];
 
     // initialize the virial to 0
-    Scalar virial[6];
+    ForceReal virial[6];
     for (int i = 0; i < 6; i++)
-        virial[i] = Scalar(0.0);
+        virial[i] = ForceReal(0.0);
 
     // loop over all angles
     for (int angle_idx = 0; angle_idx < n_angles; angle_idx++)
@@ -82,10 +82,10 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(ForceReal4* d_force,
 
         // get the a-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 x_postype = d_pos[cur_angle_x_idx];
-        Scalar3 x_pos = make_scalar3(x_postype.x, x_postype.y, x_postype.z);
+        ForceReal3 x_pos = make_forcereal3(ForceReal(x_postype.x), ForceReal(x_postype.y), ForceReal(x_postype.z));
         // get the c-particle's position (MEM TRANSFER: 16 bytes)
         ForceReal4 y_postype = d_pos[cur_angle_y_idx];
-        Scalar3 y_pos = make_scalar3(y_postype.x, y_postype.y, y_postype.z);
+        ForceReal3 y_pos = make_forcereal3(ForceReal(y_postype.x), ForceReal(y_postype.y), ForceReal(y_postype.z));
 
         if (cur_angle_abc == 0)
             {
@@ -107,42 +107,42 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(ForceReal4* d_force,
             }
 
         // calculate dr for a-b,c-b,and a-c
-        Scalar3 dab = a_pos - b_pos;
-        Scalar3 dcb = c_pos - b_pos;
-        Scalar3 dac = a_pos - c_pos;
+        ForceReal3 dab = a_pos - b_pos;
+        ForceReal3 dcb = c_pos - b_pos;
+        ForceReal3 dac = a_pos - c_pos;
 
         // apply periodic boundary conditions
-        dab = box.minImage(dab);
-        dcb = box.minImage(dcb);
-        dac = box.minImage(dac);
+        dab = box.minImageForceReal(dab);
+        dcb = box.minImageForceReal(dcb);
+        dac = box.minImageForceReal(dac);
 
         // get the angle parameters (MEM TRANSFER: 8 bytes)
         Scalar2 params = __ldg(d_params + cur_angle_type);
-        Scalar K = params.x;
-        Scalar t_0 = params.y;
+        ForceReal K = ForceReal(params.x);
+        ForceReal t_0 = ForceReal(params.y);
 
-        Scalar rsqab = dot(dab, dab);
-        Scalar rab = fast::sqrt(rsqab);
-        Scalar rsqcb = dot(dcb, dcb);
-        Scalar rcb = fast::sqrt(rsqcb);
+        ForceReal rsqab = dot(dab, dab);
+        ForceReal rab = fast::sqrt(rsqab);
+        ForceReal rsqcb = dot(dcb, dcb);
+        ForceReal rcb = fast::sqrt(rsqcb);
 
-        Scalar c_abbc = dot(dab, dcb);
+        ForceReal c_abbc = dot(dab, dcb);
         c_abbc /= rab * rcb; // cos(t)
 
-        if (c_abbc > Scalar(1.0))
-            c_abbc = Scalar(1.0);
-        if (c_abbc < -Scalar(1.0))
-            c_abbc = -Scalar(1.0);
+        if (c_abbc > ForceReal(1.0))
+            c_abbc = ForceReal(1.0);
+        if (c_abbc < -ForceReal(1.0))
+            c_abbc = -ForceReal(1.0);
 
         // actually calculate the force
         // should the user pass cos(t_0) so that it's not calculated each time for each angle?
-        Scalar dcosth = c_abbc - fast::cos(t_0);
-        Scalar tk = K * dcosth;
+        ForceReal dcosth = c_abbc - fast::cos(t_0);
+        ForceReal tk = K * dcosth;
 
-        Scalar a = Scalar(1.0) * tk;
-        Scalar a11 = a * c_abbc / rsqab;
-        Scalar a12 = -a / (rab * rcb);
-        Scalar a22 = a * c_abbc / rsqcb;
+        ForceReal a = ForceReal(1.0) * tk;
+        ForceReal a11 = a * c_abbc / rsqab;
+        ForceReal a12 = -a / (rab * rcb);
+        ForceReal a22 = a * c_abbc / rsqcb;
 
         fab[0] = a11 * dab.x + a12 * dcb.x;
         fab[1] = a11 * dab.y + a12 * dcb.y;
@@ -154,16 +154,16 @@ __global__ void gpu_compute_cosinesq_angle_forces_kernel(ForceReal4* d_force,
 
         // the rest should be the same as for the harmonic bond
         // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = tk * dcosth * Scalar(Scalar(1.0) / Scalar(6.0));
+        ForceReal angle_eng = tk * dcosth * ForceReal(ForceReal(1.0) / ForceReal(6.0));
 
         // upper triangular version of virial tensor
-        Scalar angle_virial[6];
-        angle_virial[0] = Scalar(1. / 3.) * (dab.x * fab[0] + dcb.x * fcb[0]);
-        angle_virial[1] = Scalar(1. / 3.) * (dab.y * fab[0] + dcb.y * fcb[0]);
-        angle_virial[2] = Scalar(1. / 3.) * (dab.z * fab[0] + dcb.z * fcb[0]);
-        angle_virial[3] = Scalar(1. / 3.) * (dab.y * fab[1] + dcb.y * fcb[1]);
-        angle_virial[4] = Scalar(1. / 3.) * (dab.z * fab[1] + dcb.z * fcb[1]);
-        angle_virial[5] = Scalar(1. / 3.) * (dab.z * fab[2] + dcb.z * fcb[2]);
+        ForceReal angle_virial[6];
+        angle_virial[0] = ForceReal(1. / 3.) * (dab.x * fab[0] + dcb.x * fcb[0]);
+        angle_virial[1] = ForceReal(1. / 3.) * (dab.y * fab[0] + dcb.y * fcb[0]);
+        angle_virial[2] = ForceReal(1. / 3.) * (dab.z * fab[0] + dcb.z * fcb[0]);
+        angle_virial[3] = ForceReal(1. / 3.) * (dab.y * fab[1] + dcb.y * fcb[1]);
+        angle_virial[4] = ForceReal(1. / 3.) * (dab.z * fab[1] + dcb.z * fcb[1]);
+        angle_virial[5] = ForceReal(1. / 3.) * (dab.z * fab[2] + dcb.z * fcb[2]);
 
         if (cur_angle_abc == 0)
             {
