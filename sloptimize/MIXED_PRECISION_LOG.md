@@ -1144,7 +1144,7 @@ make install  # installs to build/install_mixed/
 ### Run benchmarks
 
 ```bash
-cd benchmarks
+cd sloptimize
 
 # Single dt, all three builds in parallel (one per GPU):
 python run_benchmarks.py benchmark_chains.py \
