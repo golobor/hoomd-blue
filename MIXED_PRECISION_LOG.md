@@ -1065,3 +1065,106 @@ read double4 positions (2× bandwidth vs single).
 - CellList ForceReal4: Would halve nlist neighbor-read bandwidth but requires deep
   infrastructure changes. Deferred.
 - 6 remaining force kernels: Not used in target workloads.
+
+---
+
+## `--use_fast_math` Analysis
+
+The CUDA `--use_fast_math` compiler flag enables four sub-flags:
+
+| Flag | Effect | Already handled? |
+|------|--------|-----------------|
+| `--ftz=true` | Flush denormals to zero | Minor — denormals are rare in MD |
+| `--prec-div=false` | Replace `/` with `__fdividef` (~2 ULP) | **Only meaningful change** — divisions are everywhere: `1/r`, `F/r`, normalization |
+| `--prec-sqrt=false` | Replace `sqrtf` with approximate sqrt | Our `fast::sqrt(float)` already calls `sqrtf` (IEEE-correct), so minor |
+| `--fmad=true` | Fused multiply-add | Already the default in CUDA |
+
+The functions where fast intrinsics make the biggest difference — `sin`, `cos`, `exp`,
+`log`, `pow` — are **already using GPU intrinsics** via the `fast::` namespace in
+`HOOMDMath.h` (e.g., `__sinf`, `__cosf`, `__expf`, `__logf` on device). So
+`--use_fast_math` would only additionally affect plain `/` division operators scattered
+through the code.
+
+The workload is increasingly **memory-bandwidth-bound** after the mixed-precision
+conversion. The remaining mixed→single gap (7474 vs 12062 TPS = 1.6×) is mostly from:
+- Double-precision position reads/writes in the integrator
+- Reading both `float4` and `double4` positions (2× the position bandwidth)
+- Not from slower math functions
+
+**Decision**: Skip. Expected improvement 0-5%, not worth the precision risk for
+division-heavy force calculations. The `fast::` namespace already captures the
+high-impact intrinsics.
+
+---
+
+## Commit History
+
+```
+a56ee37b8 Log: expand nlist CellList analysis with scope and cost-benefit
+0d85807bf Update log: Phase 2C results, nlist analysis, summary
+4b1025edf Convert CosineSqAngleForceGPU.cu to ForceReal
+a1bdf7b5a Convert dihedral/improper GPU kernels to ForceReal
+8489563a9 Phase 2B: float4 position mirror + accuracy tests + dt sweep benchmarks
+007bdc275 Phase 2A Step 1: convert external potential evaluators to ForceReal
+2f667b121 Convert nlist, angle, dihedral, DPD thermo, bond kernels to ForceReal
+133feaffb Add benchmark and conversion scripts for mixed-precision testing
+3edbe36ee Mixed precision: ForceReal (float) for force computation on GPU
+```
+
+---
+
+## Build / Test / Benchmark Instructions
+
+### Prerequisites
+
+```bash
+eval "$(~/miniforge3/bin/conda shell.bash hook)" && conda activate main
+```
+
+### Three build configurations
+
+The project maintains three install prefixes for comparison:
+
+| Config | CMake flags | Install prefix |
+|--------|------------|----------------|
+| mixed | `-DHOOMD_MIXED_PRECISION=ON -DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=32` | `build/install_mixed/` |
+| double | `-DHOOMD_LONGREAL_SIZE=64 -DHOOMD_SHORTREAL_SIZE=64` | `build/install_double/` |
+| single | `-DHOOMD_LONGREAL_SIZE=32 -DHOOMD_SHORTREAL_SIZE=32` | `build/install_single/` |
+
+The mixed build is the default (`build/` dir). Double and single are separate build
+trees used only for benchmark comparisons.
+
+### Build and test (mixed)
+
+```bash
+cd build && make -j8 && ctest --output-on-failure -j8
+make install  # installs to build/install_mixed/
+```
+
+### Run benchmarks
+
+```bash
+cd benchmarks
+
+# Single dt, all three builds in parallel (one per GPU):
+python run_benchmarks.py benchmark_chains.py \
+  --lib mixed=.../build/install_mixed/lib/python3.12/site-packages \
+  --lib double=.../build/install_double/lib/python3.12/site-packages \
+  --lib single=.../build/install_single/lib/python3.12/site-packages \
+  --no-dt \
+  -- 64000 200
+
+# dt sweep (equilibrate once, benchmark each dt):
+python run_benchmarks.py benchmark_chains.py \
+  --lib mixed=... --lib double=... --lib single=... \
+  -- 64000 200
+
+# Without dihedrals:
+python run_benchmarks.py benchmark_chains.py \
+  --lib mixed=... --lib double=... --lib single=... \
+  --no-dt \
+  -- 64000 200 --no-dihedral
+```
+
+The runner auto-detects free GPUs and assigns one job per GPU. Use `--gpus 0,1,2`
+to restrict to specific GPUs.
