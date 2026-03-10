@@ -388,6 +388,37 @@ but touches infrastructure shared with HPMC.
 
 ---
 
+## Bug Fixes
+
+### Shared memory alignment in AnisoPotentialPairGPU.cuh
+
+**Symptom**: `RuntimeError: CUDA Error: misaligned address` when running patchy particle
+forces (PatchyGaussian, etc.) in mixed precision.
+
+**Root cause**: The GPU kernel allocates shared memory as
+`[param_type × N][ForceReal × N][shape_type × N_types]`. When `ForceReal = float` (4 bytes)
+and `N` is odd (e.g. single-type system: `N = 1`), `shape_type` starts at a non-8-byte-aligned
+offset. `shape_type` contains `ManagedArray` with pointer members requiring 8-byte alignment.
+In the original double build, `ForceReal = double` (8 bytes) always gave correct alignment.
+
+**Fix**: Added explicit 8-byte alignment padding between `s_rcutsq` and `s_shape_params` in
+both the kernel and the launcher's shared memory size calculation.
+
+### minImageForceReal unavailable in non-mixed builds
+
+**Symptom**: Single and double GPU builds fail with `class "BoxDim" has no member
+"minImageForceReal"`.
+
+**Root cause**: `BoxDim::minImageForceReal()` was guarded by `#ifdef HOOMD_MIXED_PRECISION`,
+but dihedral/improper/angle/bond kernels called it unconditionally after Phase 2C conversion.
+
+**Fix**: Removed the `#ifdef` guard — `ForceReal` is always defined as `ShortReal`, so
+the function compiles in all builds. In non-mixed builds (`ForceReal = Scalar`), it's
+equivalent to `minImage()`. Also simplified remaining `#ifdef`-guarded call sites in
+`PotentialPairGPU.cuh` and `AnisoPotentialPairGPU.cuh`.
+
+---
+
 ## Commit History
 
 ```

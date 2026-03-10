@@ -777,7 +777,7 @@ void mpcd::CollisionMethod::transferRigidBodyMomenta(uint64_t timestep)
             {
             angmom_change_body.z = Scalar(0);
             }
-        angmom += Scalar(2.0) * orientation * quat(0.0, angmom_change_body);
+        angmom += Scalar(2.0) * orientation * quat(Scalar(0), angmom_change_body);
 
         // save update
         h_angmom.data[central_idx] = quat_to_scalar4(angmom);

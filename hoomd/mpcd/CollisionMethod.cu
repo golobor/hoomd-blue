@@ -337,7 +337,7 @@ __global__ void transfer_rigid_body_momenta(Scalar3* d_linmom_accum,
         {
         angmom_change_body.z = Scalar(0);
         }
-    angmom += Scalar(2.0) * orientation * quat(0.0, angmom_change_body);
+    angmom += Scalar(2.0) * orientation * quat(Scalar(0), angmom_change_body);
 
     // save update
     d_angmom[central_idx] = quat_to_scalar4(angmom);

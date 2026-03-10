@@ -264,11 +264,7 @@ gpu_compute_pair_forces_shared_kernel(ForceReal4* d_force,
                 ForceReal3 dx = posi - posj;
 
                 // apply periodic boundary conditions in ForceReal precision
-#ifdef HOOMD_MIXED_PRECISION
                 dx = box.minImageForceReal(dx);
-#else
-                dx = box.minImage(dx);
-#endif
 
                 // calculate r squared
                 ForceReal rsq = dot(dx, dx);

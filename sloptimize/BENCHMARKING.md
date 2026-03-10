@@ -203,6 +203,31 @@ All stable at every dt. The second pair force increases compute intensity,
 giving mixed a higher speedup (3.5× vs 2.5× without attraction at dt=0.005) —
 more pair-force compute means more float savings to harvest.
 
+### Patchy Particles, No Dihedrals (64K particles, PatchyGaussian)
+
+Uses `AnisoPotentialPairPatchyGauss` with parameters `eps=1.0, sigma=0.5,
+alpha=0.6, omega=20, r_cut=1.5, npatches=2`. This exercises the anisotropic
+pair kernel which evaluates orientational (quaternion) math.
+
+| dt | Double | Mixed | Single | Mixed/Double |
+|----|--------|-------|--------|-------------|
+| 0.005 | 329 ± 19 | 334 ± 18 | 5,211 ± 165 | 1.02× |
+| 0.01 | 363 ± 29 | 353 ± 30 | 4,566 ± 157 | 0.97× |
+| 0.03 | 367 ± 20 | 376 ± 20 | 3,945 ± 89 | 1.02× |
+| 0.05 | 342 ± 10 | 338 ± 11 | 2,738 ± 26 | 0.99× |
+| 0.1 | 330 ± 3 | 331 ± 2 | 2,777 ± 7 | 1.00× |
+
+**Mixed ≈ Double** — no speedup. The anisotropic pair evaluator
+(`PatchEnvelope`, `PairModulator`) uses `Scalar` (double) quaternion and
+orientation math internally. Only the outer force output pipeline and
+minimum-image call use `ForceReal` (float), which is a tiny fraction of the
+workload. **Single is 8–16× faster** because all `Scalar` operations become
+float.
+
+**Takeaway**: Mixed precision only helps when `ForceReal` dominates compute.
+For orientation-heavy potentials, the evaluator internals must also be
+converted to `ForceReal` to see gains.
+
 ---
 
 ## Remaining Mixed→Single Performance Gap

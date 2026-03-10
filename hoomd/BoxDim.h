@@ -393,12 +393,12 @@ struct
         return vec3<Scalar>(minImage(vec_to_scalar3(v)));
         }
 
-#ifdef HOOMD_MIXED_PRECISION
-    //! Minimum image in ForceReal precision (float) for mixed-precision force kernels
+    //! Minimum image in ForceReal precision for force kernels
     /*! \param v ForceReal3 vector
         \return minimum image of v in ForceReal precision
         \note Box dimensions are narrowed to ForceReal for this computation. This is safe
         because the minimum image vector is always O(L), well within float range.
+        In non-mixed builds ForceReal == Scalar, so this is equivalent to minImage().
     */
     HOSTDEVICE ForceReal3 minImageForceReal(const ForceReal3& v) const
         {
@@ -493,7 +493,6 @@ struct
 
         return w;
         }
-#endif // HOOMD_MIXED_PRECISION
 
     //! Wrap a vector back into the box
     /*! \param w Vector to wrap, updated to the minimum image obeying the periodic settings

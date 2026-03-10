@@ -168,8 +168,14 @@ gpu_compute_pair_aniso_forces_kernel(ForceReal4* d_force,
     // Use ForceReal for cutoff in shared memory (mixed-precision force evaluation)
     ForceReal* s_rcutsq
         = (ForceReal*)(&s_data[num_typ_parameters * sizeof(typename evaluator::param_type)]);
+    // Align s_shape_params to 8 bytes — when ForceReal is float (4 bytes) and
+    // num_typ_parameters is odd, the pointer after s_rcutsq would be only 4-byte
+    // aligned, causing misaligned access for shape_type structs with 8-byte members.
+    char* shape_ptr = reinterpret_cast<char*>(&s_rcutsq[num_typ_parameters]);
+    shape_ptr = reinterpret_cast<char*>(
+        (reinterpret_cast<uintptr_t>(shape_ptr) + 7u) & ~static_cast<uintptr_t>(7u));
     typename evaluator::shape_type* s_shape_params
-        = (typename evaluator::shape_type*)(&s_rcutsq[num_typ_parameters]);
+        = reinterpret_cast<typename evaluator::shape_type*>(shape_ptr);
 
     // load in the per type pair parameters (narrowing rcutsq to ForceReal)
     for (unsigned int cur_offset = 0; cur_offset < num_typ_parameters; cur_offset += blockDim.x)
@@ -284,11 +290,7 @@ gpu_compute_pair_aniso_forces_kernel(ForceReal4* d_force,
                 ForceReal3 dx = posi - posj;
 
                 // apply periodic boundary conditions in ForceReal precision
-#ifdef HOOMD_MIXED_PRECISION
                 dx = box.minImageForceReal(dx);
-#else
-                dx = box.minImage(dx);
-#endif
 
                 // calculate r squared
                 ForceReal rsq = dot(dx, dx);
@@ -432,8 +434,13 @@ struct AnisoPairForceComputeKernel
             unsigned int block_size = pair_args.block_size;
 
             Index2D typpair_idx(pair_args.ntypes);
-            size_t shared_bytes = (sizeof(ForceReal) + sizeof(typename evaluator::param_type))
-                                      * typpair_idx.getNumElements()
+            // Shared memory layout: [param_type * N_pairs][ForceReal * N_pairs][padding][shape_type * N_types]
+            // Add up to 7 bytes of alignment padding between s_rcutsq and s_shape_params
+            // to ensure 8-byte alignment when ForceReal is float (4 bytes).
+            size_t pre_shape = (sizeof(typename evaluator::param_type) + sizeof(ForceReal))
+                               * typpair_idx.getNumElements();
+            pre_shape = (pre_shape + 7u) & ~static_cast<size_t>(7u); // align to 8 bytes
+            size_t shared_bytes = pre_shape
                                   + sizeof(typename evaluator::shape_type) * pair_args.ntypes;
 
             unsigned int max_block_size;
