@@ -19,17 +19,32 @@ force evaluation — only position integration truly needs double.
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double (baseline) | 2,538 ± 46 | 1.0× |
-| **mixed (this fork)** | **7,741 ± 298** | **3.05×** |
-| single | 12,093 ± 347 | 4.77× |
+| double (baseline) | 2,371 ± 38 | 1.0× |
+| **mixed (this fork)** | **10,197 ± 161** | **4.30×** |
+| single | 12,495 ± 732 | 5.27× |
 
-- **3× speedup** over double with double-precision position integration preserved
+- **4.3× speedup** over double with double-precision position integration preserved
+- **+290%** over unmodified upstream double (same codebase, same hardware)
 - Force accuracy: mean relative error ~3.6×10⁻⁷ vs double (consistent with float32 ε)
 - Energy conservation: indistinguishable from double over 100 steps
-- Stability: all builds stable through dt=0.03 with dihedrals; all crash at dt=0.05
+- Patchy particles: **8.8× speedup** (anisotropic evaluator is heavily compute-bound)
 
-Scaling: at 256K particles, mixed achieves **~3.1× double** (bandwidth-bound workloads
+Scaling: at 256K particles, mixed achieves **~3.3× double** (bandwidth-bound workloads
 benefit more from halved data widths at larger system sizes).
+
+## Quick install
+
+```bash
+# Clone and install into a conda environment (requires NVIDIA GPU + drivers)
+git clone --branch mixed-precision https://github.com/golobor/hoomd-blue.git
+bash hoomd-blue/sloptimize/install.sh
+
+# Use it
+conda activate hoomd-mixed
+python -c "import hoomd; print(hoomd.version.floating_point_precision)"  # (64, 32)
+```
+
+See [install.sh](install.sh) for options (`--env`, `--jobs`, `--python`, etc.).
 
 ## Further reading
 
@@ -71,17 +86,15 @@ cd /tmp && PYTHONPATH=<install>/lib/python3.12/site-packages \
 To build the double/single comparison configurations for benchmarking, see
 [BENCHMARKING.md](BENCHMARKING.md).
 
-## Commit history
+## Key commits
 
 ```
-a56ee37b8  Log: expand nlist CellList analysis with scope and cost-benefit
-0d85807bf  Update log: Phase 2C results, nlist analysis, summary
-4b1025edf  Convert CosineSqAngleForceGPU.cu to ForceReal
-a1bdf7b5a  Convert dihedral/improper GPU kernels to ForceReal
+82e2842e2  Update upstream regression check with post-dihedral-clamp numbers
+297dc41cb  Dihedral epsilon clamp: +35% TPS, fixes crash at large dt
+410e68af0  Use cancellation-free rotmat3 in ForceReal for patchy rotation
+919bfd189  Fix aniso pair alignment bug, make minImageForceReal unconditional
 8489563a9  Phase 2B: float4 position mirror + accuracy tests + dt sweep benchmarks
 007bdc275  Phase 2A Step 1: convert external potential evaluators to ForceReal
-2f667b121  Convert nlist, angle, dihedral, DPD thermo, bond kernels to ForceReal
-133feaffb  Add benchmark and conversion scripts for mixed-precision testing
 3edbe36ee  Mixed precision: ForceReal (float) for force computation on GPU
 ```
 
