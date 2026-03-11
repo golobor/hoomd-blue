@@ -50,19 +50,24 @@ ok()    { echo -e "\033[1;32m ✓\033[0m  $*"; }
 err()   { echo -e "\033[1;31m ✗\033[0m  $*" >&2; }
 die()   { err "$@"; exit 1; }
 
-# ─── 1. Find conda ─────────────────────────────────────────────────────
+# ─── 1. Find conda and initialize it ───────────────────────────────────
 info "Looking for conda..."
-if command -v conda &>/dev/null; then
-    CONDA_EXE="$(command -v conda)"
-elif [[ -x "$HOME/miniforge3/bin/conda" ]]; then
-    CONDA_EXE="$HOME/miniforge3/bin/conda"
-    eval "$("$CONDA_EXE" shell.bash hook)"
-elif [[ -x "$HOME/miniconda3/bin/conda" ]]; then
-    CONDA_EXE="$HOME/miniconda3/bin/conda"
-    eval "$("$CONDA_EXE" shell.bash hook)"
-else
-    die "conda not found. Install miniforge: https://github.com/conda-forge/miniforge"
-fi
+CONDA_EXE=""
+for _candidate in \
+    "$(command -v conda 2>/dev/null || true)" \
+    "$HOME/miniforge3/bin/conda" \
+    "$HOME/miniconda3/bin/conda" \
+    "$HOME/mambaforge/bin/conda" \
+    "$HOME/anaconda3/bin/conda"; do
+    if [[ -x "$_candidate" ]]; then
+        CONDA_EXE="$_candidate"
+        break
+    fi
+done
+[[ -z "$CONDA_EXE" ]] && die "conda not found. Install miniforge: https://github.com/conda-forge/miniforge"
+
+# Always initialize conda shell functions (needed for 'conda activate')
+eval "$("$CONDA_EXE" shell.bash hook)"
 ok "Found conda: $CONDA_EXE"
 
 # ─── 2. Check for NVIDIA GPU ───────────────────────────────────────────
@@ -88,7 +93,8 @@ if conda env list | grep -qw "$ENV_NAME"; then
         -c conda-forge \
         cmake eigen ninja numpy pybind11 gsd rowan cereal \
         "python=$PYTHON_VERSION" \
-        cuda-nvcc cuda-cudart-dev cuda-nvrtc-dev libcufft-dev \
+        cuda-nvcc cuda-cudart-dev cuda-nvrtc-dev cuda-profiler-api \
+        libcufft-dev libcusolver-dev libcusparse-dev libcublas-dev \
         2>/dev/null || true
 else
     info "Creating environment '$ENV_NAME'..."
@@ -96,7 +102,8 @@ else
         -c conda-forge \
         cmake eigen ninja numpy pybind11 gsd rowan cereal \
         "python=$PYTHON_VERSION" \
-        cuda-nvcc cuda-cudart-dev cuda-nvrtc-dev libcufft-dev
+        cuda-nvcc cuda-cudart-dev cuda-nvrtc-dev cuda-profiler-api \
+        libcufft-dev libcusolver-dev libcusparse-dev libcublas-dev
 fi
 conda activate "$ENV_NAME"
 ok "Conda environment active: $CONDA_DEFAULT_ENV"
