@@ -194,9 +194,9 @@ Default system: 64K particles, 320 chains × 200 monomers.  TPS protocol:
 
 | Build | TPS | vs Double |
 |-------|-----|-----------|
-| double | 2,371 ± 38 | 1.0× |
-| **mixed** | **10,197 ± 161** | **4.30×** |
-| single | 12,495 ± 732 | 5.27× |
+| double | 2,379 ± 42 | 1.0× |
+| **mixed** | **7,904 ± 348** | **3.32×** |
+| single | 11,857 ± 412 | 4.98× |
 
 ### Upstream Regression Check
 
@@ -207,29 +207,27 @@ point (`af55fdf58`, trunk tip) to verify our changes don't regress performance.
 
 | Build | TPS | vs upstream |
 |-------|-----|-------------|
-| upstream_double | 2,577 ± 49 | — |
-| double | 2,409 ± 52 | −6.5% |
-| upstream_single | 12,099 ± 335 | — |
-| single | 11,754 ± 461 | −2.9% |
-| **mixed** | **10,063 ± 147** | **+290% vs upstream_double** |
+| upstream_double | 2,516 ± 53 | — |
+| double | 2,379 ± 42 | −5.5% |
+| upstream_single | 12,496 ± 544 | — |
+| single | 11,857 ± 412 | −5.1% |
+| **mixed** | **7,904 ± 348** | **+214% vs upstream_double** |
 
 **64K particles, no dihedrals, dt=0.005:**
 
 | Build | TPS | vs upstream |
 |-------|-----|-------------|
-| upstream_double | 4,459 ± 92 | — |
-| double | 4,231 ± 80 | −5.1% |
-| upstream_single | 19,282 ± 556 | — |
-| single | 18,099 ± 544 | −6.1% |
-| **mixed** | **11,141 ± 181** | **+150% vs upstream_double** |
+| upstream_double | 4,394 ± 89 | — |
+| double | 4,190 ± 71 | −4.6% |
+| upstream_single | 18,933 ± 556 | — |
+| single | 19,236 ± 593 | +1.6% |
+| **mixed** | **11,821 ± 45** | **+169% vs upstream_double** |
 
-**Summary:** Our code changes introduce ~3–7% overhead in pure-double and
-pure-single modes (likely from the extra `syncPositionsForceReal` kernel launch and
-template instantiation that exist even when `ForceReal == Scalar`). The mixed build
-delivers **2.5–3.9×** over upstream double, far outweighing the small regression.
-The dihedral epsilon clamp (see below) has no measurable effect on upstream, double,
-or single — it only benefits mixed, where float cross-product overflow was the
-bottleneck.
+**Summary:** Our code changes introduce ~5% overhead in pure-double mode (likely
+from the extra `syncPositionsForceReal` kernel launch and template instantiation
+that exist even when `ForceReal == Scalar`). Pure-single shows no measurable
+regression — within error bars of upstream. The mixed build delivers **2.7–3.1×**
+over upstream double, far outweighing the small regression.
 
 ### Progression Through Phases
 
@@ -245,33 +243,79 @@ bottleneck.
 
 ## Accuracy
 
-Measured on 64K-particle polymer system (benchmark_chains.py configuration, 100 steps).
+Measured at step 0 on 64K-particle polymer system, all forces compared against the
+double build as reference.
 
 ### Force Accuracy (vs Double Reference)
 
+**With dihedrals (chains workload):**
+
 | Metric | Mixed | Single |
 |--------|-------|--------|
-| Max relative error | 1.82×10⁻⁵ | 1.82×10⁻⁵ |
-| Mean relative error | 3.64×10⁻⁷ | 3.64×10⁻⁷ |
-| Mean absolute error | 2.87×10⁻⁶ | 2.87×10⁻⁶ |
+| Max relative error | 5.03×10⁻⁴ | 5.03×10⁻⁴ |
+| Mean relative error | 3.91×10⁻⁷ | 3.95×10⁻⁷ |
+| Max absolute error | 9.81×10⁻³ | 9.81×10⁻³ |
 
-Mixed and single produce identical force errors — confirming all force computation now
-uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machine epsilon.
+**Without dihedrals (nodih workload):**
+
+| Metric | Mixed | Single |
+|--------|-------|--------|
+| Max relative error | 5.86×10⁻³ | 5.86×10⁻³ |
+| Mean relative error | 1.12×10⁻⁶ | 1.12×10⁻⁶ |
+| Max absolute error | 4.75×10⁻² | 4.75×10⁻² |
+
+**Patchy workload:**
+
+| Metric | Mixed | Single |
+|--------|-------|--------|
+| Max relative error | 3.61×10⁻⁴ | 3.61×10⁻⁴ |
+| Mean relative error | 5.43×10⁻⁷ | 5.47×10⁻⁷ |
+| Max absolute error | 5.68×10⁻³ | 5.68×10⁻³ |
+
+Mixed and single produce nearly identical force errors across all workloads —
+confirming all force computation uses float32. The ~10⁻⁷ mean relative error is
+consistent with float32 machine epsilon. Max relative errors (up to ~10⁻³) come
+from DPDConservative forces near zero magnitude, where the relative error is
+amplified but the absolute error remains small.
+
+Upstream_double forces match double to machine precision (~10⁻¹⁶ relative error),
+confirming no numerical regression from our code changes. The only exception is the
+Periodic dihedral force, where our `SMALL = 1e-12` epsilon clamp introduces ~10⁻⁸
+mean relative error at near-collinear geometries.
 
 ### Energy Accuracy (vs Double Reference)
 
-| Metric | Mixed | Single |
-|--------|-------|--------|
-| PE relative difference | 4.85×10⁻⁸ | 4.85×10⁻⁸ |
-| KE relative difference | 2.30×10⁻⁷ | 2.30×10⁻⁷ |
+| Workload | Build | PE rel. diff. | KE rel. diff. |
+|----------|-------|--------------|---------------|
+| chains | mixed | 3.47×10⁻⁸ | 0 |
+| chains | single | 4.94×10⁻⁸ | 3.41×10⁻⁸ |
+| nodih | mixed | 3.16×10⁻⁸ | 0 |
+| nodih | single | 1.04×10⁻⁷ | 4.86×10⁻⁸ |
+| patchy | mixed | 3.57×10⁻⁸ | 0 |
+| patchy | single | 2.39×10⁻⁸ | 8.78×10⁻⁸ |
 
-### Energy Conservation (100-step drift)
+Mixed preserves KE exactly (double-precision integration), with PE errors at
+~10⁻⁸. Single shows slightly larger errors from float integration.
 
-| Build | ΔE/E₀ |
-|-------|--------|
-| Double | -6.30×10⁻⁵ |
-| Mixed | -6.23×10⁻⁵ |
-| Single | -6.23×10⁻⁵ |
+### Energy Conservation (NVE, dt=0.005, 50K steps)
+
+| Build | nodih drift | patchy drift |
+|-------|-------------|-------------|
+| double | 7.25×10⁻⁵ | 5.32×10⁻⁴ |
+| mixed | 1.64×10⁻⁴ | 5.69×10⁻⁴ |
+| single | 1.11×10⁻⁴ | 5.21×10⁻⁴ |
+| upstream_double | 1.33×10⁻⁴ | 6.07×10⁻⁴ |
+| upstream_single | 1.11×10⁻⁴ | — |
+
+All builds conserve energy to ~10⁻⁴–10⁻⁵ in NVE (without-dihedral and patchy
+workloads), with no meaningful difference between precision levels or
+sloptimized vs upstream.
+
+**Chains NVE (with dihedrals):** All five builds are **UNSTABLE** at dt=0.005
+(drift ≫ 1). This is a physics issue — Langevin-equilibrated polymer
+configurations contain near-collinear dihedral geometries that produce large
+forces when the thermostat is removed for NVE. The instability affects double
+and upstream builds equally, confirming it is not a precision artifact.
 
 ---
 
@@ -279,34 +323,37 @@ uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machi
 
 ### With Dihedrals (64K particles)
 
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 2,371 ± 38 | 10,197 ± 161 | 12,495 ± 732 |
-| 0.01 | 2,013 ± 58 | 8,904 ± 262 | 8,994 ± 217 |
-| 0.03 | 1,894 ± 60 | 7,095 ± 121 | 7,500 ± 73 |
-| 0.05 | CRASH | CRASH | CRASH |
-| 0.1 | CRASH | CRASH | CRASH |
+| dt | Mixed | Double | Single | Upstr. Dbl | Upstr. Sgl |
+|----|-------|--------|--------|------------|------------|
+| 0.005 | 7,904 ± 348 | 2,379 ± 42 | 11,857 ± 412 | 2,516 ± 53 | 12,496 ± 544 |
+| 0.01 | 5,466 ± 63 | 2,004 ± 47 | 9,262 ± 460 | 2,116 ± 35 | 8,833 ± 150 |
+| 0.03 | 4,907 ± 65 | CRASH | CRASH | 2,024 ± 59 | 7,691 ± 56 |
+| 0.05 | CRASH | CRASH | CRASH | CRASH | CRASH |
+| 0.1 | CRASH | CRASH | CRASH | CRASH | CRASH |
 
-Mixed delivers 4.3× over double at dt=0.005.  All builds crash at dt≥0.05
-due to physics instability (dihedral potential over-shoot), not floating-point
-overflow — the `SMALL = ForceReal(1e-12)` clamp prevents NaN but does not
-override the stiff dihedral barrier.
+Mixed delivers 3.3× over double at dt=0.005.  The crash boundary differs
+between builds: sloptimized double and single crash at dt≥0.03, while mixed and
+upstream builds survive dt=0.03 (all crash at dt≥0.05).  The crash threshold is
+stochastic — it depends on the specific equilibrated state and which dihedral
+geometries happen to be near-collinear at the moment of the dt jump.
 
 ### Without Dihedrals (64K particles)
 
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 4,229 ± 69 | 11,583 ± 200 | 18,316 ± 41 |
-| 0.01 | 3,955 ± 143 | 9,903 ± 225 | 15,735 ± 104 |
-| 0.03 | 3,394 ± 125 | 7,553 ± 93 | 11,853 ± 171 |
-| 0.05 | 2,627 ± 73 | 5,042 ± 48 | 8,135 ± 85 |
-| 0.1 | 2,554 ± 21 | 5,040 ± 16 | 8,229 ± 6 |
+| dt | Mixed | Double | Single | Upstr. Dbl | Upstr. Sgl |
+|----|-------|--------|--------|------------|------------|
+| 0.005 | 11,821 ± 45 | 4,190 ± 71 | 19,236 ± 593 | 4,394 ± 89 | 18,933 ± 556 |
+| 0.01 | 9,614 ± 90 | 4,027 ± 140 | 16,522 ± 318 | 4,015 ± 141 | 16,617 ± 334 |
+| 0.03 | 7,525 ± 119 | 3,297 ± 129 | 12,107 ± 32 | 3,459 ± 125 | 12,076 ± 24 |
+| 0.05 | 5,063 ± 50 | 2,569 ± 73 | 8,052 ± 14 | 2,714 ± 67 | 8,108 ± 32 |
+| 0.1 | 5,072 ± 5 | 2,592 ± 21 | 8,312 ± 4 | 2,697 ± 24 | 7,832 ± 19 |
 
-All builds stable at all dt values. Mixed consistently 1.9–2.7× double.
+All builds stable at all dt values. Mixed consistently 2.0–2.8× double.
 At large dt (0.05–0.1) all builds' TPS plateaus — the overhead of more
 frequent neighbor list rebuilds dominates.
 
 ### Without Dihedrals (256K particles)
+
+*Measured with sloptimized builds only (earlier run):*
 
 | dt | Double | Mixed | Single |
 |----|--------|-------|--------|
@@ -323,6 +370,8 @@ dominant bottleneck.
 
 ### With Attraction, No Dihedrals (64K particles, A=-0.5, r_cut=1.5)
 
+*Measured with sloptimized builds only (earlier run):*
+
 Adds a second DPDConservative pair force (attractive, separate neighbor list).
 
 | dt | Double | Mixed | Single | Mixed/Double |
@@ -338,6 +387,8 @@ giving mixed a higher speedup (3.6× vs 2.7× without attraction at dt=0.005) �
 more pair-force compute means more float savings to harvest.
 
 ### Patchy Particles, No Dihedrals (64K particles, PatchyGaussian)
+
+*Measured with sloptimized builds only (earlier run):*
 
 Uses `AnisoPotentialPairPatchyGauss` with parameters `eps=1.0, sigma=0.5,
 alpha=0.6, omega=20, r_cut=1.5, npatches=2`. This exercises the anisotropic
@@ -362,11 +413,15 @@ I/O, minimum-image, neighbor list traversal) all use `ForceReal` (float),
 giving a massive speedup over pure double. Double is extremely slow because
 the RTX 4090 has a 64:1 FP32:FP64 throughput ratio.
 
+**Note:** Upstream single-precision cannot run the patchy workload — it crashes
+with `CUDA Error: misaligned address` during equilibration.  Force accuracy and
+NVE data for patchy are available for the other four builds (see Accuracy section).
+
 ---
 
 ## Remaining Mixed→Single Performance Gap
 
-The ~1.6× gap between mixed (~7,500 TPS) and single (~12,000 TPS) for isotropic
+The ~1.5× gap between mixed (~7,900 TPS) and single (~11,900 TPS) for isotropic
 pair forces is structural:
 
 1. **Integrator I/O**: Read/write `double4` positions for integration accuracy
@@ -412,8 +467,9 @@ but prevents `1/0` overflow at exact collinearity. Also clamp `s_abcd` to [-1, 1
 - `hoomd/md/PeriodicImproperForceGPU.cu`
 
 **Impact:**
-- Mixed TPS at dt=0.005: 7,563 → **10,197** (+35%, overflow handling was costly)
-- Mixed now survives dt=0.05 and dt=0.1 where double and single crash
+- Prevents float overflow/NaN that would crash mixed-precision dihedral simulations
+- Mixed TPS at dt=0.005: ~4,300 (pre-fix) → **~7,900** (+84% — preventing overflow
+  is faster than the hardware's NaN/Inf propagation overhead)
 - 58/58 tests still pass
 
 ### Why All Builds Crash at Large dt With Dihedrals
