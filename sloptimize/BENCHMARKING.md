@@ -235,9 +235,9 @@ over upstream double, far outweighing the small regression.
 
 | Phase | Mixed TPS | vs Double | vs Single |
 |-------|-----------|-----------|-----------|
-| Phase 2A (external evaluators only) | 3,059 | +16.5% | 0.25× |
-| Phase 2B (float4 positions) | 4,262 | +62.3% | 0.35× |
-| Phase 2C (dihedral fix) | 7,474 | +199% | 0.62× |
+| Phase 2A (external evaluators only) | 3,059 | +29% | 0.26× |
+| Phase 2B (float4 positions) | 4,262 | +79% | 0.36× |
+| Phase 2C (dihedral fix) | 7,474 | +214% | 0.63× |
 
 ---
 
@@ -353,42 +353,36 @@ frequent neighbor list rebuilds dominates.
 
 ### Without Dihedrals (256K particles)
 
-*Measured with sloptimized builds only (earlier run):*
-
-| dt | Double | Mixed | Single |
-|----|--------|-------|--------|
-| 0.005 | 1,140 ± 11 | 3,725 ± 67 | 5,464 ± 166 |
-| 0.01 | 1,060 ± 22 | 3,215 ± 61 | 4,741 ± 98 |
-| 0.03 | 934 ± 40 | 2,558 ± 29 | 3,728 ± 63 |
-| 0.05 | 735 ± 31 | 1,702 ± 22 | 2,514 ± 10 |
-| 0.1 | 730 ± 19 | 1,724 ± 12 | 2,450 ± 4 |
+| dt | Mixed | Double | Single | Upstr. Dbl | Upstr. Sgl |
+|----|-------|--------|--------|------------|------------|
+| 0.005 | 3,787 ± 8 | 1,132 ± 6 | 5,496 ± 125 | 1,196 ± 12 | 5,328 ± 150 |
+| 0.01 | 3,138 ± 60 | 1,057 ± 23 | 4,740 ± 112 | 1,070 ± 23 | 4,657 ± 122 |
+| 0.03 | 2,513 ± 34 | 881 ± 45 | 3,685 ± 20 | 939 ± 45 | 3,708 ± 20 |
+| 0.05 | 1,662 ± 15 | 705 ± 37 | 2,492 ± 10 | 736 ± 40 | 2,558 ± 19 |
+| 0.1 | 1,710 ± 10 | 735 ± 23 | 2,501 ± 17 | 775 ± 24 | 2,448 ± 7 |
 
 All builds stable. Mixed achieves ~3.3× double at dt=0.005 — bandwidth-bound
 workloads benefit more at larger system sizes. Mixed-to-single gap narrows to
-1.47× (from 1.58× at 64K), consistent with memory bandwidth becoming the
+1.45× (from 1.63× at 64K), consistent with memory bandwidth becoming the
 dominant bottleneck.
 
 ### With Attraction, No Dihedrals (64K particles, A=-0.5, r_cut=1.5)
 
-*Measured with sloptimized builds only (earlier run):*
-
 Adds a second DPDConservative pair force (attractive, separate neighbor list).
 
-| dt | Double | Mixed | Single | Mixed/Double |
-|----|--------|-------|--------|-------------|
-| 0.005 | 1,935 ± 83 | 6,917 ± 170 | 10,200 ± 226 | 3.57× |
-| 0.01 | 1,796 ± 122 | 5,685 ± 202 | 8,720 ± 173 | 3.17× |
-| 0.03 | 1,450 ± 95 | 3,958 ± 90 | 5,835 ± 147 | 2.73× |
-| 0.05 | 1,034 ± 53 | 2,393 ± 51 | 3,751 ± 35 | 2.31× |
-| 0.1 | 1,012 ± 24 | 2,502 ± 29 | 3,646 ± 17 | 2.47× |
+| dt | Mixed | Double | Single | Upstr. Dbl | Upstr. Sgl |
+|----|-------|--------|--------|------------|------------|
+| 0.005 | 7,040 ± 166 | 1,901 ± 80 | 10,590 ± 203 | 2,112 ± 93 | 10,394 ± 344 |
+| 0.01 | 5,560 ± 168 | 1,815 ± 123 | 8,499 ± 371 | 1,844 ± 118 | 8,457 ± 220 |
+| 0.03 | 3,906 ± 90 | 1,417 ± 94 | 5,816 ± 129 | 1,510 ± 98 | 5,909 ± 146 |
+| 0.05 | 2,397 ± 52 | 1,006 ± 52 | 3,651 ± 39 | 1,058 ± 52 | 3,602 ± 37 |
+| 0.1 | 2,443 ± 23 | 1,028 ± 24 | 3,566 ± 25 | 1,101 ± 25 | 3,743 ± 52 |
 
 All stable at every dt. The second pair force increases compute intensity,
-giving mixed a higher speedup (3.6× vs 2.7× without attraction at dt=0.005) —
+giving mixed a higher speedup (3.7× vs 2.8× without attraction at dt=0.005) —
 more pair-force compute means more float savings to harvest.
 
 ### Patchy Particles, No Dihedrals (64K particles, PatchyGaussian)
-
-*Measured with sloptimized builds only (earlier run):*
 
 Uses `AnisoPotentialPairPatchyGauss` with parameters `eps=1.0, sigma=0.5,
 alpha=0.6, omega=20, r_cut=1.5, npatches=2`. This exercises the anisotropic
@@ -398,15 +392,15 @@ Includes the cancellation-free `rotmat3(quat)` constructor (`1 − 2c² − 2d²
 diagonals) and PatchEnvelope rotation unified to `rotmat3<ForceReal>` on both
 CPU and GPU.
 
-| dt | Double | Mixed | Single | Mixed/Double |
-|----|--------|-------|--------|-------------|
-| 0.005 | 329 ± 19 | 2,902 ± 42 | 4,892 ± 135 | 8.82× |
-| 0.01 | 357 ± 31 | 2,613 ± 62 | 4,507 ± 161 | 7.32× |
-| 0.03 | 366 ± 20 | 2,232 ± 56 | 3,756 ± 79 | 6.10× |
-| 0.05 | 352 ± 12 | 1,674 ± 16 | 2,709 ± 29 | 4.76× |
-| 0.1 | 338 ± 2 | 1,694 ± 9 | 2,702 ± 6 | 5.01× |
+| dt | Mixed | Double | Single | Upstr. Dbl |
+|----|-------|--------|--------|------------|
+| 0.005 | 2,877 ± 57 | 350 ± 19 | 5,053 ± 139 | 326 ± 17 |
+| 0.01 | 2,742 ± 86 | 369 ± 28 | 4,596 ± 184 | 352 ± 27 |
+| 0.03 | 2,208 ± 44 | 391 ± 21 | 3,781 ± 78 | 377 ± 22 |
+| 0.05 | 1,669 ± 14 | 346 ± 10 | 2,742 ± 28 | 345 ± 11 |
+| 0.1 | 1,656 ± 12 | 350 ± 3 | 2,680 ± 4 | 342 ± 3 |
 
-**Mixed 5–9× faster than double.** The anisotropic pair evaluator internally
+**Mixed 5–8× faster than double.** The anisotropic pair evaluator internally
 uses `Scalar` (double on mixed, float on single), so mixed does NOT reach
 single-precision speed. But the isotropic portions of the kernel (pair force
 I/O, minimum-image, neighbor list traversal) all use `ForceReal` (float),
@@ -414,8 +408,9 @@ giving a massive speedup over pure double. Double is extremely slow because
 the RTX 4090 has a 64:1 FP32:FP64 throughput ratio.
 
 **Note:** Upstream single-precision cannot run the patchy workload — it crashes
-with `CUDA Error: misaligned address` during equilibration.  Force accuracy and
-NVE data for patchy are available for the other four builds (see Accuracy section).
+with `CUDA Error: misaligned address` during equilibration (upstream bug, not
+related to our changes).  Force accuracy and NVE data for patchy are available
+for the other four builds (see Accuracy section).
 
 ---
 
