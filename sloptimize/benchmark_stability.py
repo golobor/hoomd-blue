@@ -48,14 +48,13 @@ NVE_STEPS = 50_000
 NVE_LOG_PERIOD = 1_000
 
 
-# ── Force accuracy ───────────────────────────────────────────────────────
+# ── Shared simulation setup ──────────────────────────────────────────────
 
-def test_force_accuracy(device, gsd_path, sphere_radius, force_kwargs,
-                        save_path=None):
-    """Compute per-force-type forces and energies at step 0.
+def _create_test_sim(device, gsd_path, dt, sphere_radius, force_kwargs):
+    """Create and initialise a simulation for accuracy / NVE testing.
 
-    Returns a dict with per-force metrics.  If *save_path* is given,
-    saves per-force arrays to an ``.npz`` file for cross-build comparison.
+    Returns ``(sim, forces, thermo)`` with forces already evaluated
+    via a single ``run(0)``.
     """
     import hoomd
 
@@ -66,16 +65,28 @@ def test_force_accuracy(device, gsd_path, sphere_radius, force_kwargs,
     has_patchy = force_kwargs.get("patchy") is not None
 
     nve = hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All())
-    integrator = hoomd.md.Integrator(dt=0.005, methods=[nve], forces=forces)
+    integrator = hoomd.md.Integrator(dt=dt, methods=[nve], forces=forces)
     if has_patchy:
         integrator.integrate_rotational_dof = True
     sim.operations.integrator = integrator
-    sim.run(0)
 
     thermo = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
     sim.operations.computes.append(thermo)
-    sim.run(0)
+    device.gpu_error_checking = False
+    sim.run(0)  # single init: builds NL, compiles kernels, evaluates forces
 
+    return sim, forces, thermo
+
+
+# ── Force accuracy ───────────────────────────────────────────────────────
+
+def collect_force_accuracy(sim, forces, thermo, save_path=None):
+    """Collect per-force-type forces and energies at step 0.
+
+    The simulation must already be initialised (``run(0)`` called).
+    Returns a dict with per-force metrics.  If *save_path* is given,
+    saves per-force arrays to an ``.npz`` file for cross-build comparison.
+    """
     # ── Collect per-force data ────────────────────────────────────────
     force_details = {}
     name_counts = {}
@@ -126,41 +137,17 @@ def test_force_accuracy(device, gsd_path, sphere_radius, force_kwargs,
         np.savez(save_path, **save_arrays)
         print(f"  Saved forces to {save_path}")
 
-    del sim
-    gc.collect()
-
     return force_details
 
 
 # ── NVE stability ────────────────────────────────────────────────────────
 
-def test_nve(device, gsd_path, dt, sphere_radius, force_kwargs,
-             nve_steps=NVE_STEPS, log_period=NVE_LOG_PERIOD):
-    """Run NVE at *dt* and return energy stability metrics."""
-    import hoomd
+def run_nve_test(sim, thermo, nve_steps=NVE_STEPS, log_period=NVE_LOG_PERIOD):
+    """Run NVE from the current state and return energy stability metrics.
 
-    sim = hoomd.Simulation(device=device, seed=42)
-    sim.create_state_from_gsd(filename=gsd_path)
-
-    forces = make_forces(sphere_radius, **force_kwargs)
-    has_patchy = force_kwargs.get("patchy") is not None
-
-    nve = hoomd.md.methods.ConstantVolume(filter=hoomd.filter.All())
-    integrator = hoomd.md.Integrator(dt=dt, methods=[nve], forces=forces)
-    if has_patchy:
-        integrator.integrate_rotational_dof = True
-    sim.operations.integrator = integrator
-
-    thermo = hoomd.md.compute.ThermodynamicQuantities(filter=hoomd.filter.All())
-    sim.operations.computes.append(thermo)
-    device.gpu_error_checking = False
-
-    try:
-        sim.run(0)
-    except Exception:
-        del sim; gc.collect()
-        return dict(status="CRASHED", steps=0)
-
+    The simulation must already be initialised (``run(0)`` called).
+    Caller is responsible for ``del sim`` cleanup.
+    """
     E0 = thermo.kinetic_energy + thermo.potential_energy
     energies = [E0]
     temps = [thermo.kinetic_temperature]
@@ -171,21 +158,17 @@ def test_nve(device, gsd_path, dt, sphere_radius, force_kwargs,
         try:
             sim.run(chunk)
         except Exception:
-            del sim; gc.collect()
             return dict(status="CRASHED", steps=steps_done)
 
         E = thermo.kinetic_energy + thermo.potential_energy
         T = thermo.kinetic_temperature
 
         if not np.isfinite(E) or (E0 != 0 and abs(E / E0) > 1e6):
-            del sim; gc.collect()
             return dict(status="CRASHED", steps=steps_done)
 
         energies.append(E)
         temps.append(T)
         steps_done += chunk
-
-    del sim; gc.collect()
 
     E_arr = np.array(energies)
     T_arr = np.array(temps)
@@ -410,6 +393,11 @@ def main():
     force_kwargs = parse_force_kwargs(args)
     results = {}
 
+    # ── Single simulation for all tests ───────────────────────────────
+    sim, forces, thermo = _create_test_sim(
+        device, gsd_path, args.dt, sphere_radius, force_kwargs,
+    )
+
     # ── Force accuracy ────────────────────────────────────────────────
     if args.tests in ("all", "accuracy"):
         print("=" * 70)
@@ -421,9 +409,8 @@ def main():
             forces_save = os.path.join(
                 args.out_dir, f"forces_{args.tag}.npz"
             )
-        accuracy = test_force_accuracy(
-            device, gsd_path, sphere_radius, force_kwargs,
-            save_path=forces_save,
+        accuracy = collect_force_accuracy(
+            sim, forces, thermo, save_path=forces_save,
         )
         results["accuracy"] = accuracy
         print()
@@ -435,14 +422,14 @@ def main():
               f"{args.nve_steps:,} steps)")
         print("=" * 70)
         t0 = time.perf_counter()
-        nve_res = test_nve(
-            device, gsd_path, args.dt, sphere_radius, force_kwargs,
-            nve_steps=args.nve_steps,
-        )
+        nve_res = run_nve_test(sim, thermo, nve_steps=args.nve_steps)
         elapsed = time.perf_counter() - t0
         print_nve_result(args.dt, nve_res, elapsed)
         results["nve"] = {str(args.dt): nve_res}
         print()
+
+    del sim
+    gc.collect()
 
     # ── Save results JSON ─────────────────────────────────────────────
     if args.out_dir:
