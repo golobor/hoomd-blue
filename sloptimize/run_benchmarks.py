@@ -219,11 +219,16 @@ def main():
               f"will queue {n_jobs - n_gpus} job(s)")
     print()
 
-    # Copy script to temp location to avoid source-tree shadowing
+    # Copy script + benchlib to temp location to avoid source-tree shadowing
     script_src = os.path.abspath(args.script)
+    script_dir = os.path.dirname(script_src)
     tmp_dir = tempfile.mkdtemp(prefix="hoomd_bench_")
     script_dst = os.path.join(tmp_dir, os.path.basename(script_src))
     shutil.copy2(script_src, script_dst)
+    # Copy benchlib.py so the script can import it via sys.path
+    benchlib_src = os.path.join(script_dir, "benchlib.py")
+    if os.path.exists(benchlib_src):
+        shutil.copy2(benchlib_src, os.path.join(tmp_dir, "benchlib.py"))
 
     # Inject --log for each job so output is always tail -f friendly
     log_dir = os.path.abspath(args.log_dir)
@@ -236,8 +241,7 @@ def main():
 
     # Cleanup
     try:
-        os.unlink(script_dst)
-        os.rmdir(tmp_dir)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
     except OSError:
         pass
 
