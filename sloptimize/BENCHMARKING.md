@@ -116,11 +116,19 @@ Auto-detects repo root and Python version from the script location.
 
 ## Running Benchmarks
 
+Two scripts, one shared library:
+
+- **`benchlib.py`** — shared simulation setup (lattice builder, force factory,
+  equilibration). Not run directly.
+- **`benchmark_tps.py`** — measures Langevin TPS at a single dt.
+- **`benchmark_stability.py`** — NVE energy conservation + per-force accuracy
+  at step 0. Also has a `compare` subcommand for cross-build comparison.
+
 ```bash
 cd sloptimize
 
-# Single dt, all three builds in parallel (one per GPU):
-python run_benchmarks.py benchmark_chains.py \
+# Single-dt TPS, all three builds in parallel (one per GPU):
+python run_benchmarks.py benchmark_tps.py \
   --lib mixed=../build/install_mixed/lib/python3.12/site-packages \
   --lib double=../build/install_double/lib/python3.12/site-packages \
   --lib single=../build/install_single/lib/python3.12/site-packages \
@@ -128,26 +136,51 @@ python run_benchmarks.py benchmark_chains.py \
   -- 64000 200
 
 # dt sweep (equilibrate once, benchmark each dt):
-python run_benchmarks.py benchmark_chains.py \
+python run_benchmarks.py benchmark_tps.py \
   --lib mixed=... --lib double=... --lib single=... \
   -- 64000 200
 
 # Without dihedrals:
-python run_benchmarks.py benchmark_chains.py \
+python run_benchmarks.py benchmark_tps.py \
   --lib mixed=... --lib double=... --lib single=... \
   --no-dt \
   -- 64000 200 --no-dihedral
+
+# Force accuracy (save .npz, then compare):
+python run_benchmarks.py benchmark_stability.py \
+  --lib mixed=... --lib double=... \
+  --no-dt \
+  -- --tests accuracy --out-dir /tmp/bench/{label}
+python benchmark_stability.py compare /tmp/bench/double /tmp/bench/mixed
+
+# NVE stability:
+python benchmark_stability.py 0 64000 200 --tests nve --dt 0.01
+
+# Patchy workload TPS:
+python benchmark_tps.py 0 64000 200 --no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2
+
+# Full suite (all 5 builds × 3 workloads):
+bash run_full_benchmarks.sh
+bash run_full_benchmarks.sh --quick  # single dt only
 ```
 
 The runner auto-detects free GPUs and uses a queue-based GPU pool — each worker
 acquires a GPU before starting and releases it when done, guaranteeing no two jobs
 share a GPU simultaneously. Use `--gpus 0,1,2` to restrict to specific devices.
 
-### Workload
+### Workloads
 
-`benchmark_chains.py` — 64K particles (or configurable), 320 chains × 200 monomers,
-pair(Gaussian A=5) + harmonic bonds + wall(Gaussian) + angle + dihedral, Langevin
-integrator, dt=0.005. Protocol: 10K warmup + 100K benchmark steps, report every 10K.
+Workload variations are expressed as CLI flags (no more `--workload` enum):
+
+| Workload | CLI flags | Description |
+|----------|-----------|-------------|
+| chains | *(default)* | pair + bond + angle + dihedral + wall |
+| nodih | `--no-dihedral` | same without dihedrals |
+| patchy | `--no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2` | PatchyGaussian anisotropic pair |
+| attract | `--attract 0.5,1.5` | DPD attraction pair |
+
+Default system: 64K particles, 320 chains × 200 monomers.  TPS protocol:
+10K warmup + 100K benchmark steps, report every 10K.
 
 ---
 
@@ -247,13 +280,13 @@ uses float32. The ~10⁻⁷ mean relative error is consistent with float32 machi
 | 0.005 | 2,371 ± 38 | 10,197 ± 161 | 12,495 ± 732 |
 | 0.01 | 2,013 ± 58 | 8,904 ± 262 | 8,994 ± 217 |
 | 0.03 | 1,894 ± 60 | 7,095 ± 121 | 7,500 ± 73 |
-| 0.05 | CRASH | 4,698 ± 45 | CRASH |
-| 0.1 | CRASH | 4,755 ± 5 | CRASH |
+| 0.05 | CRASH | CRASH | CRASH |
+| 0.1 | CRASH | CRASH | CRASH |
 
-Mixed delivers 4.3× over double at dt=0.005 and is **more stable** at large dt:
-double and single crash at dt≥0.05 due to dihedral force overflow from
-near-collinear geometries, while mixed survives thanks to the `SMALL` epsilon
-clamp on cross-product magnitudes (see dihedral stability fix below).
+Mixed delivers 4.3× over double at dt=0.005.  All builds crash at dt≥0.05
+due to physics instability (dihedral potential over-shoot), not floating-point
+overflow — the `SMALL = ForceReal(1e-12)` clamp prevents NaN but does not
+override the stiff dihedral barrier.
 
 ### Without Dihedrals (64K particles)
 
@@ -363,10 +396,11 @@ The singularity is analytically removable (the `dV/dφ ∝ sin(φ)` factor cance
 `1/|n|²` at collinear geometries), but float precision loses this cancellation.
 The CPU path uses `Scalar` (double in mixed mode), hiding the problem.
 
-**Fix:** Added `SMALL = ForceReal(0.001)` epsilon clamping on `raasq` and `rbbsq`
-before division, matching the existing convention in `HarmonicImproperForceGPU.cu`
-and `HarmonicAngleForceGPU.cu`. Also clamp `s_abcd` to [-1, 1] (previously only
-`c_abcd` was clamped).
+**Fix:** Added `SMALL = ForceReal(1e-12)` epsilon clamping on `raasq` and `rbbsq`
+before division, preventing float overflow without affecting physics. The value
+is small enough that it never activates for geometrically plausible configurations,
+but prevents `1/0` overflow at exact collinearity. Also clamp `s_abcd` to [-1, 1]
+(previously only `c_abcd` was clamped).
 
 **Files modified:**
 - `hoomd/md/HarmonicDihedralForceGPU.cu`
@@ -378,26 +412,15 @@ and `HarmonicAngleForceGPU.cu`. Also clamp `s_abcd` to [-1, 1] (previously only
 - Mixed now survives dt=0.05 and dt=0.1 where double and single crash
 - 58/58 tests still pass
 
-### Why Mixed Survives at Large dt While Double and Single Crash
+### Why All Builds Crash at Large dt With Dihedrals
 
-The three builds crash (or don't) for fundamentally different reasons:
+With `SMALL = ForceReal(1e-12)`, all builds crash at dt≥0.05 — the clamp prevents
+float overflow/NaN but does not override the physics.  At large dt the Verlet
+integrator overshoots the stiff dihedral potential barrier, particles swing past,
+and the simulation diverges regardless of floating-point precision.
 
-- **Double** crashes from **physics instability**, not numerical overflow.
-  At dt=0.05 the Verlet integrator over-shoots the stiff dihedral potential,
-  particles swing past the barrier, and the integrator diverges. The `SMALL`
-  clamp never triggers because double has enough mantissa bits to represent
-  the cross-product magnitudes accurately — `raasq` stays well above 0.001.
-
-- **Single** crashes from **both** problems: (1) float cross products overflow
-  exactly as described above (the clamp fixes this), but also (2) float
-  position integration accumulates truncation error that misplaces particles
-  into overlapping configurations. Even with the clamp preventing force NaNs,
-  the float integrator still produces bad trajectories at large dt.
-
-- **Mixed** only had problem (1) — float force overflow. Its integrator runs
-  in double, so positions and velocities stay accurate even at dt=0.05. Once
-  the `SMALL` clamp removes the float overflow pathway, mixed has no remaining
-  failure mode at these timesteps. The double integrator keeps the trajectory
-  on the correct energy surface, and the clamped float forces are accurate
-  enough (the clamp only activates for near-collinear geometries where the
-  true force is near zero anyway).
+The earlier clamp of `SMALL = 0.001` was large enough to artificially soften the
+dihedral barrier at near-collinear geometries, which let mixed survive at dt=0.05.
+However that amounted to a silent potential modification.  With the physics-correct
+clamp (`1e-12`), mixed crashes at the same thresholds as double and single, which
+is the expected behaviour.

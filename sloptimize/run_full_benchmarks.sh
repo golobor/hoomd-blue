@@ -7,7 +7,7 @@
 #   bash sloptimize/run_full_benchmarks.sh --workload chains  # one workload only
 #
 # Results are saved to /tmp/bench_suite/<build_label>/
-# Compare with: python sloptimize/benchmark_suite.py compare \
+# Compare with: python sloptimize/benchmark_stability.py compare \
 #     /tmp/bench_suite/double /tmp/bench_suite/mixed /tmp/bench_suite/single \
 #     /tmp/bench_suite/upstream_double /tmp/bench_suite/upstream_single
 
@@ -18,18 +18,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BASE="$REPO_DIR/build"
-SUITE_SCRIPT="$SCRIPT_DIR/benchmark_suite.py"
+TPS_SCRIPT="$SCRIPT_DIR/benchmark_tps.py"
+STAB_SCRIPT="$SCRIPT_DIR/benchmark_stability.py"
 RUNNER_SCRIPT="$SCRIPT_DIR/run_benchmarks.py"
 
 OUT_BASE="/tmp/bench_suite"
 WORKLOAD="all"
-EXTRA_ARGS=""
+DT_ARGS=""  # empty = use defaults from run_benchmarks.py (0.005 0.01 0.03 0.05 0.1)
 
 # ── Parse args ────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --quick)
-            EXTRA_ARGS="--dt 0.005"
+            DT_ARGS="--dt 0.005"
             shift ;;
         --workload)
             WORKLOAD="$2"
@@ -38,7 +39,7 @@ while [[ $# -gt 0 ]]; do
             OUT_BASE="$2"
             shift 2 ;;
         --help|-h)
-            head -11 "$0" | tail -9
+            head -12 "$0" | tail -10
             exit 0 ;;
         *)
             echo "Unknown option: $1"
@@ -80,90 +81,101 @@ for label in "${LABELS[@]}"; do
     LIB_FLAGS="$LIB_FLAGS --lib ${label}=${LIB_PATHS[$label]}"
 done
 
-# ── Phase 1: Equilibrate reference build (double) ────────────────────────
-echo "============================================================"
-echo "PHASE 1: Equilibrating reference build (double)"
-echo "============================================================"
-echo ""
+# ── Workload definitions ─────────────────────────────────────────────────
+# Each workload is a set of CLI flags for benchmark_tps.py / benchmark_stability.py
+#   chains: angle + dihedral (default)
+#   nodih:  angle, no dihedral
+#   patchy: angle, no dihedral, PatchyGaussian
+declare -A WORKLOAD_FLAGS
+WORKLOAD_FLAGS[chains]=""
+WORKLOAD_FLAGS[nodih]="--no-dihedral"
+WORKLOAD_FLAGS[patchy]="--no-dihedral --patchy 1.0,0.5,0.6,20.0,1.5,2"
 
-python3 "$RUNNER_SCRIPT" "$SUITE_SCRIPT" \
-    --lib "double=${LIB_PATHS[double]}" \
-    --no-dt \
-    -- --workload "$WORKLOAD" \
-       --out-dir "${OUT_BASE}/double" \
-       --equilibrate-only
+if [[ "$WORKLOAD" == "all" ]]; then
+    WORKLOADS=(chains nodih patchy)
+else
+    WORKLOADS=("$WORKLOAD")
+fi
 
-echo ""
+# ── Run each workload ─────────────────────────────────────────────────────
+for wl in "${WORKLOADS[@]}"; do
+    WL_FLAGS="${WORKLOAD_FLAGS[$wl]}"
 
-# ── Phase 2: Force accuracy with shared reference state ──────────────────
-echo "============================================================"
-echo "PHASE 2a: Force accuracy (all builds, shared double state)"
-echo "============================================================"
-echo ""
+    echo "============================================================"
+    echo "WORKLOAD: $wl  (flags: ${WL_FLAGS:-<default>})"
+    echo "============================================================"
+    echo ""
 
-python3 "$RUNNER_SCRIPT" "$SUITE_SCRIPT" \
-    $LIB_FLAGS \
-    --no-dt \
-    -- --workload "$WORKLOAD" \
-       --out-dir "${OUT_BASE}/{label}" \
-       --load-dir "${OUT_BASE}/double" \
-       --tests accuracy
+    # ── Phase 1: Equilibrate reference build (double) ─────────────────
+    echo "--- Phase 1: Equilibrate reference (double) for '$wl' ---"
+    python3 "$RUNNER_SCRIPT" "$STAB_SCRIPT" \
+        --lib "double=${LIB_PATHS[double]}" \
+        --no-dt \
+        -- $WL_FLAGS \
+           --equilibrate-only \
+           --save-state "${OUT_BASE}/double/state_${wl}.gsd"
+    echo ""
 
-echo ""
+    # Equilibrate non-double builds (each gets its own state)
+    echo "--- Equilibrate other builds for '$wl' ---"
+    NON_DOUBLE_FLAGS=""
+    for label in "${LABELS[@]}"; do
+        if [[ "$label" != "double" ]]; then
+            NON_DOUBLE_FLAGS="$NON_DOUBLE_FLAGS --lib ${label}=${LIB_PATHS[$label]}"
+        fi
+    done
 
-# ── Phase 3: NVE + Langevin (per-build equilibrated states) ──────────────
-echo "============================================================"
-echo "PHASE 2b: NVE + Langevin (per-build equilibrated states)"
-echo "============================================================"
-echo ""
+    python3 "$RUNNER_SCRIPT" "$STAB_SCRIPT" \
+        $NON_DOUBLE_FLAGS \
+        --no-dt \
+        -- $WL_FLAGS \
+           --equilibrate-only \
+           --save-state "${OUT_BASE}/{label}/state_${wl}.gsd"
+    echo ""
 
-# Equilibrate non-double builds
-NON_DOUBLE_FLAGS=""
-for label in "${LABELS[@]}"; do
-    if [[ "$label" != "double" ]]; then
-        NON_DOUBLE_FLAGS="$NON_DOUBLE_FLAGS --lib ${label}=${LIB_PATHS[$label]}"
-    fi
+    # ── Phase 2: Force accuracy (all builds, shared double state) ─────
+    echo "--- Phase 2: Force accuracy (shared double state) for '$wl' ---"
+    python3 "$RUNNER_SCRIPT" "$STAB_SCRIPT" \
+        $LIB_FLAGS \
+        --no-dt \
+        -- $WL_FLAGS \
+           --tests accuracy \
+           --out-dir "${OUT_BASE}/{label}" \
+           --load-state "${OUT_BASE}/double/state_${wl}.gsd" \
+           --tag "$wl"
+    echo ""
+
+    # ── Phase 3: NVE stability (per-build states) ─────────────────────
+    echo "--- Phase 3: NVE stability for '$wl' ---"
+    python3 "$RUNNER_SCRIPT" "$STAB_SCRIPT" \
+        $LIB_FLAGS \
+        --no-dt \
+        -- $WL_FLAGS \
+           --tests nve \
+           --out-dir "${OUT_BASE}/{label}" \
+           --load-state "${OUT_BASE}/{label}/state_${wl}.gsd" \
+           --tag "$wl" \
+           $DT_ARGS
+    echo ""
+
+    # ── Phase 4: TPS (per-build states, dt sweep) ─────────────────────
+    echo "--- Phase 4: TPS for '$wl' ---"
+    python3 "$RUNNER_SCRIPT" "$TPS_SCRIPT" \
+        $LIB_FLAGS \
+        $DT_ARGS \
+        -- $WL_FLAGS \
+           --load-state "${OUT_BASE}/{label}/state_${wl}.gsd"
+    echo ""
+
 done
 
-python3 "$RUNNER_SCRIPT" "$SUITE_SCRIPT" \
-    $NON_DOUBLE_FLAGS \
-    --no-dt \
-    -- --workload "$WORKLOAD" \
-       --out-dir "${OUT_BASE}/{label}" \
-       --equilibrate-only
-
-echo ""
-
-# Run NVE + Langevin for all builds
-python3 "$RUNNER_SCRIPT" "$SUITE_SCRIPT" \
-    $LIB_FLAGS \
-    --no-dt \
-    -- --workload "$WORKLOAD" \
-       --out-dir "${OUT_BASE}/{label}" \
-       --load-dir "${OUT_BASE}/{label}" \
-       --tests nve \
-       $EXTRA_ARGS
-
-echo ""
-
-python3 "$RUNNER_SCRIPT" "$SUITE_SCRIPT" \
-    $LIB_FLAGS \
-    --no-dt \
-    -- --workload "$WORKLOAD" \
-       --out-dir "${OUT_BASE}/{label}" \
-       --load-dir "${OUT_BASE}/{label}" \
-       --tests langevin \
-       $EXTRA_ARGS
-
-echo ""
-
-# ── Phase 3: Compare ─────────────────────────────────────────────────────
+# ── Phase 5: Compare ─────────────────────────────────────────────────────
 echo "============================================================"
-echo "PHASE 3: Cross-build comparison"
+echo "CROSS-BUILD COMPARISON"
 echo "============================================================"
 echo ""
 
-python3 "$SUITE_SCRIPT" compare \
+python3 "$STAB_SCRIPT" compare \
     "${OUT_BASE}/double" \
     "${OUT_BASE}/mixed" \
     "${OUT_BASE}/single" \
@@ -173,4 +185,4 @@ python3 "$SUITE_SCRIPT" compare \
 echo ""
 echo "Done! Results in: $OUT_BASE"
 echo "Re-run comparison anytime with:"
-echo "  python3 $SUITE_SCRIPT compare ${OUT_BASE}/double ${OUT_BASE}/mixed ${OUT_BASE}/single ${OUT_BASE}/upstream_double ${OUT_BASE}/upstream_single"
+echo "  python3 $STAB_SCRIPT compare ${OUT_BASE}/double ${OUT_BASE}/mixed ${OUT_BASE}/single ${OUT_BASE}/upstream_double ${OUT_BASE}/upstream_single"

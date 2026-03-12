@@ -44,7 +44,7 @@ def main():
 
     # Import benchmark infrastructure
     sys.path.insert(0, os.path.dirname(__file__))
-    from benchmark_chains import equilibrate_and_save, _make_forces
+    from benchlib import equilibrate_and_save, make_forces
 
     import math
     import numpy as np
@@ -71,7 +71,7 @@ def main():
     else:
         gsd_path, sphere_radius = equilibrate_and_save(
             device, n_particles, a.chain_length,
-            with_angle=True, with_dihedral=True,
+            include_angle=True, include_dihedral=True,
             dpd_A=dpd_A, attract=attract, patchy=patchy,
             save_path=a.save_state,
         )
@@ -80,8 +80,8 @@ def main():
     sim = hoomd.Simulation(device=device, seed=42)
     sim.create_state_from_gsd(filename=gsd_path)
 
-    forces = _make_forces(sphere_radius, with_angle=True, with_dihedral=True,
-                          dpd_A=dpd_A, attract=attract, patchy=patchy)
+    forces = make_forces(sphere_radius, include_angle=True, include_dihedral=True,
+                         dpd_A=dpd_A, attract=attract, patchy=patchy)
     langevin = hoomd.md.methods.Langevin(
         filter=hoomd.filter.All(), kT=1.0, default_gamma=1.0,
     )
