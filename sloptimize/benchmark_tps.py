@@ -8,25 +8,28 @@ Equilibration is handled by benchlib; use --save-state / --load-state
 to equilibrate once and reuse across runs.
 
 Usage:
-    python benchmark_tps.py [gpu_id] [n_particles] [chain_length] [options]
+    python benchmark_tps.py [options]
 
 Examples:
     # Default (64K particles, chains of 200, all forces):
-    python benchmark_tps.py 0
+    python benchmark_tps.py
 
     # No dihedrals:
-    python benchmark_tps.py 0 64000 200 --no-dihedral
+    python benchmark_tps.py --no-dihedral
 
     # Patchy particles:
-    python benchmark_tps.py 0 64000 200 --no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2
+    python benchmark_tps.py --no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2
 
     # Different dt:
-    python benchmark_tps.py 0 64000 200 --dt 0.01
+    python benchmark_tps.py --dt 0.01
+
+    # Custom system size:
+    python benchmark_tps.py -N 256000 -L 400
 
     # Equilibrate once, reuse:
-    python benchmark_tps.py 0 --equilibrate-only --save-state /tmp/eq.gsd
-    python benchmark_tps.py 0 --load-state /tmp/eq.gsd --dt 0.005
-    python benchmark_tps.py 0 --load-state /tmp/eq.gsd --dt 0.01
+    python benchmark_tps.py --equilibrate-only --save-state /tmp/eq.gsd
+    python benchmark_tps.py --load-state /tmp/eq.gsd --dt 0.005
+    python benchmark_tps.py --load-state /tmp/eq.gsd --dt 0.01
 """
 
 import sys
@@ -144,7 +147,7 @@ def main():
     print(f"Version: {hoomd.version.version}")
     print()
 
-    device = hoomd.device.GPU(gpu_id=args.gpu_id)
+    device = hoomd.device.GPU(gpu_id=args.gpu)
     gsd_path, sphere_radius = load_or_equilibrate(args, device)
 
     if args.equilibrate_only:

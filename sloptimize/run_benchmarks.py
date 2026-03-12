@@ -11,38 +11,37 @@ Usage
 The placeholder ``{label}`` in script_args is replaced with each job's label.
 This enables per-build state files, e.g.:
 
-    python run_benchmarks.py benchmark_chains.py \
+    python run_benchmarks.py benchmark_tps.py \
         --lib mixed=... --lib double=... \
         -- --equilibrate-only --save-state /tmp/eq_{label}.gsd
 
 Examples
 --------
     # Phase 1: equilibrate (one per build, in parallel)
-    python run_benchmarks.py benchmark_chains.py \
+    python run_benchmarks.py benchmark_tps.py \
         --lib mixed=.../install_mixed/lib/python3.12/site-packages \
         --lib double=.../install_double/lib/python3.12/site-packages \
-        -- 64000 200 --equilibrate-only --save-state /tmp/eq_{label}.gsd
+        -- --equilibrate-only --save-state /tmp/eq_{label}.gsd
 
     # Phase 2: benchmark (loads saved state, skips equilibration)
-    python run_benchmarks.py benchmark_chains.py \
+    python run_benchmarks.py benchmark_tps.py \
         --lib mixed=... --lib double=... \
-        -- 64000 200 --load-state /tmp/eq_{label}.gsd
+        -- --load-state /tmp/eq_{label}.gsd
 
     # Restrict to specific GPUs:
-    python run_benchmarks.py benchmark_dt_stability.py \
+    python run_benchmarks.py benchmark_stability.py \
         --gpus 1,2,3 \
-        --lib mixed=... --lib double=... -- 64000 200
+        --lib mixed=... --lib double=... -- --tests nve
 
     # Sweep multiple dt values (auto-equilibrates once, then benchmarks each dt):
-    python run_benchmarks.py benchmark_chains.py \
+    python run_benchmarks.py benchmark_tps.py \
         --lib mixed=... --lib double=... \
-        --dt 0.005 0.01 0.02 \
-        -- 64000 200
+        --dt 0.005 0.01 0.02
 
 Notes
 -----
-- The benchmark script's FIRST positional argument must be gpu_id.
-  The runner replaces it with the assigned GPU index automatically.
+- GPU assignment is handled via CUDA_VISIBLE_DEVICES. The benchmark script
+  always sees device 0. No positional gpu_id is needed.
 - Each --lib flag is "label=pythonpath".  The label is used in output prefixes.
 - If more jobs than free GPUs, jobs are queued and run as GPUs become free.
 - Use {label} in script_args for per-build file paths.
@@ -125,8 +124,8 @@ def run_one_benchmark(script_path, gpu_id, label, pythonpath, extra_args):
     # Substitute {label} in extra_args
     resolved = [a.replace("{label}", label) for a in extra_args]
 
-    # With CUDA_VISIBLE_DEVICES set, the script sees device 0
-    cmd = [sys.executable, script_path, "0"] + list(resolved)
+    # With CUDA_VISIBLE_DEVICES set, the script sees device 0 (--gpu default)
+    cmd = [sys.executable, script_path] + list(resolved)
 
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

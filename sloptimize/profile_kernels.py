@@ -21,9 +21,9 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--pythonpath", required=True,
                    help="Path to site-packages for this build")
-    p.add_argument("--gpu", type=int, default=0)
-    p.add_argument("--n-particles", type=int, default=64000)
-    p.add_argument("--chain-length", type=int, default=200)
+    p.add_argument("-g", "--gpu", type=int, default=0)
+    p.add_argument("-N", "--particles", type=int, default=64000)
+    p.add_argument("-L", "--chain-length", type=int, default=200)
     p.add_argument("--profile-steps", type=int, default=2000,
                    help="Steps to run under profiler (default: 2000)")
     p.add_argument("--warmup-steps", type=int, default=5000)
@@ -49,7 +49,7 @@ def main():
     import math
     import numpy as np
 
-    n_chains = a.n_particles // a.chain_length
+    n_chains = a.particles // a.chain_length
     n_particles = n_chains * a.chain_length
     density = 0.3
     volume = n_particles / density

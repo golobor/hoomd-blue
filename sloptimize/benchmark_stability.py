@@ -8,21 +8,23 @@ Measures:
 
 Usage:
     # NVE stability test:
-    python benchmark_stability.py 0 64000 200 --tests nve --dt 0.005
+    python benchmark_stability.py --tests nve --dt 0.005
 
     # Force accuracy (save per-force .npz):
-    python benchmark_stability.py 0 64000 200 --tests accuracy \
-        --out-dir /tmp/bench/mixed
+    python benchmark_stability.py --tests accuracy --out-dir /tmp/bench/mixed
 
     # Both tests:
-    python benchmark_stability.py 0 64000 200 --out-dir /tmp/bench/mixed
+    python benchmark_stability.py --out-dir /tmp/bench/mixed
 
     # Compare across builds:
     python benchmark_stability.py compare /tmp/bench/double /tmp/bench/mixed
 
-    # equilibrate once, reuse:
-    python benchmark_stability.py 0 --equilibrate-only --save-state /tmp/eq.gsd
-    python benchmark_stability.py 0 --load-state /tmp/eq.gsd --tests accuracy \
+    # Custom system size:
+    python benchmark_stability.py -N 256000 -L 400 --tests nve
+
+    # Equilibrate once, reuse:
+    python benchmark_stability.py --equilibrate-only --save-state /tmp/eq.gsd
+    python benchmark_stability.py --load-state /tmp/eq.gsd --tests accuracy \
         --out-dir /tmp/bench/mixed
 """
 
@@ -398,7 +400,7 @@ def main():
     print(f"Version: {hoomd.version.version}")
     print()
 
-    device = hoomd.device.GPU(gpu_id=args.gpu_id)
+    device = hoomd.device.GPU(gpu_id=args.gpu)
     gsd_path, sphere_radius = load_or_equilibrate(args, device)
 
     if args.equilibrate_only:

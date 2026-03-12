@@ -35,7 +35,7 @@ Extract from `benchmark_chains.py` (the most complete version):
   - With patchy-aware sub-phase ramp (dt/gamma ramp for anisotropic forces)
   - Returns `(gsd_path, sphere_radius)`
 - `add_common_args(parser)` — adds shared CLI flags to any argparse parser:
-  - Positional: `gpu_id`, `n_particles` (default 64000), `chain_length` (default 200)
+  - Named: `-g`/`--gpu` (default 0), `-N`/`--particles` (default 64000), `-L`/`--chain-length` (default 200)
   - Optional: `--no-angle`, `--no-dihedral`, `--dpd-A`, `--attract STRENGTH,RCUT`,
     `--patchy EPS,SIGMA,ALPHA,OMEGA,RCUT,NPATCHES`, `--dt` (single float, default 0.005),
     `--save-state PATH`, `--load-state PATH`, `--equilibrate-only`, `--log FILE`
@@ -57,7 +57,7 @@ Replaces `benchmark_chains.py`. Single-dt Langevin performance measurement.
 - Constants (from benchmark_chains.py): 10K warmup + 100K benchmark, report every 10K
 - Supports `--equilibrate-only` (just equilibrate and save state, exit)
 
-CLI: `python benchmark_tps.py [gpu_id] [n_particles] [chain_length] [options]`
+CLI: `python benchmark_tps.py [-g GPU] [-N PARTICLES] [-L CHAIN_LENGTH] [options]`
 
 ### 3. `benchmark_stability.py` — NVE + force accuracy (~350 lines)
 
@@ -73,7 +73,7 @@ Single-dt NVE and force accuracy measurement.
   prints cross-build force/energy comparison tables
 - Supports `--equilibrate-only`
 
-CLI: `python benchmark_stability.py [gpu_id] [n_particles] [chain_length] [options]`
+CLI: `python benchmark_stability.py [-g GPU] [-N PARTICLES] [-L CHAIN_LENGTH] [options]`
      `python benchmark_stability.py compare dir1 dir2 [dir3 ...]`
 
 ### 4. `profile_kernels.py` — GPU kernel profiling (~105 lines, mostly unchanged)
@@ -98,13 +98,13 @@ become explicit CLI flag combinations:
 
 ```bash
 # "chains" workload = default (angle + dihedral)
-python benchmark_tps.py 0 64000 200
+python benchmark_tps.py
 
 # "nodih" workload = no dihedral
-python benchmark_tps.py 0 64000 200 --no-dihedral
+python benchmark_tps.py --no-dihedral
 
 # "patchy" workload = patchy + no dihedral
-python benchmark_tps.py 0 64000 200 --no-dihedral --patchy 1.0,0.5,0.6,20.0,1.5,2
+python benchmark_tps.py --no-dihedral --patchy 1.0,0.5,0.6,20.0,1.5,2
 ```
 
 The three-phase pipeline stays:
@@ -118,12 +118,12 @@ Equilibration lives in `benchlib.equilibrate_and_save()`. Both scripts share
 equilibrated states via `--save-state` / `--load-state` CLI flags:
 
 1. Phase 1 — equilibrate once:
-   `benchmark_tps.py 0 64000 200 --equilibrate-only --save-state /tmp/state.gsd`
+   `benchmark_tps.py --equilibrate-only --save-state /tmp/state.gsd`
 
 2. Phase 2 — reuse for all runs:
-   - `benchmark_tps.py 0 ... --load-state /tmp/state.gsd --dt 0.005`
-   - `benchmark_tps.py 0 ... --load-state /tmp/state.gsd --dt 0.01`
-   - `benchmark_stability.py 0 ... --load-state /tmp/state.gsd --dt 0.005`
+   - `benchmark_tps.py --load-state /tmp/state.gsd --dt 0.005`
+   - `benchmark_tps.py --load-state /tmp/state.gsd --dt 0.01`
+   - `benchmark_stability.py --load-state /tmp/state.gsd --dt 0.005`
 
 `run_benchmarks.py` already orchestrates this (Phase 1 passes `--equilibrate-only
 --save-state`, Phase 2 passes `--load-state`).
@@ -176,12 +176,12 @@ Update `BENCHMARKING.md`:
 
 ## Verification Checklist
 
-- [ ] `python benchmark_tps.py 0 64000 200` reproduces headline TPS
-- [ ] `python benchmark_tps.py 0 64000 200 --no-dihedral` works
-- [ ] `python benchmark_tps.py 0 64000 200 --patchy 1.0,0.5,0.6,20.0,1.5,2` works
-- [ ] `python benchmark_tps.py 0 64000 200 --attract -0.5,1.5` works
-- [ ] `python benchmark_stability.py 0 64000 200 --tests accuracy --out-dir /tmp/test` saves .npz
-- [ ] `python benchmark_stability.py 0 64000 200 --tests nve` prints NVE table
+- [ ] `python benchmark_tps.py` reproduces headline TPS
+- [ ] `python benchmark_tps.py --no-dihedral` works
+- [ ] `python benchmark_tps.py --no-dihedral --patchy 1.0,0.5,0.6,20.0,1.5,2` works
+- [ ] `python benchmark_tps.py --attract -0.5,1.5` works
+- [ ] `python benchmark_stability.py --tests accuracy --out-dir /tmp/test` saves .npz
+- [ ] `python benchmark_stability.py --tests nve` prints NVE table
 - [ ] `python benchmark_stability.py compare /tmp/d /tmp/m` prints comparison
 - [ ] `--save-state` / `--load-state` round-trip works across scripts
 - [ ] `--equilibrate-only` works in both scripts

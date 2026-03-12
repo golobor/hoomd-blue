@@ -132,19 +132,23 @@ python run_benchmarks.py benchmark_tps.py \
   --lib mixed=../build/install_mixed/lib/python3.12/site-packages \
   --lib double=../build/install_double/lib/python3.12/site-packages \
   --lib single=../build/install_single/lib/python3.12/site-packages \
-  --no-dt \
-  -- 64000 200
+  --no-dt
 
 # dt sweep (equilibrate once, benchmark each dt):
 python run_benchmarks.py benchmark_tps.py \
-  --lib mixed=... --lib double=... --lib single=... \
-  -- 64000 200
+  --lib mixed=... --lib double=... --lib single=...
 
 # Without dihedrals:
 python run_benchmarks.py benchmark_tps.py \
   --lib mixed=... --lib double=... --lib single=... \
   --no-dt \
-  -- 64000 200 --no-dihedral
+  -- --no-dihedral
+
+# Non-default system size:
+python run_benchmarks.py benchmark_tps.py \
+  --lib mixed=... --lib double=... \
+  --no-dt \
+  -- -N 256000 -L 400
 
 # Force accuracy (save .npz, then compare):
 python run_benchmarks.py benchmark_stability.py \
@@ -154,10 +158,10 @@ python run_benchmarks.py benchmark_stability.py \
 python benchmark_stability.py compare /tmp/bench/double /tmp/bench/mixed
 
 # NVE stability:
-python benchmark_stability.py 0 64000 200 --tests nve --dt 0.01
+python benchmark_stability.py --tests nve --dt 0.01
 
 # Patchy workload TPS:
-python benchmark_tps.py 0 64000 200 --no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2
+python benchmark_tps.py --no-dihedral --patchy 1.0,0.5,0.6,20,1.5,2
 
 # Full suite (all 5 builds × 3 workloads):
 bash run_full_benchmarks.sh

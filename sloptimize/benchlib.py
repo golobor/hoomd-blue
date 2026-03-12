@@ -430,20 +430,20 @@ def equilibrate_and_save(device, n_particles, chain_length,
 def add_common_args(parser):
     """Add shared CLI arguments to *parser*.
 
-    Positional: gpu_id, n_particles, chain_length.
-    Optional: --no-angle, --no-dihedral, --dpd-A, --attract, --patchy,
-              --dt, --save-state, --load-state, --equilibrate-only, --log.
+    System: -g/--gpu, -N/--particles, -L/--chain-length.
+    Forces: --no-angle, --no-dihedral, --dpd-A, --attract, --patchy.
+    Run:    --dt, --save-state, --load-state, --equilibrate-only, --log.
     """
     parser.add_argument(
-        "gpu_id", nargs="?", type=int, default=0,
+        "-g", "--gpu", type=int, default=0,
         help="GPU device index (default: 0)",
     )
     parser.add_argument(
-        "n_particles", nargs="?", type=int, default=64000,
+        "-N", "--particles", type=int, default=64000,
         help="Number of particles (default: 64000)",
     )
     parser.add_argument(
-        "chain_length", nargs="?", type=int, default=200,
+        "-L", "--chain-length", type=int, default=200,
         help="Monomers per chain (default: 200)",
     )
     parser.add_argument(
@@ -518,7 +518,7 @@ def parse_force_kwargs(args):
 def load_or_equilibrate(args, device):
     """Load saved state or run equilibration.
 
-    Uses ``args.load_state``, ``args.save_state``, ``args.n_particles``,
+    Uses ``args.load_state``, ``args.save_state``, ``args.particles``,
     ``args.chain_length``, and force kwargs from ``parse_force_kwargs(args)``.
 
     Returns ``(gsd_path, sphere_radius)``.
@@ -536,7 +536,7 @@ def load_or_equilibrate(args, device):
         return gsd_path, sphere_radius
 
     return equilibrate_and_save(
-        device, args.n_particles, args.chain_length,
+        device, args.particles, args.chain_length,
         save_path=args.save_state, **fkw,
     )
 
