@@ -45,7 +45,7 @@ from benchlib import (
 # ── Constants ─────────────────────────────────────────────────────────────
 
 NVE_STEPS = 50_000
-NVE_LOG_PERIOD = 1_000
+NVE_LOG_PERIOD = 5_000
 
 
 # ── Shared simulation setup ──────────────────────────────────────────────
