@@ -10,8 +10,9 @@
 
 #include <assert.h>
 
-// No SMALL clamp for proper/OPLS dihedrals — large forces near collinear
-// geometries are physically correct. Only guard against exact zero.
+// Tiny epsilon to prevent 1/rasq overflow in float for near-collinear
+// geometries. At 1e-12 the inverse is 1e12 — well within float range.
+#define SMALL ForceReal(1e-12)
 
 /*! \file OPLSDihedralForceGPU.cu
     \brief Defines GPU kernel code for calculating OPLS dihedral forces. Used by
@@ -152,14 +153,18 @@ __global__ void gpu_compute_opls_dihedral_forces_kernel(ForceReal4* d_force,
         ForceReal rgsq = vb2m.x * vb2m.x + vb2m.y * vb2m.y + vb2m.z * vb2m.z;
         ForceReal rg = fast::sqrt(rgsq);
 
+        // Clamp cross-product magnitudes to prevent 1/rasq overflow in float
+        if (rasq < SMALL)
+            rasq = SMALL;
+        if (rbsq < SMALL)
+            rbsq = SMALL;
+
         ForceReal rginv, ra2inv, rb2inv;
         rginv = ra2inv = rb2inv = ForceReal(0.0);
         if (rg > ForceReal(0.0))
             rginv = ForceReal(1.0) / rg;
-        if (rasq > ForceReal(0.0))
-            ra2inv = ForceReal(1.0) / rasq;
-        if (rbsq > ForceReal(0.0))
-            rb2inv = ForceReal(1.0) / rbsq;
+        ra2inv = ForceReal(1.0) / rasq;
+        rb2inv = ForceReal(1.0) / rbsq;
         ForceReal rabinv = fast::sqrt(ra2inv * rb2inv);
 
         ForceReal c = (ax * bx + ay * by + az * bz) * rabinv;

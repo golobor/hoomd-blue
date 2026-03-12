@@ -12,6 +12,12 @@
 #define __scalar2int_rn __double2int_rn
 #endif
 
+// Tiny epsilon to prevent 1/raasq overflow in float for near-collinear
+// geometries. At 1e-12 the inverse is 1e12 — well within float range.
+// This is far below any physical cross-product magnitude (raasq ~ sin²θ,
+// so this triggers only at θ < 0.00006° from exact collinearity).
+#define SMALL ForceReal(1e-12)
+
 /*! \file HarmonicDihedralForceGPU.cu
     \brief Defines GPU kernel code for calculating the harmonic dihedral forces. Used by
    HarmonicDihedralForceComputeGPU.
@@ -154,14 +160,18 @@ __global__ void gpu_compute_harmonic_dihedral_forces_kernel(ForceReal4* d_force,
         ForceReal rgsq = dcbm.x * dcbm.x + dcbm.y * dcbm.y + dcbm.z * dcbm.z;
         ForceReal rg = fast::sqrt(rgsq);
 
+        // Clamp cross-product magnitudes to prevent 1/raasq overflow in float
+        if (raasq < SMALL)
+            raasq = SMALL;
+        if (rbbsq < SMALL)
+            rbbsq = SMALL;
+
         ForceReal rginv, raa2inv, rbb2inv;
         rginv = raa2inv = rbb2inv = ForceReal(0.0);
         if (rg > ForceReal(0.0))
             rginv = ForceReal(1.0) / rg;
-        if (raasq > ForceReal(0.0))
-            raa2inv = ForceReal(1.0) / raasq;
-        if (rbbsq > ForceReal(0.0))
-            rbb2inv = ForceReal(1.0) / rbbsq;
+        raa2inv = ForceReal(1.0) / raasq;
+        rbb2inv = ForceReal(1.0) / rbbsq;
         ForceReal rabinv = fast::sqrt(raa2inv * rbb2inv);
 
         ForceReal c_abcd = (aax * bbx + aay * bby + aaz * bbz) * rabinv;

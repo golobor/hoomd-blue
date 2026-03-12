@@ -6,8 +6,9 @@
 
 #include <assert.h>
 
-// SMALL a relatively small number
-#define SMALL ForceReal(0.001)
+// Tiny epsilon to prevent 1/raasq overflow in float for near-collinear
+// geometries. At 1e-12 the inverse is 1e12 — well within float range.
+#define SMALL ForceReal(1e-12)
 
 namespace hoomd
     {
