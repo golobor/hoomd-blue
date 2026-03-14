@@ -36,8 +36,8 @@ benefit more from halved data widths at larger system sizes).
 
 ```bash
 # Clone and install into a conda environment (requires NVIDIA GPU + drivers)
-git clone --branch mixed-precision https://github.com/golobor/hoomd-blue.git
-bash hoomd-blue/sloptimize/install.sh
+git clone https://github.com/glab-vbc/hoomd-sloptimize.git
+bash hoomd-sloptimize/sloptimize/install.sh
 
 # Use it
 conda activate hoomd-mixed

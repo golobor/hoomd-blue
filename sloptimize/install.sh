@@ -25,7 +25,7 @@ ENV_NAME="hoomd-mixed"
 JOBS="$(nproc 2>/dev/null || echo 4)"
 SOURCE_DIR=""
 PYTHON_VERSION="3.12"
-REPO_URL="https://github.com/golobor/hoomd-blue.git"
+REPO_URL="https://github.com/glab-vbc/hoomd-sloptimize.git"
 BRANCH="mixed-precision"
 
 # ─── Parse arguments ───────────────────────────────────────────────────

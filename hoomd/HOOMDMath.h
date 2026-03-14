@@ -105,6 +105,7 @@ typedef double4 ShortReal4;
 // ForceReal: the precision used for force evaluation kernels.
 // In mixed precision mode, forces are evaluated in ShortReal (float) for speed,
 // while integration (position/velocity accumulation) stays in Scalar (double).
+#define HOOMD_HAS_FORCEREAL
 typedef ShortReal ForceReal;
 typedef ShortReal2 ForceReal2;
 typedef ShortReal3 ForceReal3;
