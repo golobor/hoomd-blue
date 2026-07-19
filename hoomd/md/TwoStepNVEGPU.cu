@@ -204,11 +204,23 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
         const unsigned int group_idx = work_idx;
         unsigned int idx = d_group_members[group_idx];
 
+        // The no-squish (Miller) rotation is the compute-heavy part of the rigid-body
+        // integrator (~10 cos/sin per particle). Like the force evaluators, it runs in
+        // the reduced-precision ForceReal type: single on the mixed-precision build
+        // (SHORTREAL=32) where fast:: maps to the __cosf/__sinf intrinsics, and
+        // byte-identical double on the double/upstream builds (ForceReal aliases Scalar
+        // and fast:: falls through to the same ::cos/::sin/::sqrt as slow::). The
+        // orientation/angmom state stays Scalar4; quaternions are bounded and
+        // renormalized each step, so single-precision compute is safe.
+        ForceReal deltaT_r = ForceReal(deltaT);
+        ForceReal scale_r = ForceReal(scale);
+
         // read the particle's orientation, conjugate quaternion, moment of inertia and net torque
-        quat<Scalar> q(d_orientation[idx]);
-        quat<Scalar> p(d_angmom[idx]);
-        ForceReal4 t_raw = d_net_torque[idx]; vec3<Scalar> t(Scalar(t_raw.x), Scalar(t_raw.y), Scalar(t_raw.z));
-        vec3<Scalar> I(d_inertia[idx]);
+        quat<ForceReal> q(d_orientation[idx]);
+        quat<ForceReal> p(d_angmom[idx]);
+        ForceReal4 t_raw = d_net_torque[idx];
+        vec3<ForceReal> t(t_raw.x, t_raw.y, t_raw.z);
+        vec3<ForceReal> I(d_inertia[idx]);
 
         // rotate torque into principal frame
         t = rotate(conj(q), t);
@@ -221,30 +233,30 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 
         // ignore torque component along an axis for which the moment of inertia zero
         if (x_zero)
-            t.x = Scalar(0.0);
+            t.x = ForceReal(0.0);
         if (y_zero)
-            t.y = Scalar(0.0);
+            t.y = ForceReal(0.0);
         if (z_zero)
-            t.z = Scalar(0.0);
+            t.z = ForceReal(0.0);
 
         // advance p(t)->p(t+deltaT/2), q(t)->q(t+deltaT)
-        p += deltaT * q * t;
+        p += deltaT_r * q * t;
 
-        p = p * scale;
+        p = p * scale_r;
 
-        quat<Scalar> p1, p2, p3; // permutated quaternions
-        quat<Scalar> q1, q2, q3;
-        Scalar phi1, cphi1, sphi1;
-        Scalar phi2, cphi2, sphi2;
-        Scalar phi3, cphi3, sphi3;
+        quat<ForceReal> p1, p2, p3; // permutated quaternions
+        quat<ForceReal> q1, q2, q3;
+        ForceReal phi1, cphi1, sphi1;
+        ForceReal phi2, cphi2, sphi2;
+        ForceReal phi3, cphi3, sphi3;
 
         if (!z_zero)
             {
-            p3 = quat<Scalar>(-p.v.z, vec3<Scalar>(p.v.y, -p.v.x, p.s));
-            q3 = quat<Scalar>(-q.v.z, vec3<Scalar>(q.v.y, -q.v.x, q.s));
-            phi3 = Scalar(1. / 4.) / I.z * dot(p, q3);
-            cphi3 = slow::cos(Scalar(1. / 2.) * deltaT * phi3);
-            sphi3 = slow::sin(Scalar(1. / 2.) * deltaT * phi3);
+            p3 = quat<ForceReal>(-p.v.z, vec3<ForceReal>(p.v.y, -p.v.x, p.s));
+            q3 = quat<ForceReal>(-q.v.z, vec3<ForceReal>(q.v.y, -q.v.x, q.s));
+            phi3 = ForceReal(1. / 4.) / I.z * dot(p, q3);
+            cphi3 = fast::cos(ForceReal(1. / 2.) * deltaT_r * phi3);
+            sphi3 = fast::sin(ForceReal(1. / 2.) * deltaT_r * phi3);
 
             p = cphi3 * p + sphi3 * p3;
             q = cphi3 * q + sphi3 * q3;
@@ -252,11 +264,11 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 
         if (!y_zero)
             {
-            p2 = quat<Scalar>(-p.v.y, vec3<Scalar>(-p.v.z, p.s, p.v.x));
-            q2 = quat<Scalar>(-q.v.y, vec3<Scalar>(-q.v.z, q.s, q.v.x));
-            phi2 = Scalar(1. / 4.) / I.y * dot(p, q2);
-            cphi2 = slow::cos(Scalar(1. / 2.) * deltaT * phi2);
-            sphi2 = slow::sin(Scalar(1. / 2.) * deltaT * phi2);
+            p2 = quat<ForceReal>(-p.v.y, vec3<ForceReal>(-p.v.z, p.s, p.v.x));
+            q2 = quat<ForceReal>(-q.v.y, vec3<ForceReal>(-q.v.z, q.s, q.v.x));
+            phi2 = ForceReal(1. / 4.) / I.y * dot(p, q2);
+            cphi2 = fast::cos(ForceReal(1. / 2.) * deltaT_r * phi2);
+            sphi2 = fast::sin(ForceReal(1. / 2.) * deltaT_r * phi2);
 
             p = cphi2 * p + sphi2 * p2;
             q = cphi2 * q + sphi2 * q2;
@@ -264,11 +276,11 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 
         if (!x_zero)
             {
-            p1 = quat<Scalar>(-p.v.x, vec3<Scalar>(p.s, p.v.z, -p.v.y));
-            q1 = quat<Scalar>(-q.v.x, vec3<Scalar>(q.s, q.v.z, -q.v.y));
-            phi1 = Scalar(1. / 4.) / I.x * dot(p, q1);
-            cphi1 = slow::cos(deltaT * phi1);
-            sphi1 = slow::sin(deltaT * phi1);
+            p1 = quat<ForceReal>(-p.v.x, vec3<ForceReal>(p.s, p.v.z, -p.v.y));
+            q1 = quat<ForceReal>(-q.v.x, vec3<ForceReal>(q.s, q.v.z, -q.v.y));
+            phi1 = ForceReal(1. / 4.) / I.x * dot(p, q1);
+            cphi1 = fast::cos(deltaT_r * phi1);
+            sphi1 = fast::sin(deltaT_r * phi1);
 
             p = cphi1 * p + sphi1 * p1;
             q = cphi1 * q + sphi1 * q1;
@@ -276,11 +288,11 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 
         if (!y_zero)
             {
-            p2 = quat<Scalar>(-p.v.y, vec3<Scalar>(-p.v.z, p.s, p.v.x));
-            q2 = quat<Scalar>(-q.v.y, vec3<Scalar>(-q.v.z, q.s, q.v.x));
-            phi2 = Scalar(1. / 4.) / I.y * dot(p, q2);
-            cphi2 = slow::cos(Scalar(1. / 2.) * deltaT * phi2);
-            sphi2 = slow::sin(Scalar(1. / 2.) * deltaT * phi2);
+            p2 = quat<ForceReal>(-p.v.y, vec3<ForceReal>(-p.v.z, p.s, p.v.x));
+            q2 = quat<ForceReal>(-q.v.y, vec3<ForceReal>(-q.v.z, q.s, q.v.x));
+            phi2 = ForceReal(1. / 4.) / I.y * dot(p, q2);
+            cphi2 = fast::cos(ForceReal(1. / 2.) * deltaT_r * phi2);
+            sphi2 = fast::sin(ForceReal(1. / 2.) * deltaT_r * phi2);
 
             p = cphi2 * p + sphi2 * p2;
             q = cphi2 * q + sphi2 * q2;
@@ -288,18 +300,18 @@ __global__ void gpu_nve_angular_step_one_kernel(Scalar4* d_orientation,
 
         if (!z_zero)
             {
-            p3 = quat<Scalar>(-p.v.z, vec3<Scalar>(p.v.y, -p.v.x, p.s));
-            q3 = quat<Scalar>(-q.v.z, vec3<Scalar>(q.v.y, -q.v.x, q.s));
-            phi3 = Scalar(1. / 4.) / I.z * dot(p, q3);
-            cphi3 = slow::cos(Scalar(1. / 2.) * deltaT * phi3);
-            sphi3 = slow::sin(Scalar(1. / 2.) * deltaT * phi3);
+            p3 = quat<ForceReal>(-p.v.z, vec3<ForceReal>(p.v.y, -p.v.x, p.s));
+            q3 = quat<ForceReal>(-q.v.z, vec3<ForceReal>(q.v.y, -q.v.x, q.s));
+            phi3 = ForceReal(1. / 4.) / I.z * dot(p, q3);
+            cphi3 = fast::cos(ForceReal(1. / 2.) * deltaT_r * phi3);
+            sphi3 = fast::sin(ForceReal(1. / 2.) * deltaT_r * phi3);
 
             p = cphi3 * p + sphi3 * p3;
             q = cphi3 * q + sphi3 * q3;
             }
 
         // renormalize (improves stability)
-        q = q * (Scalar(1.0) / slow::sqrt(norm2(q)));
+        q = q * (ForceReal(1.0) / fast::sqrt(norm2(q)));
 
         d_orientation[idx] = quat_to_scalar4(q);
         d_angmom[idx] = quat_to_scalar4(p);
